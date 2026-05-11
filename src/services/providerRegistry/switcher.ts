@@ -21,6 +21,10 @@ export interface SwitchProviderResult {
   provider: ProviderConfig
 }
 
+function isDeepSeekProvider(provider: ProviderConfig): boolean {
+  return provider.id === 'deepseek'
+}
+
 /**
  * Compute the environment variables needed to activate an OpenAI-compat provider.
  *
@@ -49,14 +53,19 @@ export function switchProvider(
     )
   }
 
-  const env: Record<string, string> = {
-    CLAUDE_CODE_USE_OPENAI: '1',
-    OPENAI_BASE_URL: found.baseUrl,
-    OPENAI_MODEL: found.defaultModel,
-    // The value is the env var name that holds the key, not the key itself.
-    // Shell snippet: export OPENAI_API_KEY=$CEREBRAS_API_KEY
-    // We return the recommended export, but the actual value depends on user env.
-  }
+  const env: Record<string, string> = isDeepSeekProvider(found)
+    ? {
+        DEEPSEEK_BASE_URL: found.baseUrl,
+        DEEPSEEK_MODEL: found.defaultModel,
+      }
+    : {
+        CLAUDE_CODE_USE_OPENAI: '1',
+        OPENAI_BASE_URL: found.baseUrl,
+        OPENAI_MODEL: found.defaultModel,
+        // The value is the env var name that holds the key, not the key itself.
+        // Shell snippet: export OPENAI_API_KEY=$CEREBRAS_API_KEY
+        // We return the recommended export, but the actual value depends on user env.
+      }
 
   // Include the api key env var name so callers can construct the shell snippet.
   // We do NOT read process.env[found.apiKeyEnv] to avoid leaking the key.
@@ -67,7 +76,8 @@ export function switchProvider(
   // in a side-channel stderr log.
   const hasOpenAIMode =
     process.env['CLAUDE_CODE_USE_OPENAI'] === '1' ||
-    Boolean(process.env['OPENAI_API_KEY'])
+    Boolean(process.env['OPENAI_API_KEY']) ||
+    Boolean(process.env['DEEPSEEK_API_KEY'])
   const hasAnthropicKey = Boolean(process.env['ANTHROPIC_API_KEY'])
   if (hasOpenAIMode && hasAnthropicKey) {
     warnings.push(
@@ -101,11 +111,17 @@ export function switchProvider(
  */
 export function buildShellExportBlock(result: SwitchProviderResult): string {
   const { env, provider } = result
-  const lines: string[] = [
-    `export CLAUDE_CODE_USE_OPENAI=${env['CLAUDE_CODE_USE_OPENAI'] ?? '1'}`,
-    `export OPENAI_BASE_URL=${env['OPENAI_BASE_URL'] ?? provider.baseUrl}`,
-    `export OPENAI_API_KEY=$${provider.apiKeyEnv}`,
-    `export OPENAI_MODEL=${env['OPENAI_MODEL'] ?? provider.defaultModel}`,
-  ]
+  const lines: string[] = isDeepSeekProvider(provider)
+    ? [
+        `export DEEPSEEK_BASE_URL=${env['DEEPSEEK_BASE_URL'] ?? provider.baseUrl}`,
+        `export DEEPSEEK_API_KEY=$${provider.apiKeyEnv}`,
+        `export DEEPSEEK_MODEL=${env['DEEPSEEK_MODEL'] ?? provider.defaultModel}`,
+      ]
+    : [
+        `export CLAUDE_CODE_USE_OPENAI=${env['CLAUDE_CODE_USE_OPENAI'] ?? '1'}`,
+        `export OPENAI_BASE_URL=${env['OPENAI_BASE_URL'] ?? provider.baseUrl}`,
+        `export OPENAI_API_KEY=$${provider.apiKeyEnv}`,
+        `export OPENAI_MODEL=${env['OPENAI_MODEL'] ?? provider.defaultModel}`,
+      ]
   return lines.join('\n')
 }

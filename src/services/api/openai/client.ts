@@ -2,12 +2,15 @@ import OpenAI from 'openai'
 import { openaiAdapter } from 'src/services/providerUsage/adapters/openai.js'
 import { updateProviderBuckets } from 'src/services/providerUsage/store.js'
 import { getProxyFetchOptions } from 'src/utils/proxy.js'
+import { resolveOpenAICompatEnv } from './env.js'
 
 /**
  * Environment variables:
  *
- * OPENAI_API_KEY: Required. API key for the OpenAI-compatible endpoint.
- * OPENAI_BASE_URL: Recommended. Base URL for the endpoint (e.g. http://localhost:11434/v1).
+ * DEEPSEEK_API_KEY: Preferred API key for the DeepSeek endpoint.
+ * DEEPSEEK_BASE_URL: Optional. Defaults to https://api.deepseek.com/v1 when any DEEPSEEK_* env is set.
+ * OPENAI_API_KEY: Fallback API key for OpenAI-compatible endpoints.
+ * OPENAI_BASE_URL: Fallback base URL for OpenAI-compatible endpoints (e.g. http://localhost:11434/v1).
  * OPENAI_ORG_ID: Optional. Organization ID.
  * OPENAI_PROJECT_ID: Optional. Project ID.
  */
@@ -43,8 +46,7 @@ export function getOpenAIClient(options?: {
 }): OpenAI {
   if (cachedClient) return cachedClient
 
-  const apiKey = process.env.OPENAI_API_KEY || ''
-  const baseURL = process.env.OPENAI_BASE_URL
+  const { apiKey, baseURL } = resolveOpenAICompatEnv()
 
   const baseFetch = options?.fetchOverride ?? (globalThis.fetch as typeof fetch)
   const wrappedFetch = wrapFetchForUsage(baseFetch)

@@ -16,6 +16,16 @@ const DEFAULT_MODEL_MAP: Record<string, string> = {
   'claude-3-5-sonnet-20241022': 'gpt-4o',
 }
 
+const DEEPSEEK_DEFAULT_MODEL = 'deepseek-chat'
+
+function isDeepSeekEnvConfigured(): boolean {
+  return Boolean(
+    process.env.DEEPSEEK_API_KEY ||
+      process.env.DEEPSEEK_BASE_URL ||
+      process.env.DEEPSEEK_MODEL,
+  )
+}
+
 function getModelFamily(model: string): 'haiku' | 'sonnet' | 'opus' | null {
   if (/haiku/i.test(model)) return 'haiku'
   if (/opus/i.test(model)) return 'opus'
@@ -27,13 +37,20 @@ function getModelFamily(model: string): 'haiku' | 'sonnet' | 'opus' | null {
  * Resolve the OpenAI model name for a given Anthropic model.
  *
  * Priority:
- * 1. OPENAI_MODEL env var (override all)
- * 2. OPENAI_DEFAULT_{FAMILY}_MODEL env var (e.g. OPENAI_DEFAULT_SONNET_MODEL)
- * 3. ANTHROPIC_DEFAULT_{FAMILY}_MODEL env var (backward compatibility)
- * 4. DEFAULT_MODEL_MAP lookup
- * 5. Pass through original model name
+ * 1. DEEPSEEK_MODEL env var (preferred DeepSeek entrypoint)
+ * 2. OPENAI_MODEL env var (backward-compatible OpenAI-compatible entrypoint)
+ * 3. DEEPSEEK_DEFAULT_{FAMILY}_MODEL env var (e.g. DEEPSEEK_DEFAULT_SONNET_MODEL)
+ * 4. OPENAI_DEFAULT_{FAMILY}_MODEL env var
+ * 5. ANTHROPIC_DEFAULT_{FAMILY}_MODEL env var (backward compatibility)
+ * 6. DeepSeek default model when any DEEPSEEK_* env var is configured
+ * 7. DEFAULT_MODEL_MAP lookup
+ * 8. Pass through original model name
  */
 export function resolveOpenAIModel(anthropicModel: string): string {
+  if (process.env.DEEPSEEK_MODEL) {
+    return process.env.DEEPSEEK_MODEL
+  }
+
   if (process.env.OPENAI_MODEL) {
     return process.env.OPENAI_MODEL
   }
@@ -42,6 +59,10 @@ export function resolveOpenAIModel(anthropicModel: string): string {
 
   const family = getModelFamily(cleanModel)
   if (family) {
+    const deepSeekEnvVar = `DEEPSEEK_DEFAULT_${family.toUpperCase()}_MODEL`
+    const deepSeekOverride = process.env[deepSeekEnvVar]
+    if (deepSeekOverride) return deepSeekOverride
+
     const openaiEnvVar = `OPENAI_DEFAULT_${family.toUpperCase()}_MODEL`
     const openaiOverride = process.env[openaiEnvVar]
     if (openaiOverride) return openaiOverride
@@ -49,6 +70,10 @@ export function resolveOpenAIModel(anthropicModel: string): string {
     const anthropicEnvVar = `ANTHROPIC_DEFAULT_${family.toUpperCase()}_MODEL`
     const anthropicOverride = process.env[anthropicEnvVar]
     if (anthropicOverride) return anthropicOverride
+  }
+
+  if (isDeepSeekEnvConfigured()) {
+    return DEEPSEEK_DEFAULT_MODEL
   }
 
   return DEFAULT_MODEL_MAP[cleanModel] ?? cleanModel

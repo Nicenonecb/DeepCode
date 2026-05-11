@@ -11,7 +11,7 @@
  * VERTEX_REGION_CLAUDE_* is prefix-matched. New providers or new routing
  * config vars (endpoint, project, region, auth) do.
  *
- * Note: OpenAI provider uses OPENAI_* env vars (OPENAI_API_KEY, OPENAI_BASE_URL,
+ * Note: OpenAI provider uses DEEPSEEK_* and OPENAI_* env vars (OPENAI_API_KEY, OPENAI_BASE_URL,
  * OPENAI_MODEL, OPENAI_AUTH_MODE, OPENAI_DEFAULT_*_MODEL, OPENAI_SMALL_FAST_MODEL) which are all
  * provider-managed to keep routing config isolated from Anthropic settings.
  */
@@ -75,6 +75,12 @@ const PROVIDER_MANAGED_ENV_VARS = new Set([
   'OPENAI_DEFAULT_SONNET_MODEL_NAME',
   'OPENAI_DEFAULT_SONNET_MODEL_SUPPORTED_CAPABILITIES',
   'OPENAI_SMALL_FAST_MODEL',
+  'DEEPSEEK_API_KEY',
+  'DEEPSEEK_BASE_URL',
+  'DEEPSEEK_MODEL',
+  'DEEPSEEK_DEFAULT_HAIKU_MODEL',
+  'DEEPSEEK_DEFAULT_OPUS_MODEL',
+  'DEEPSEEK_DEFAULT_SONNET_MODEL',
   'ANTHROPIC_SMALL_FAST_MODEL',
   'ANTHROPIC_SMALL_FAST_MODEL_AWS_REGION',
   'CLAUDE_CODE_SUBAGENT_MODEL',

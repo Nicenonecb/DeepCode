@@ -120,6 +120,9 @@ export function isAnthropicAuthEnabled(): boolean {
     (settings as any).modelType === 'openai' ||
     (settings as any).modelType === 'gemini' ||
     !!process.env.OPENAI_BASE_URL ||
+    !!process.env.DEEPSEEK_API_KEY ||
+    !!process.env.DEEPSEEK_BASE_URL ||
+    !!process.env.DEEPSEEK_MODEL ||
     !!process.env.GEMINI_BASE_URL
   const apiKeyHelper = settings.apiKeyHelper
   const hasExternalAuthToken =

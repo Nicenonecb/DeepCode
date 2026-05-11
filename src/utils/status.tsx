@@ -5,6 +5,7 @@ import { color, Text } from '@anthropic/ink';
 import type { MCPServerConnection } from '../services/mcp/types.js';
 import { getAccountInformation, isClaudeAISubscriber } from './auth.js';
 import { getLargeMemoryFiles, getMemoryFiles, MAX_MEMORY_CHARACTER_COUNT } from './claudemd.js';
+import { DEEPSEEK_DEFAULT_BASE_URL, hasDeepSeekEnv } from '../services/api/openai/env.js';
 import { getDoctorDiagnostic } from './doctorDiagnostic.js';
 import { getAWSRegion, getDefaultVertexRegion, isEnvTruthy } from './envUtils.js';
 import { getDisplayPath } from './file.js';
@@ -397,9 +398,13 @@ export function buildAPIProviderProperties(): Property[] {
       value: grokBaseUrl,
     });
   } else if (apiProvider === 'openai') {
-    const openaiBaseUrl = process.env.OPENAI_BASE_URL;
+    const deepSeekEnvConfigured = hasDeepSeekEnv();
+    const openaiBaseUrl =
+      process.env.DEEPSEEK_BASE_URL ||
+      (deepSeekEnvConfigured ? DEEPSEEK_DEFAULT_BASE_URL : undefined) ||
+      process.env.OPENAI_BASE_URL;
     properties.push({
-      label: 'OpenAI base URL',
+      label: deepSeekEnvConfigured ? 'DeepSeek base URL' : 'OpenAI base URL',
       value: openaiBaseUrl,
     });
   }

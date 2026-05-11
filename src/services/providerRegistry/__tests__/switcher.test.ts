@@ -13,6 +13,8 @@ beforeEach(() => {
   delete process.env['CLAUDE_CODE_USE_OPENAI']
   delete process.env['OPENAI_API_KEY']
   delete process.env['OPENAI_BASE_URL']
+  delete process.env['DEEPSEEK_BASE_URL']
+  delete process.env['DEEPSEEK_MODEL']
   delete process.env['ANTHROPIC_API_KEY']
   delete process.env['CEREBRAS_API_KEY']
   delete process.env['GROQ_API_KEY']
@@ -24,6 +26,9 @@ afterEach(() => {
   delete process.env['CLAUDE_CODE_USE_OPENAI']
   delete process.env['OPENAI_API_KEY']
   delete process.env['OPENAI_BASE_URL']
+  delete process.env['DEEPSEEK_API_KEY']
+  delete process.env['DEEPSEEK_BASE_URL']
+  delete process.env['DEEPSEEK_MODEL']
   delete process.env['ANTHROPIC_API_KEY']
 })
 
@@ -60,8 +65,9 @@ describe('switchProvider', () => {
     const { switchProvider } = await import('../switcher.js')
     const { DEFAULT_PROVIDERS } = await import('../loader.js')
     const result = switchProvider('deepseek', DEFAULT_PROVIDERS)
-    expect(result.env['OPENAI_BASE_URL']).toBe('https://api.deepseek.com/v1')
-    expect(result.env['OPENAI_MODEL']).toBe('deepseek-chat')
+    expect(result.env['DEEPSEEK_BASE_URL']).toBe('https://api.deepseek.com/v1')
+    expect(result.env['DEEPSEEK_MODEL']).toBe('deepseek-chat')
+    expect(result.env['CLAUDE_CODE_USE_OPENAI']).toBeUndefined()
   })
 
   test('throws for non-existent provider id', async () => {
@@ -123,7 +129,22 @@ describe('buildShellExportBlock', () => {
     // Must NOT contain the literal key value
     expect(block).not.toContain('sk-secret-key')
     // Must use variable reference
-    expect(block).toContain('$DEEPSEEK_API_KEY')
+    expect(block).toContain('export DEEPSEEK_API_KEY=$DEEPSEEK_API_KEY')
     delete process.env['DEEPSEEK_API_KEY']
+  })
+
+  test('produces DeepSeek-native export lines for deepseek', async () => {
+    const { switchProvider, buildShellExportBlock } = await import(
+      '../switcher.js'
+    )
+    const { DEFAULT_PROVIDERS } = await import('../loader.js')
+    const result = switchProvider('deepseek', DEFAULT_PROVIDERS)
+    const block = buildShellExportBlock(result)
+    expect(block).toContain(
+      'export DEEPSEEK_BASE_URL=https://api.deepseek.com/v1',
+    )
+    expect(block).toContain('export DEEPSEEK_API_KEY=$DEEPSEEK_API_KEY')
+    expect(block).toContain('export DEEPSEEK_MODEL=deepseek-chat')
+    expect(block).not.toContain('OPENAI_API_KEY')
   })
 })

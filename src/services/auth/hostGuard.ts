@@ -79,7 +79,8 @@ export function assertSubscriptionBaseUrl(url: string): void {
 export function assertNoAnthropicEnvForOpenAI(): void {
   const hasOpenAIMode =
     process.env['CLAUDE_CODE_USE_OPENAI'] === '1' ||
-    Boolean(process.env['OPENAI_API_KEY'])
+    Boolean(process.env['OPENAI_API_KEY']) ||
+    Boolean(process.env['DEEPSEEK_API_KEY'])
   const hasAnthropicKey = Boolean(process.env['ANTHROPIC_API_KEY'])
 
   if (hasOpenAIMode && hasAnthropicKey) {

@@ -12,6 +12,9 @@ describe('getAPIProvider', () => {
     'CLAUDE_CODE_USE_FOUNDRY',
     'CLAUDE_CODE_USE_OPENAI',
     'CLAUDE_CODE_USE_GROK',
+    'DEEPSEEK_API_KEY',
+    'DEEPSEEK_BASE_URL',
+    'DEEPSEEK_MODEL',
   ] as const
   const savedEnv: Record<string, string | undefined> = {}
 
@@ -65,6 +68,22 @@ describe('getAPIProvider', () => {
   test('returns "foundry" when CLAUDE_CODE_USE_FOUNDRY is set', () => {
     process.env.CLAUDE_CODE_USE_FOUNDRY = '1'
     expect(getAPIProvider({})).toBe('foundry')
+  })
+
+  test('returns "openai" when DEEPSEEK_API_KEY is set', () => {
+    process.env.DEEPSEEK_API_KEY = 'sk-deepseek'
+    expect(getAPIProvider({})).toBe('openai')
+  })
+
+  test('returns "openai" when DEEPSEEK_BASE_URL is set', () => {
+    process.env.DEEPSEEK_BASE_URL = 'https://api.deepseek.com/v1'
+    expect(getAPIProvider({})).toBe('openai')
+  })
+
+  test('explicit provider env vars take precedence over implicit DeepSeek env', () => {
+    process.env.DEEPSEEK_API_KEY = 'sk-deepseek'
+    process.env.CLAUDE_CODE_USE_GEMINI = '1'
+    expect(getAPIProvider({})).toBe('gemini')
   })
 
   test('bedrock takes precedence over gemini', () => {
