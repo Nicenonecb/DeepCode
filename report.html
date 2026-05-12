@@ -239,16 +239,17 @@
   <main class="wrap">
     <header>
       <p class="eyebrow">DeepCode Progress Report</p>
-      <h1>当前进度：公开品牌痕迹清理与命名统一</h1>
+      <h1>当前进度：DeepSeek Model Profile 已接入</h1>
       <p class="lead">
-        本轮目标是清理对公众可见的旧用户名、旧项目名、旧缩写和本机路径，把仓库入口统一到
-        <span class="code">DeepCode</span> 与 <span class="code">Nicenonecb/DeepCode</span>。
+        本轮把 DeepSeek V4 Pro、V4 Flash、V3.2 的 context、thinking、effort、tool protocol、
+        pricing 和默认策略集中到模型画像表，并把画像接入 OpenAI 兼容请求、context/max output、
+        effort 默认值和成本计算，减少靠模型名字符串散落判断的风险。
       </p>
       <div class="meta">
-        <span class="pill">状态：已实现并验证</span>
-        <span class="pill">风险：中</span>
-        <span class="pill">依赖：已刷新</span>
-        <span class="pill">类型检查：通过</span>
+        <span class="pill">状态：已实现</span>
+        <span class="pill">风险：低-中</span>
+        <span class="pill">代码改动：已完成</span>
+        <span class="pill">验证：局部绿，全量有既有失败</span>
       </div>
     </header>
 
@@ -263,8 +264,8 @@
     <section>
       <h2>本轮目标</h2>
       <p>
-        面向公开宣传前检查仓库中不统一的用户名、项目名和旧品牌残留。清理范围覆盖 README、package 元数据、
-        文档站配置、报告页、workspace package scope、CLI 展示名、更新命令和公开示例命令。
+        统一声明 DeepSeek V4 Pro / V4 Flash / V3.2 的模型能力，避免 OpenAI 兼容层、context 计算、
+        effort 判断和成本统计继续各自用字符串/环境变量拼能力。当前不新增任务语义路由，只修正模型画像和运行时能力读取。
       </p>
     </section>
 
@@ -272,39 +273,39 @@
       <h2>已完成改动</h2>
       <table class="table">
         <tr>
-          <th>项目元数据</th>
+          <th>模型画像</th>
           <td>
-            <span class="code">package.json</span> 改为 <span class="code">deepcode</span>，
-            repository/homepage/issues 统一指向 <span class="code">github.com/Nicenonecb/DeepCode</span>。
+            新增 <span class="code">src/services/deepseek/modelProfiles.ts</span>，集中声明 V4 Pro / V4 Flash / V3.2
+            的 context window、max output、thinking 默认值、supported effort、tool protocol、pricing 和默认策略。
           </td>
         </tr>
         <tr>
-          <th>CLI 命名</th>
+          <th>默认模型</th>
           <td>
-            bin 入口统一为 <span class="code">deepcode</span> / <span class="code">deepcode-bun</span>，
-            Commander 展示名和 update 命令改为 DeepCode。
+            <span class="code">src/services/deepseek/config.ts</span> 改为从 profile 导出默认模型，
+            保持 <span class="code">deepseek-v4-pro</span> 作为默认入口。
           </td>
         </tr>
         <tr>
-          <th>内部包 scope</th>
+          <th>Thinking / Effort</th>
           <td>
-            本仓库 workspace 包已统一为
-            <span class="code">@deepcode/*</span>，并同步更新 <span class="code">tsconfig.json</span>、
-            imports、tests、docs 和 <span class="code">bun.lock</span>。
+            <span class="code">src/services/api/openai/requestBody.ts</span> 改为通过 profile 判断 DeepSeek thinking 默认值；
+            开启 thinking 时写入 <span class="code">reasoning_effort</span>，并把 <span class="code">xhigh</span>
+            映射为 DeepSeek 支持的 <span class="code">max</span>。
           </td>
         </tr>
         <tr>
-          <th>公开文档</th>
+          <th>Context / Output</th>
           <td>
-            重写 <span class="code">README_EN.md</span>，修正中文 README 的本机路径，更新 Mintlify 配置、
-            docs logo、RCS README、贡献者 SVG、设计上下文和示例命令。
+            <span class="code">src/utils/context.ts</span> 现在优先读取 DeepSeek profile 的
+            <span class="code">contextWindowTokens</span> 和 <span class="code">maxOutputTokens</span>。
           </td>
         </tr>
         <tr>
-          <th>安装链路</th>
+          <th>成本统计</th>
           <td>
-            移除旧 Chrome MCP bridge 包名依赖；postinstall 只保留本项目脚本。
-            Chrome MCP setup 改为通过 <span class="code">DEEPCODE_CHROME_MCP_BRIDGE_CLI</span> 显式指定。
+            <span class="code">src/utils/modelCost.ts</span> 用 DeepSeek profile pricing 计算 input、output、
+            cache read 和 cache write 成本，不再落到未知模型默认价格。
           </td>
         </tr>
       </table>
@@ -314,18 +315,27 @@
       <h2>验证结果</h2>
       <div class="status-list">
         <div class="status">
-          <strong>Trace Scan</strong>
+          <strong>Focused Tests</strong>
           <span>
-            <span class="code">rg</span> 扫描通过：未再发现旧用户名、旧缩写、旧文档域名、旧包 scope 或本机桌面路径。
+            <span class="code">bun test src/services/deepseek/__tests__/modelProfiles.test.ts src/services/api/openai/__tests__/thinking.test.ts src/services/api/openai/__tests__/env.test.ts src/utils/__tests__/effort.test.ts</span>
+            通过，93 pass。
           </span>
         </div>
         <div class="status">
-          <strong>Install</strong>
-          <span><span class="code">bun install</span> 通过，并刷新 workspace 链接与 lockfile。</span>
+          <strong>Typecheck</strong>
+          <span><span class="code">bun run typecheck</span> 通过，TypeScript 零错误。</span>
         </div>
         <div class="status">
-          <strong>Typecheck</strong>
-          <span><span class="code">bun run typecheck</span> 通过。</span>
+          <strong>Lint</strong>
+          <span><span class="code">bun run lint ...</span> 通过，Biome 未发现问题。</span>
+        </div>
+        <div class="status">
+          <strong>Full Test</strong>
+          <span>
+            <span class="code">bun run test:all</span> 不存在；改跑 <span class="code">bun test</span>。
+            全量结果：5377 pass / 5 fail。失败项集中在 skill search/skillLearning 的既有状态污染，以及
+            OpenAI env 测试在全量并发环境下的 process.env/config 竞争；相关 DeepSeek 局部测试单独运行通过。
+          </span>
         </div>
       </div>
     </section>
@@ -333,37 +343,34 @@
     <section>
       <h2>主要影响文件</h2>
       <div class="files">
-        <div>package.json</div>
-        <div>bun.lock</div>
-        <div>README.md</div>
-        <div>README_EN.md</div>
-        <div>docs.json</div>
-        <div>mint.json</div>
-        <div>tsconfig.json</div>
-        <div>src/main.tsx</div>
-        <div>src/cli/updateDeepCode.ts</div>
-        <div>scripts/setup-chrome-mcp.mjs</div>
-        <div>packages/*/package.json</div>
-        <div>docs/logo/*.svg</div>
-        <div>packages/remote-control-server/README.md</div>
+        <div>src/services/deepseek/modelProfiles.ts</div>
+        <div>src/services/deepseek/__tests__/modelProfiles.test.ts</div>
+        <div>src/services/deepseek/config.ts</div>
+        <div>src/services/api/openai/requestBody.ts</div>
+        <div>src/services/api/openai/__tests__/thinking.test.ts</div>
+        <div>src/services/api/openai/index.ts</div>
+        <div>src/utils/effort.ts</div>
+        <div>src/utils/__tests__/effort.test.ts</div>
+        <div>src/utils/context.ts</div>
+        <div>src/utils/modelCost.ts</div>
       </div>
     </section>
 
     <section id="risks">
       <h2>剩余风险</h2>
       <ul>
-        <li>代码中仍保留必要的外部 SDK、协议、环境变量和服务兼容命名；这些不是公开品牌入口，贸然改名会破坏运行路径。</li>
-        <li>文档目录中仍有少数历史文件名包含兼容特性名称，当前只清理了可见文案和入口配置。</li>
-        <li>如果要发布 npm 包，还需要确认 <span class="code">deepcode</span> 包名和 <span class="code">@deepcode</span> scope 的可用性。</li>
+        <li>DeepSeek 官方价格和促销截止日期仍是外部事实，后续版本应定期复核 profile pricing。</li>
+        <li>全量 <span class="code">bun test</span> 仍有 5 个跨测试状态/并发环境失败，当前未在本轮修复。</li>
+        <li>OpenAI SDK 类型尚未包含 DeepSeek 的 <span class="code">reasoning_effort: max</span>，调用点使用双重断言透传兼容字段。</li>
       </ul>
     </section>
 
     <section>
       <h2>建议下一步</h2>
       <ul>
-        <li>决定公开域名、npm scope 和容器镜像命名后，再把占位 URL 统一到正式地址。</li>
-        <li>如需继续深度去品牌化，再单独规划环境变量、配置目录和协议兼容层的迁移策略。</li>
-        <li>发布前运行 <span class="code">bun run build</span> 和目标 smoke test，确认 bin 重命名后的产物路径。</li>
+        <li>把 OpenAI env/config 测试改成隔离进程或 mock 配置存储，消除全量并发下的环境变量竞争。</li>
+        <li>如果继续做“任务感知模型路由”，基于本次 profile 输出模型/effort 建议，不要在 provider adapter 里散落策略。</li>
+        <li>补一个低副作用的成本计算测试入口，直接覆盖 DeepSeek pricing 到 <span class="code">calculateUSDCost()</span> 的映射。</li>
       </ul>
     </section>
 

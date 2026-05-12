@@ -1,4 +1,5 @@
 import type { BetaToolUnion } from '@anthropic-ai/sdk/resources/beta/messages/messages.mjs'
+import type { ChatCompletionCreateParamsStreaming } from 'openai/resources/chat/completions/completions.mjs'
 import type { SystemPrompt } from '../../../utils/systemPromptType.js'
 import type {
   Message,
@@ -376,7 +377,8 @@ export async function* queryModelOpenAI(
               enableThinking,
               maxTokens,
               temperatureOverride: options.temperatureOverride,
-            }),
+              effortValue: options.effortValue,
+            }) as unknown as ChatCompletionCreateParamsStreaming,
             { signal },
           ),
           openaiModel,

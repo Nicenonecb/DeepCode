@@ -28,6 +28,7 @@ const {
   convertEffortValueToLevel,
   getEffortLevelDescription,
   resolvePickerEffortPersistence,
+  resolveAppliedEffort,
   getDefaultEffortForModel,
   EFFORT_LEVELS,
 } = await import('src/utils/effort.js')
@@ -286,5 +287,9 @@ describe('getDefaultEffortForModel', () => {
 
   test("defaults DeepSeek V4 Pro to 'max'", () => {
     expect(getDefaultEffortForModel('deepseek-v4-pro')).toBe('max')
+  })
+
+  test("maps DeepSeek xhigh to 'max'", () => {
+    expect(resolveAppliedEffort('deepseek-v4-pro', 'xhigh')).toBe('max')
   })
 })

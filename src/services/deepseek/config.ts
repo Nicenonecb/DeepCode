@@ -2,9 +2,10 @@ import { promises as fs } from 'fs'
 import { getGlobalConfig, saveGlobalConfig } from '../../utils/config.js'
 import { getGlobalClaudeFile } from '../../utils/env.js'
 import { logError } from '../../utils/log.js'
+import { DEEPSEEK_DEFAULT_MODEL } from './modelProfiles.js'
 
 export const DEEPSEEK_DEFAULT_BASE_URL = 'https://api.deepseek.com/v1'
-export const DEEPSEEK_DEFAULT_MODEL = 'deepseek-v4-pro'
+export { DEEPSEEK_DEFAULT_MODEL }
 
 const MIN_API_KEY_LENGTH = 8
 const MAX_API_KEY_LENGTH = 512
