@@ -5,7 +5,7 @@
 `UDS_INBOX` 现在不是一个“空壳 flag”，而是一套已经落地的本机 IPC 能力。但它同时承载了两层不同目标，必须拆开理解：
 
 1. **UDS peer messaging**
-   - 面向任意 Claude Code 进程。
+   - 面向任意 DeepCode 进程。
    - 使用 `src/utils/udsMessaging.ts` 和 `src/utils/udsClient.ts`。
    - 对外入口是 `/peers` 和 `SendMessageTool` 的 `uds:<socket-path>` 地址。
 2. **pipes control plane**

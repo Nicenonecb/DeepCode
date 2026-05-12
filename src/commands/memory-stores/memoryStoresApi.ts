@@ -124,7 +124,7 @@ function classifyError(err: unknown): MemoryStoresApiError {
     const status = err.response?.status ?? 0
     if (status === 401) {
       return new MemoryStoresApiError(
-        'Authentication failed. Please run /login to re-authenticate.',
+        'Authentication failed. Configure ANTHROPIC_API_KEY or provider credentials.',
         401,
       )
     }

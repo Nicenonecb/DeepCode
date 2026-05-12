@@ -183,7 +183,7 @@ describe('listTriggers', () => {
         'isAxiosError' in e &&
         (e as { isAxiosError: boolean }).isAxiosError === true,
     )
-    await expect(listTriggers()).rejects.toThrow(/login|authenticate/i)
+    await expect(listTriggers()).rejects.toThrow(/credentials|authentication/i)
   })
 
   test('throws 403 with subscription message', async () => {

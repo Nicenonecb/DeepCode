@@ -1,8 +1,8 @@
 # DeepCode
 
-DeepCode 是一个面向 **DeepSeek V4 Pro** 模型的终端编程助手项目，目标是在本地提供类似 Claude Code 的交互式编码体验：理解项目、读写文件、运行命令、修复错误、生成补丁，并围绕真实代码仓库完成开发任务。
+DeepCode 是一个面向 **DeepSeek V4 Pro** 模型的终端编程助手项目，目标是在本地提供类似 DeepCode 的交互式编码体验：理解项目、读写文件、运行命令、修复错误、生成补丁，并围绕真实代码仓库完成开发任务。
 
-本项目基于 reverse-engineered / decompiled 的 Claude Code CLI 工程继续整理和适配，重点服务于 DeepSeek V4 Pro 这类强代码模型的日常开发工作流。
+本项目基于终端 coding agent 工程继续整理和适配，重点服务于 DeepSeek V4 Pro 这类强代码模型的日常开发工作流。
 
 ## 项目定位
 
@@ -34,7 +34,7 @@ bun --version
 ### 2. 安装依赖
 
 ```bash
-cd /Users/justin/Desktop/DeepCode
+cd DeepCode
 bun install
 ```
 
@@ -98,6 +98,6 @@ scripts/                     构建、开发、检查脚本
 
 ## 许可证与声明
 
-本项目仅用于学习、研究和个人实验。原 Claude Code 的相关权利归 Anthropic 所有。
+本项目仅用于学习、研究和个人实验。请在公开分发、商用或二次发布前确认依赖、商标和许可证边界。
 
 如果你要公开分发、商用、重新发布 npm 包或进行大规模二次开发，请先确认相关版权、商标和许可证风险。

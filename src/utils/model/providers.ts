@@ -2,7 +2,7 @@ import type { AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS } from 
 import { getInitialSettings } from '../settings/settings.js'
 import type { SettingsJson } from '../settings/types.js'
 import { isEnvTruthy } from '../envUtils.js'
-import { hasDeepSeekEnv } from '../../services/api/openai/env.js'
+import { hasDeepSeekConfig } from '../../services/api/openai/env.js'
 
 export type APIProvider =
   | 'firstParty'
@@ -28,7 +28,7 @@ export function getAPIProvider(
   if (isEnvTruthy(process.env.CLAUDE_CODE_USE_OPENAI)) return 'openai'
   if (isEnvTruthy(process.env.CLAUDE_CODE_USE_GEMINI)) return 'gemini'
   if (isEnvTruthy(process.env.CLAUDE_CODE_USE_GROK)) return 'grok'
-  if (hasDeepSeekEnv()) return 'openai'
+  if (hasDeepSeekConfig()) return 'openai'
 
   return 'firstParty'
 }

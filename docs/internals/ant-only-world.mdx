@@ -1,6 +1,6 @@
 ---
 title: "Ant 特权世界 - Anthropic 员工专属功能"
-description: "完整记录 Claude Code 身份门控层：USER_TYPE === 'ant' 时解锁的专属工具、命令、API 和代号体系，揭示内外部构建的差异。"
+description: "完整记录 DeepCode 身份门控层：USER_TYPE === 'ant' 时解锁的专属工具、命令、API 和代号体系，揭示内外部构建的差异。"
 keywords: ["Ant 特权", "USER_TYPE", "身份门控", "内部功能", "Anthropic 员工"]
 ---
 
@@ -36,11 +36,11 @@ keywords: ["Ant 特权", "USER_TYPE", "身份门控", "内部功能", "Anthropic
 /* eslint-disable custom-rules/no-process-env-top-level, @typescript-eslint/no-require-imports */
 const REPLTool =
   process.env.USER_TYPE === 'ant'
-    ? require('@claude-code-best/builtin-tools/tools/REPLTool/REPLTool.js').REPLTool
+    ? require('@deepcode/builtin-tools/tools/REPLTool/REPLTool.js').REPLTool
     : null
 const SuggestBackgroundPRTool =
   process.env.USER_TYPE === 'ant'
-    ? require('@claude-code-best/builtin-tools/tools/SuggestBackgroundPRTool/SuggestBackgroundPRTool.js')
+    ? require('@deepcode/builtin-tools/tools/SuggestBackgroundPRTool/SuggestBackgroundPRTool.js')
         .SuggestBackgroundPRTool
     : null
 ```
@@ -94,13 +94,13 @@ const SuggestBackgroundPRTool =
 
 ## Beta API Headers
 
-Claude Code 向 API 发送的 beta headers 分布在 `src/constants/betas.ts`（主注册表）和其他文件中，按可见性分为以下几类：
+DeepCode 向 API 发送的 beta headers 分布在 `src/constants/betas.ts`（主注册表）和其他文件中，按可见性分为以下几类：
 
 ### 公开 Headers（所有构建均发送）
 
 | Header | 功能 | 额外条件 |
 |--------|------|----------|
-| `claude-code-20250219` | Claude Code 标识 | 非 Haiku 时始终发送；Haiku 在 agentic 模式下也发送 |
+| `claude-code-20250219` | DeepCode 标识 | 非 Haiku 时始终发送；Haiku 在 agentic 模式下也发送 |
 | `effort-2025-11-24` | 推理强度控制 | 动态注入 |
 | `task-budgets-2026-03-13` | 任务预算 | 始终通过 `addAgenticBetas()` 注入 |
 | `fast-mode-2026-02-01` | 快速模式 | 通过 sticky-on latch 动态注入 |
@@ -167,7 +167,7 @@ Anthropic 有浓厚的"动物命名"文化：
 
 | 代号 | 身份 | 出处 |
 |------|------|------|
-| **Tengu**（天狗） | Claude Code 项目代号 | 所有 GrowthBook flags 的 `tengu_` 前缀、分析事件名称 |
+| **Tengu**（天狗） | DeepCode 项目代号 | 所有 GrowthBook flags 的 `tengu_` 前缀、分析事件名称 |
 | **Capybara**（水豚） | 模型代号 | `src/constants/prompts.ts` 中被 Undercover Mode 屏蔽的名称 |
 | **Fennec**（耳廓狐） | 已退役模型别名 | `src/migrations/migrateFennecToOpus.ts`——曾用名已迁移到 Opus |
 

@@ -228,6 +228,14 @@ export type GlobalConfig = {
    * ANTHROPIC_API_KEY env var takes precedence when both are present.
    */
   workspaceApiKey?: string
+  /**
+   * DeepSeek/OpenAI-compatible credentials saved by DeepCode onboarding.
+   * Stored in plaintext in the local global config file; chmod 600 is applied
+   * on POSIX after writes.
+   */
+  deepSeekApiKey?: string
+  deepSeekBaseUrl?: string
+  deepSeekModel?: string
   hasAcknowledgedCostThreshold?: boolean
   hasSeenUndercoverAutoNotice?: boolean // ant-only: whether the one-time auto-undercover explainer has been shown
   hasSeenUltraplanTerms?: boolean // ant-only: whether the one-time CCR terms notice has been shown in the ultraplan launch dialog

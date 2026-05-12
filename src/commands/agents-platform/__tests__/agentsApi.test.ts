@@ -131,7 +131,7 @@ describe('listAgents', () => {
         (e as { isAxiosError: boolean }).isAxiosError === true,
     )
 
-    await expect(listAgents()).rejects.toThrow('re-authenticate')
+    await expect(listAgents()).rejects.toThrow(/credentials|authentication/i)
   })
 
   test('throws on 403 with subscription message', async () => {

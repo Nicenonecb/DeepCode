@@ -1,5 +1,4 @@
 import { logEvent } from 'src/services/analytics/index.js'
-import { isProSubscriber } from '../utils/auth.js'
 import { getGlobalConfig, saveGlobalConfig } from '../utils/config.js'
 import { getAPIProvider } from '../utils/model/providers.js'
 import { getSettings_DEPRECATED } from '../utils/settings/settings.js'
@@ -13,8 +12,8 @@ export function resetProToOpusDefault(): void {
 
   const apiProvider = getAPIProvider()
 
-  // Pro users on firstParty get auto-migrated to Opus 4.5 default
-  if (apiProvider !== 'firstParty' || !isProSubscriber()) {
+  // First-party local/API users get the Opus default without account-tier gating.
+  if (apiProvider !== 'firstParty') {
     saveGlobalConfig(current => ({
       ...current,
       opusProMigrationComplete: true,

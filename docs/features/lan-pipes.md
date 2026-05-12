@@ -2,14 +2,14 @@
 
 ## 什么是 LAN Pipes
 
-LAN Pipes 让多台机器上的 Claude Code 实例通过局域网自动发现并协作。你可以在一台机器（main）上操控其他机器（sub）上的 Claude Code，发送 prompt、查看执行结果、审批权限请求——全程零配置。
+LAN Pipes 让多台机器上的 DeepCode 实例通过局域网自动发现并协作。你可以在一台机器（main）上操控其他机器（sub）上的 DeepCode，发送 prompt、查看执行结果、审批权限请求——全程零配置。
 
 基于本机 Pipe IPC（`UDS_INBOX`）扩展，新增 TCP 传输层 + UDP Multicast 发现。
 
 ## 前置条件
 
 - 两台或以上机器在同一局域网
-- 每台机器安装了 CCB 并能 `bun run dev`
+- 每台机器安装了 DeepCode 并能 `bun run dev`
 - Feature flag `LAN_PIPES`（dev/build 默认开启）
 - 防火墙允许 UDP 7101 + TCP 动态端口（见下方配置）
 
@@ -21,9 +21,9 @@ LAN Pipes 让多台机器上的 Claude Code 实例通过局域网自动发现并
 
 **Windows**（管理员 PowerShell）：
 ```powershell
-New-NetFirewallRule -DisplayName "CCB LAN Beacon (UDP)" -Direction Inbound -Protocol UDP -LocalPort 7101 -Action Allow -Profile Private
-New-NetFirewallRule -DisplayName "CCB LAN Pipes (TCP)" -Direction Inbound -Protocol TCP -LocalPort 1024-65535 -Program (Get-Command bun).Source -Action Allow -Profile Private
-New-NetFirewallRule -DisplayName "CCB LAN Beacon Out (UDP)" -Direction Outbound -Protocol UDP -RemotePort 7101 -Action Allow -Profile Private
+New-NetFirewallRule -DisplayName "DeepCode LAN Beacon (UDP)" -Direction Inbound -Protocol UDP -LocalPort 7101 -Action Allow -Profile Private
+New-NetFirewallRule -DisplayName "DeepCode LAN Pipes (TCP)" -Direction Inbound -Protocol TCP -LocalPort 1024-65535 -Program (Get-Command bun).Source -Action Allow -Profile Private
+New-NetFirewallRule -DisplayName "DeepCode LAN Beacon Out (UDP)" -Direction Outbound -Protocol UDP -RemotePort 7101 -Action Allow -Profile Private
 ```
 
 验证网络为"专用"（非公共）：`Get-NetConnectionProfile`

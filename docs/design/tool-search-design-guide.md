@@ -4,7 +4,7 @@
 
 ## 1. 问题背景
 
-Claude Code 内置了 60+ 工具，加上用户连接的 MCP 服务器可能引入数十甚至上百个额外工具。将所有工具的完整 schema 一次性发送给模型，会产生几个严重问题：
+DeepCode 内置了 60+ 工具，加上用户连接的 MCP 服务器可能引入数十甚至上百个额外工具。将所有工具的完整 schema 一次性发送给模型，会产生几个严重问题：
 
 1. **Token 爆炸** — 每个工具定义（name + description + inputSchema）平均消耗数百 token，60 个工具就是数万 token 的常量开销。
 2. **Prompt Cache 失效** — 工具列表作为 prompt 的一部分参与缓存计算。任何工具的增减（如 MCP 服务器连接/断开）都会导致整段缓存失效。
@@ -222,7 +222,7 @@ Delta attachment 扫描历史消息中的 `deferred_tools_delta` 类型 attachme
 - **强化优先级引导** — core tools 直接调用，ToolSearch 仅作为发现 deferred tools 的手段
 - **已加载工具拒绝提示** — 搜索 core tool 时返回明确拒绝
 
-**设计决策**：prompt cache 是 Claude Code 性能优化的关键。每次 tools JSON 变化都会导致缓存失效，代价远大于通过 ExecuteExtraTool 代理调用 deferred tools 的额外 token。因此选择牺牲一点直接调用的便利性，换取 cache 稳定性。
+**设计决策**：prompt cache 是 DeepCode 性能优化的关键。每次 tools JSON 变化都会导致缓存失效，代价远大于通过 ExecuteExtraTool 代理调用 deferred tools 的额外 token。因此选择牺牲一点直接调用的便利性，换取 cache 稳定性。
 
 ### v4: Agents/Teams 延迟化（`af0d7dc8`）
 

@@ -39,10 +39,8 @@ export function getMacroDefines(): Record<string, string> {
 export const DEFAULT_BUILD_FEATURES = [
   'BUDDY', // 陪伴宠物角色（Squirtle Waddles）
   'TRANSCRIPT_CLASSIFIER', // 对话分类器，用于标注会话类型
-  'BRIDGE_MODE', // Remote Control / Bridge 模式，远程控制会话
   'AGENT_TRIGGERS_REMOTE', // sessionIngress 模块级 Map 累积（非 GB 级主因）
   'CHICAGO_MCP', // Chicago MCP 集成（内部代号）
-  'VOICE_MODE', // Push-to-Talk 语音输入模式
   'SHOT_STATS', // 单次请求统计信息收集
   'PROMPT_CACHE_BREAK_DETECTION', // 检测 prompt cache 是否被打破（有 10 条上限，可控）
   'TOKEN_BUDGET', // Token 预算管理与控制
@@ -95,4 +93,8 @@ export const DEFAULT_BUILD_FEATURES = [
   'SSH_REMOTE', // SSH 远程连接，本地 REPL + 远端工具执行
   // Autofix PR
   'AUTOFIX_PR', // /autofix-pr 命令（fork 引入；docs/jira/AUTOFIX-PR-001.md 承诺默认开启）
+  // Claude OAuth dependent entry points stay opt-in only:
+  //   FEATURE_BRIDGE_MODE=1 FEATURE_CLAUDE_OAUTH_FEATURES=1 enables remote-control.
+  //   FEATURE_VOICE_MODE=1 enables the voice code path.
+  //   FEATURE_CLAUDE_OAUTH_FEATURES=1 enables /teleport, /skill-store, --remote, and --teleport.
 ] as const

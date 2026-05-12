@@ -12,11 +12,11 @@ import type { Tools } from '../../../Tool.js'
 import { getOpenAIClient } from './client.js'
 import {
   anthropicMessagesToOpenAI,
-  resolveOpenAIModel,
   adaptOpenAIStreamToAnthropic,
   anthropicToolsToOpenAI,
   anthropicToolChoiceToOpenAI,
 } from '@ant/model-provider'
+import { resolveOpenAICompatModel } from './env.js'
 import { isChatGPTAuthEnabled } from './chatgptAuth.js'
 import {
   adaptResponsesStreamToAnthropic,
@@ -66,7 +66,7 @@ import {
   formatDeferredToolLine,
   isDeferredTool,
   SEARCH_EXTRA_TOOLS_TOOL_NAME,
-} from '@claude-code-best/builtin-tools/tools/SearchExtraToolsTool/prompt.js'
+} from '@deepcode/builtin-tools/tools/SearchExtraToolsTool/prompt.js'
 
 function convertToResponsesReasoningEffort(
   effortValue: unknown,
@@ -218,7 +218,7 @@ export async function* queryModelOpenAI(
 > {
   try {
     // 1. Resolve model name
-    const openaiModel = resolveOpenAIModel(options.model)
+    const openaiModel = resolveOpenAICompatModel(options.model)
 
     // 2. Normalize messages using shared preprocessing
     const messagesForAPI = normalizeMessagesForAPI(messages, tools)

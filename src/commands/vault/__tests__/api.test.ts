@@ -249,7 +249,7 @@ describe('listVaults', () => {
         'isAxiosError' in e &&
         (e as { isAxiosError: boolean }).isAxiosError === true,
     )
-    await expect(listVaults()).rejects.toThrow(/login|authenticate/i)
+    await expect(listVaults()).rejects.toThrow(/credentials|authentication/i)
   })
 
   test('throws 403 with subscription message', async () => {

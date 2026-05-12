@@ -43,7 +43,7 @@ export const DEFAULT_PROVIDERS: ProviderConfig[] = [
     kind: 'openai-compat',
     baseUrl: 'https://api.deepseek.com/v1',
     apiKeyEnv: 'DEEPSEEK_API_KEY',
-    defaultModel: 'deepseek-chat',
+    defaultModel: 'deepseek-v4-pro',
     compatRule: 'deepseek',
   },
 ]

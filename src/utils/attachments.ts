@@ -15,7 +15,7 @@ import {
   MaxFileReadTokenExceededError,
   type Output as FileReadToolOutput,
   readImageWithTokenBudget,
-} from '@claude-code-best/builtin-tools/tools/FileReadTool/FileReadTool.js'
+} from '@deepcode/builtin-tools/tools/FileReadTool/FileReadTool.js'
 import { FileTooLargeError, readFileInRange } from './readFileInRange.js'
 import { expandPath } from './path.js'
 import { countCharInString } from './stringUtils.js'
@@ -23,11 +23,11 @@ import { uniq } from './array.js'
 import { getFsImplementation } from './fsOperations.js'
 import { readdir, stat } from 'fs/promises'
 import type { IDESelection } from '../hooks/useIdeSelection.js'
-import { TODO_WRITE_TOOL_NAME } from '@claude-code-best/builtin-tools/tools/TodoWriteTool/constants.js'
-import { TASK_CREATE_TOOL_NAME } from '@claude-code-best/builtin-tools/tools/TaskCreateTool/constants.js'
-import { TASK_UPDATE_TOOL_NAME } from '@claude-code-best/builtin-tools/tools/TaskUpdateTool/constants.js'
-import { BASH_TOOL_NAME } from '@claude-code-best/builtin-tools/tools/BashTool/toolName.js'
-import { SKILL_TOOL_NAME } from '@claude-code-best/builtin-tools/tools/SkillTool/constants.js'
+import { TODO_WRITE_TOOL_NAME } from '@deepcode/builtin-tools/tools/TodoWriteTool/constants.js'
+import { TASK_CREATE_TOOL_NAME } from '@deepcode/builtin-tools/tools/TaskCreateTool/constants.js'
+import { TASK_UPDATE_TOOL_NAME } from '@deepcode/builtin-tools/tools/TaskUpdateTool/constants.js'
+import { BASH_TOOL_NAME } from '@deepcode/builtin-tools/tools/BashTool/toolName.js'
+import { SKILL_TOOL_NAME } from '@deepcode/builtin-tools/tools/SkillTool/constants.js'
 import type { TodoList } from './todo/types.js'
 import {
   type Task,
@@ -62,7 +62,7 @@ import {
   isValidImagePaste,
 } from 'src/types/textInputTypes.js'
 import { randomUUID, type UUID } from 'crypto'
-import { getSnippetForTwoFileDiff } from '@claude-code-best/builtin-tools/tools/FileEditTool/utils.js'
+import { getSnippetForTwoFileDiff } from '@deepcode/builtin-tools/tools/FileEditTool/utils.js'
 import type {
   ContentBlockParam,
   ImageBlockParam,
@@ -81,7 +81,7 @@ import { getSkillToolCommands, getMcpSkillCommands } from '../commands.js'
 import type { Command } from '../types/command.js'
 import uniqBy from 'lodash-es/uniqBy.js'
 import { getProjectRoot } from '../bootstrap/state.js'
-import { formatCommandsWithinBudget } from '@claude-code-best/builtin-tools/tools/SkillTool/prompt.js'
+import { formatCommandsWithinBudget } from '@deepcode/builtin-tools/tools/SkillTool/prompt.js'
 import { getContextWindowForModel } from './context.js'
 import type { DiscoverySignal } from '../services/skillSearch/signals.js'
 // Conditional require for DCE. All skill-search string literals that would
@@ -111,8 +111,8 @@ const autoModeStateModule = feature('TRANSCRIPT_CLASSIFIER')
 import {
   MAX_LINES_TO_READ,
   FILE_READ_TOOL_NAME,
-} from '@claude-code-best/builtin-tools/tools/FileReadTool/prompt.js'
-import { getDefaultFileReadingLimits } from '@claude-code-best/builtin-tools/tools/FileReadTool/limits.js'
+} from '@deepcode/builtin-tools/tools/FileReadTool/prompt.js'
+import { getDefaultFileReadingLimits } from '@deepcode/builtin-tools/tools/FileReadTool/limits.js'
 import { cacheKeys, type FileStateCache } from './fileStateCache.js'
 import {
   createAbortController,
@@ -123,15 +123,14 @@ import {
   getFileModificationTimeAsync,
   isFileWithinReadSizeLimit,
 } from './file.js'
-import type { AgentDefinition } from '@claude-code-best/builtin-tools/tools/AgentTool/loadAgentsDir.js'
-import { filterAgentsByMcpRequirements } from '@claude-code-best/builtin-tools/tools/AgentTool/loadAgentsDir.js'
-import { AGENT_TOOL_NAME } from '@claude-code-best/builtin-tools/tools/AgentTool/constants.js'
+import type { AgentDefinition } from '@deepcode/builtin-tools/tools/AgentTool/loadAgentsDir.js'
+import { filterAgentsByMcpRequirements } from '@deepcode/builtin-tools/tools/AgentTool/loadAgentsDir.js'
+import { AGENT_TOOL_NAME } from '@deepcode/builtin-tools/tools/AgentTool/constants.js'
 import {
   formatAgentLine,
   shouldInjectAgentListInMessages,
-} from '@claude-code-best/builtin-tools/tools/AgentTool/prompt.js'
+} from '@deepcode/builtin-tools/tools/AgentTool/prompt.js'
 import { filterDeniedAgents } from './permissions/permissions.js'
-import { getSubscriptionType } from './auth.js'
 import { mcpInfoFromString } from '../services/mcp/mcpStringUtils.js'
 import {
   matchingRuleForInput,
@@ -203,7 +202,7 @@ import { feature } from 'bun:bundle'
 const BRIEF_TOOL_NAME: string | null =
   feature('KAIROS') || feature('KAIROS_BRIEF')
     ? (
-        require('@claude-code-best/builtin-tools/tools/BriefTool/prompt.js') as typeof import('@claude-code-best/builtin-tools/tools/BriefTool/prompt.js')
+        require('@deepcode/builtin-tools/tools/BriefTool/prompt.js') as typeof import('@deepcode/builtin-tools/tools/BriefTool/prompt.js')
       ).BRIEF_TOOL_NAME
     : null
 const sessionTranscriptModule = feature('KAIROS')
@@ -235,7 +234,7 @@ import { isAgentSwarmsEnabled } from './agentSwarmsEnabled.js'
 import { findRelevantMemories } from '../memdir/findRelevantMemories.js'
 import { memoryAge, memoryFreshnessText } from '../memdir/memoryAge.js'
 import { getAutoMemPath, isAutoMemoryEnabled } from '../memdir/paths.js'
-import { getAgentMemoryDir } from '@claude-code-best/builtin-tools/tools/AgentTool/agentMemory.js'
+import { getAgentMemoryDir } from '@deepcode/builtin-tools/tools/AgentTool/agentMemory.js'
 import {
   readUnreadMessages,
   markMessagesAsReadByPredicate,
@@ -722,7 +721,7 @@ export type Attachment =
       removedTypes: string[]
       /** True when this is the first announcement in the conversation */
       isInitial: boolean
-      /** Whether to include the "launch multiple agents concurrently" note (non-pro subscriptions) */
+      /** Whether to include the "launch multiple agents concurrently" note */
       showConcurrencyNote: boolean
     }
   | {
@@ -1604,7 +1603,7 @@ export function getAgentListingDeltaAttachment(
       addedLines: added.map(formatAgentLine),
       removedTypes: removed,
       isInitial: announced.size === 0,
-      showConcurrencyNote: getSubscriptionType() !== 'pro',
+      showConcurrencyNote: true,
     },
   ]
 }

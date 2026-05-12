@@ -1,5 +1,5 @@
 /**
- * `ccb update` — Check and install the latest version of claude-code-best.
+ * `deepcode update` — Check and install the latest version of deepcode.
  *
  * Detection strategy:
  *  1. If `bun` is available and the current installation was done via bun → use `bun update -g`
@@ -16,13 +16,13 @@ import { execFileNoThrowWithCwd } from '../utils/execFileNoThrow.js'
 import { gracefulShutdown } from '../utils/gracefulShutdown.js'
 import { writeToStdout } from '../utils/process.js'
 
-const PACKAGE_NAME = 'claude-code-best'
+const PACKAGE_NAME = 'deepcode'
 
 function getCurrentVersion(): string {
   // Read version from the nearest package.json (walks up from this file)
   try {
     const __dirname = dirname(fileURLToPath(import.meta.url))
-    // In dev: src/cli/updateCCB.ts → ../../package.json
+    // In dev: src/cli/updateDeepCode.ts → ../../package.json
     // In build: dist/chunks/xxx.js → ../../package.json (may not exist)
     const pkgPath = join(__dirname, '..', '..', 'package.json')
     if (existsSync(pkgPath)) {
@@ -94,7 +94,7 @@ function gte(a: string, b: string): boolean {
   return true
 }
 
-export async function updateCCB(): Promise<void> {
+export async function updateDeepCode(): Promise<void> {
   const currentVersion = getCurrentVersion()
   writeToStdout(`Current version: ${currentVersion}\n`)
 
@@ -117,7 +117,9 @@ export async function updateCCB(): Promise<void> {
 
   // Already up to date?
   if (latestVersion === currentVersion || gte(currentVersion, latestVersion)) {
-    writeToStdout(chalk.green(`ccb is up to date (${currentVersion})`) + '\n')
+    writeToStdout(
+      chalk.green(`deepcode is up to date (${currentVersion})`) + '\n',
+    )
     await gracefulShutdown(0)
     return
   }

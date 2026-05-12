@@ -1,6 +1,6 @@
 ---
 title: "三层门禁系统 - 功能可见性控制架构"
-description: "详解 Claude Code 三层门禁系统：构建时 feature()、运行时 GrowthBook 和身份层 USER_TYPE，如何控制功能的可见性和灰度发布。"
+description: "详解 DeepCode 三层门禁系统：构建时 feature()、运行时 GrowthBook 和身份层 USER_TYPE，如何控制功能的可见性和灰度发布。"
 keywords: ["门禁系统", "功能门控", "feature flag", "灰度发布", "可见性控制"]
 ---
 
@@ -8,7 +8,7 @@ keywords: ["门禁系统", "功能门控", "feature flag", "灰度发布", "可�
 
 ## 冰山一角
 
-你日常使用的 Claude Code，只是完整代码库的冰山一角。
+你日常使用的 DeepCode，只是完整代码库的冰山一角。
 
 逆向工程揭示了一个事实：大量功能被精心"藏"在三层独立的门禁系统之后。有些是正在 A/B 测试的实验性功能，有些是仅限 Anthropic 员工使用的内部工具，还有些是尚未对外发布的下一代能力。
 
@@ -26,7 +26,7 @@ keywords: ["门禁系统", "功能门控", "feature flag", "灰度发布", "可�
 
 ## 决策流程
 
-当一个功能请求进入 Claude Code，它会依次经过三层门禁的检查：
+当一个功能请求进入 DeepCode，它会依次经过三层门禁的检查：
 
 ```
 功能请求

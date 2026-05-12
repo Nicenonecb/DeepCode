@@ -21,6 +21,7 @@ import { KeybindingSetup } from './keybindings/KeybindingProviderSetup.js';
 import { startDeferredPrefetches } from './main.js';
 import { initializeGrowthBook, resetGrowthBook } from './services/analytics/growthbook.js';
 import { isQualifiedForGrove } from './services/api/grove.js';
+import { hasOpenAICompatApiKey } from './services/api/openai/env.js';
 import { handleMcpjsonServerApprovals } from './services/mcpServerApproval.js';
 import { AppStateProvider } from './state/AppState.js';
 import { onChangeAppState } from './state/onChangeAppState.js';
@@ -148,7 +149,8 @@ export async function showSetupScreens(
   let onboardingShown = false;
   if (
     !config.theme ||
-    !config.hasCompletedOnboarding // always show onboarding at least once
+    !config.hasCompletedOnboarding || // always show onboarding at least once
+    !hasOpenAICompatApiKey()
   ) {
     onboardingShown = true;
     const { Onboarding } = await import('./components/Onboarding.js');

@@ -4,16 +4,16 @@ const MODEL_EMAIL_MAP: Array<{ keywords: string[]; email: string }> = [
   // github 组织是不能用 co author 的
   {
     keywords: ['gpt', 'dall-e', 'o1-', 'o3-', 'o4-'],
-    email: 'openai@claude-code-best.win',
+    email: 'openai@deepcode.local',
   },
-  { keywords: ['gemini'], email: 'google-gemini@claude-code-best.win' },
-  { keywords: ['grok'], email: 'xai-org@claude-code-best.win' },
-  { keywords: ['glm'], email: 'zai-org@claude-code-best.win' },
-  { keywords: ['deepseek'], email: 'deepseek-ai@claude-code-best.win' },
-  { keywords: ['qwen'], email: 'QwenLM@claude-code-best.win' },
-  { keywords: ['minimax'], email: 'MiniMax-AI@claude-code-best.win' },
-  { keywords: ['mimo'], email: 'XiaomiMiMo@claude-code-best.win' },
-  { keywords: ['kimi'], email: 'MoonshotAI@claude-code-best.win' },
+  { keywords: ['gemini'], email: 'google-gemini@deepcode.local' },
+  { keywords: ['grok'], email: 'xai-org@deepcode.local' },
+  { keywords: ['glm'], email: 'zai-org@deepcode.local' },
+  { keywords: ['deepseek'], email: 'deepseek-ai@deepcode.local' },
+  { keywords: ['qwen'], email: 'QwenLM@deepcode.local' },
+  { keywords: ['minimax'], email: 'MiniMax-AI@deepcode.local' },
+  { keywords: ['mimo'], email: 'XiaomiMiMo@deepcode.local' },
+  { keywords: ['kimi'], email: 'MoonshotAI@deepcode.local' },
 ]
 
 export function getAttributionEmail(modelName: string): string {

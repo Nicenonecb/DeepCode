@@ -185,7 +185,7 @@ describe('listStores', () => {
         'isAxiosError' in e &&
         (e as { isAxiosError: boolean }).isAxiosError === true,
     )
-    await expect(listStores()).rejects.toThrow(/login|authenticate/i)
+    await expect(listStores()).rejects.toThrow(/credentials|authentication/i)
   })
 
   test('throws 403 with subscription message', async () => {
@@ -438,7 +438,7 @@ describe('deleteMemory', () => {
         (e as { isAxiosError: boolean }).isAxiosError === true,
     )
     await expect(deleteMemory('ms_1', 'mem_x')).rejects.toThrow(
-      /login|authenticate/i,
+      /credentials|authentication/i,
     )
   })
 })

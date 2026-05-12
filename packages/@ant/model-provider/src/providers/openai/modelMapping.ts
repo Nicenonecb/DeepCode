@@ -16,7 +16,7 @@ const DEFAULT_MODEL_MAP: Record<string, string> = {
   'claude-3-5-sonnet-20241022': 'gpt-4o',
 }
 
-const DEEPSEEK_DEFAULT_MODEL = 'deepseek-chat'
+const DEEPSEEK_DEFAULT_MODEL = 'deepseek-v4-pro'
 
 function isDeepSeekEnvConfigured(): boolean {
   return Boolean(

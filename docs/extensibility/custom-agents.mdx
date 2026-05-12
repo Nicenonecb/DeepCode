@@ -1,6 +1,6 @@
 ---
 title: "自定义 Agent - 从 Markdown 到运行时的完整链路"
-description: "揭秘 Claude Code 自定义 Agent 完整链路：Agent 定义的 Markdown 数据模型、三种加载来源、工具过滤策略和与 AgentTool 的联动机制。"
+description: "揭秘 DeepCode 自定义 Agent 完整链路：Agent 定义的 Markdown 数据模型、三种加载来源、工具过滤策略和与 AgentTool 的联动机制。"
 keywords: ["自定义 Agent", "Agent 定义", "Markdown Agent", "Agent 配置", "角色定制"]
 ---
 
@@ -8,7 +8,7 @@ keywords: ["自定义 Agent", "Agent 定义", "Markdown Agent", "Agent 配置", 
 
 ## Agent 定义的三种来源
 
-Claude Code 的 Agent 不仅仅来自用户自定义——系统有三类来源，按优先级合并：
+DeepCode 的 Agent 不仅仅来自用户自定义——系统有三类来源，按优先级合并：
 
 | 来源 | 位置 | 优先级 |
 |------|------|--------|
@@ -195,7 +195,7 @@ AgentTool.call({ subagent_type: "reviewer", ... })
 | **Explore** | `Explore` | 代码搜索专家 | 只读（无 Write/Edit） | haiku（外部） |
 | **Plan** | `Plan` | 规划专家 | 只读 + ExitPlanMode | inherit |
 | **Verification** | `verification` | 结果验证 | 由 feature flag 控制 | — |
-| **Code Guide** | `claude-code-guide` | Claude Code 使用指南 | 只读 | — |
+| **Code Guide** | `claude-code-guide` | DeepCode 使用指南 | 只读 | — |
 | **Statusline Setup** | `statusline-setup` | 终端状态栏配置 | 有限 | — |
 
 SDK 入口（`sdk-ts`/`sdk-py`/`sdk-cli`）不加载 Code Guide Agent。环境变量 `CLAUDE_AGENT_SDK_DISABLE_BUILTIN_AGENTS` 可以完全禁用内置 Agent，给 SDK 用户提供空白画布。
