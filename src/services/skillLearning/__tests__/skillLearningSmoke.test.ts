@@ -16,28 +16,44 @@ import {
   setSkillLearningConfigForTest,
 } from '../config.js'
 import { loadInstincts, readObservations } from '../index.js'
+import { resetProjectContextCacheForTest } from '../projectContext.js'
 
 let root: string
-let previousCwd: string
-const originalEnv = { ...process.env }
+const envKeys = [
+  'CLAUDE_SKILL_LEARNING_HOME',
+  'CLAUDE_CONFIG_DIR',
+  'SKILL_LEARNING_ENABLED',
+  'CLAUDE_CODE_DISABLE_ADVISOR_TOOL',
+  'ANTHROPIC_API_KEY',
+  'NODE_ENV',
+] as const
+const savedEnv: Record<string, string | undefined> = {}
 
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), 'skill-learning-smoke-'))
-  previousCwd = process.cwd()
-  process.chdir(root)
-  process.env = { ...originalEnv }
+  for (const key of envKeys) {
+    savedEnv[key] = process.env[key]
+  }
   process.env.CLAUDE_SKILL_LEARNING_HOME = join(root, 'learning-home')
   process.env.CLAUDE_CONFIG_DIR = join(root, 'config')
   process.env.SKILL_LEARNING_ENABLED = '1'
+  process.env.CLAUDE_CODE_DISABLE_ADVISOR_TOOL = '1'
   process.env.ANTHROPIC_API_KEY = 'test-key'
   process.env.NODE_ENV = 'test'
   setSkillLearningConfigForTest({ minConfidence: 0.3, minClusterSize: 1 })
+  resetProjectContextCacheForTest()
 })
 
 afterEach(() => {
-  process.chdir(previousCwd)
-  process.env = { ...originalEnv }
+  for (const key of envKeys) {
+    if (savedEnv[key] === undefined) {
+      delete process.env[key]
+    } else {
+      process.env[key] = savedEnv[key]
+    }
+  }
   resetSkillLearningConfig()
+  resetProjectContextCacheForTest()
   clearCommandsCache()
   try {
     rmSync(root, {
@@ -61,7 +77,7 @@ describe('skillLearning smoke', () => {
     // skipped by the ECC-parity gate (default threshold: 10 observations).
     const ingestResult = await call(
       `ingest ${transcript} --min-session-length=0`,
-      {} as any,
+      { cwd: root } as any,
     )
     expect(ingestResult.type).toBe('text')
     if (ingestResult.type === 'text') {
@@ -87,7 +103,7 @@ describe('skillLearning smoke', () => {
     expect(testingInstinct?.confidence).toBe(0.8)
     expect(testingInstinct?.status).toBe('active')
 
-    const evolveResult = await call('evolve --generate', {} as any)
+    const evolveResult = await call('evolve --generate', { cwd: root } as any)
     expect(evolveResult.type).toBe('text')
     if (evolveResult.type === 'text') {
       // Smoke transcript (9 obs, single fabricated instinct per domain) may

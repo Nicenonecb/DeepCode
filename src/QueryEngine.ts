@@ -422,6 +422,7 @@ export class QueryEngine {
       shouldQuery,
       allowedTools,
       model: modelFromUserInput,
+      effort: effortFromUserInput,
       resultText,
     } = await processUserInput({
       input: prompt,
@@ -497,6 +498,13 @@ export class QueryEngine {
     }))
 
     const mainLoopModel = modelFromUserInput ?? initialMainLoopModel
+    const getAppStateForQuery =
+      effortFromUserInput !== undefined
+        ? () => ({
+            ...getAppState(),
+            effortValue: effortFromUserInput,
+          })
+        : getAppState
 
     // Recreate after processing the prompt to pick up updated messages and
     // model (from slash commands).
@@ -522,7 +530,7 @@ export class QueryEngine {
         agentDefinitions: { activeAgents: agents, allAgents: [] },
         maxBudgetUsd,
       },
-      getAppState,
+      getAppState: getAppStateForQuery,
       setAppState,
       abortController: this.abortController,
       readFileState: this.readFileState,

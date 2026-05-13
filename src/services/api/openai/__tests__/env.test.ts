@@ -17,6 +17,10 @@ describe('OpenAI-compatible env resolution', () => {
     'DEEPSEEK_API_KEY',
     'DEEPSEEK_BASE_URL',
     'DEEPSEEK_MODEL',
+    'DEEPSEEK_DEFAULT_HAIKU_MODEL',
+    'DEEPSEEK_DEFAULT_SONNET_MODEL',
+    'DEEPSEEK_DEFAULT_OPUS_MODEL',
+    'OPENAI_MODEL',
     'OPENAI_API_KEY',
     'OPENAI_BASE_URL',
   ] as const
@@ -80,6 +84,31 @@ describe('OpenAI-compatible env resolution', () => {
     })
     expect(resolveOpenAICompatModel('claude-sonnet-4-6')).toBe(
       'deepseek-v4-pro',
+    )
+  })
+
+  test('saved DeepSeek key uses the profile family default for Haiku', async () => {
+    await saveDeepSeekConfig({ apiKey: 'sk-local-deepseek' })
+
+    expect(resolveOpenAICompatModel('claude-haiku-4-5-20251001')).toBe(
+      'deepseek-v4-flash',
+    )
+  })
+
+  test('DEEPSEEK_API_KEY uses the profile family default for Haiku', () => {
+    process.env.DEEPSEEK_API_KEY = 'sk-deepseek'
+
+    expect(resolveOpenAICompatModel('claude-haiku-4-5-20251001')).toBe(
+      'deepseek-v4-flash',
+    )
+  })
+
+  test('DEEPSEEK_DEFAULT_*_MODEL overrides profile family default', () => {
+    process.env.DEEPSEEK_API_KEY = 'sk-deepseek'
+    process.env.DEEPSEEK_DEFAULT_HAIKU_MODEL = 'deepseek-custom-haiku'
+
+    expect(resolveOpenAICompatModel('claude-haiku-4-5-20251001')).toBe(
+      'deepseek-custom-haiku',
     )
   })
 

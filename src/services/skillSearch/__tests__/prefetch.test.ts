@@ -9,33 +9,57 @@ import {
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { clearCommandsCache } from '../../../commands.js'
-import { getTurnZeroSkillDiscovery } from '../prefetch.js'
+import {
+  clearSkillDiscoveryStateForTesting,
+  getTurnZeroSkillDiscovery,
+} from '../prefetch.js'
 import { clearSkillIndexCache } from '../localSearch.js'
+import { clearIntentNormalizeCache } from '../intentNormalize.js'
 
 let root: string
-let previousCwd: string
-const originalEnv = { ...process.env }
+const envKeys = [
+  'CLAUDE_CONFIG_DIR',
+  'CLAUDE_SKILL_LEARNING_HOME',
+  'SKILL_SEARCH_ENABLED',
+  'SKILL_LEARNING_ENABLED',
+  'SKILL_SEARCH_INTENT_ENABLED',
+  'CLAUDE_CODE_DISABLE_ADVISOR_TOOL',
+  'NODE_ENV',
+  'ANTHROPIC_API_KEY',
+] as const
+const savedEnv: Record<string, string | undefined> = {}
 
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), 'skill-search-prefetch-'))
-  previousCwd = process.cwd()
-  process.chdir(root)
-  process.env = { ...originalEnv }
+  for (const key of envKeys) {
+    savedEnv[key] = process.env[key]
+  }
   process.env.CLAUDE_CONFIG_DIR = join(root, 'config')
   process.env.CLAUDE_SKILL_LEARNING_HOME = join(root, 'learning')
   process.env.SKILL_SEARCH_ENABLED = '1'
   process.env.SKILL_LEARNING_ENABLED = '1'
+  delete process.env.SKILL_SEARCH_INTENT_ENABLED
+  process.env.CLAUDE_CODE_DISABLE_ADVISOR_TOOL = '1'
   process.env.NODE_ENV = 'test'
   process.env.ANTHROPIC_API_KEY = 'test-key'
   clearCommandsCache()
   clearSkillIndexCache()
+  clearSkillDiscoveryStateForTesting()
+  clearIntentNormalizeCache()
 })
 
 afterEach(() => {
-  process.chdir(previousCwd)
-  process.env = { ...originalEnv }
+  for (const key of envKeys) {
+    if (savedEnv[key] === undefined) {
+      delete process.env[key]
+    } else {
+      process.env[key] = savedEnv[key]
+    }
+  }
   clearCommandsCache()
   clearSkillIndexCache()
+  clearSkillDiscoveryStateForTesting()
+  clearIntentNormalizeCache()
   try {
     rmSync(root, {
       recursive: true,
@@ -69,7 +93,7 @@ describe('skill search prefetch', () => {
     const attachment = await getTurnZeroSkillDiscovery(
       'audit feature flags for minimal implementation stubs',
       [],
-      { agentId: undefined } as any,
+      { agentId: undefined, cwd: root } as any,
     )
 
     expect(attachment?.type).toBe('skill_discovery')
@@ -87,7 +111,7 @@ describe('skill search prefetch', () => {
     const attachment = await getTurnZeroSkillDiscovery(
       'frobnicate zephyr ledger workflow',
       [],
-      { agentId: undefined } as any,
+      { agentId: undefined, cwd: root } as any,
     )
 
     expect(attachment?.type).toBe('skill_discovery')

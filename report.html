@@ -239,17 +239,17 @@
   <main class="wrap">
     <header>
       <p class="eyebrow">DeepCode Progress Report</p>
-      <h1>当前进度：DeepSeek Model Profile 已接入</h1>
+      <h1>当前进度：DeepSeek Model Profile 收口完成</h1>
       <p class="lead">
-        本轮把 DeepSeek V4 Pro、V4 Flash、V3.2 的 context、thinking、effort、tool protocol、
-        pricing 和默认策略集中到模型画像表，并把画像接入 OpenAI 兼容请求、context/max output、
-        effort 默认值和成本计算，减少靠模型名字符串散落判断的风险。
+        本轮复查并补齐 DeepSeek Model Profile：V4 Pro / V4 Flash / V3.2 的 context、thinking、
+        effort、tool protocol、价格和默认策略已经集中声明，并继续收口 DeepSeek 默认模型解析，
+        让 Haiku/Sonnet/Opus family 默认策略从 profile 生效。
       </p>
       <div class="meta">
         <span class="pill">状态：已实现</span>
-        <span class="pill">风险：低-中</span>
+        <span class="pill">风险：低</span>
         <span class="pill">代码改动：已完成</span>
-        <span class="pill">验证：局部绿，全量有既有失败</span>
+        <span class="pill">验证：全量测试、类型检查、lint 通过</span>
       </div>
     </header>
 
@@ -264,8 +264,8 @@
     <section>
       <h2>本轮目标</h2>
       <p>
-        统一声明 DeepSeek V4 Pro / V4 Flash / V3.2 的模型能力，避免 OpenAI 兼容层、context 计算、
-        effort 判断和成本统计继续各自用字符串/环境变量拼能力。当前不新增任务语义路由，只修正模型画像和运行时能力读取。
+        完成 DeepSeek 模型能力的统一声明与运行时接入，并修正默认策略未完全成为单一来源的问题：
+        DeepSeek env/config 下的默认模型解析现在会通过 profile 的 familyDefaults 决定 V4 Flash / V4 Pro。
       </p>
     </section>
 
@@ -275,37 +275,39 @@
         <tr>
           <th>模型画像</th>
           <td>
-            新增 <span class="code">src/services/deepseek/modelProfiles.ts</span>，集中声明 V4 Pro / V4 Flash / V3.2
-            的 context window、max output、thinking 默认值、supported effort、tool protocol、pricing 和默认策略。
+            <span class="code">src/services/deepseek/modelProfiles.ts</span> 集中声明 V4 Pro / V4 Flash / V3.2
+            的 context、max output、thinking 默认值、supported effort、tool protocol、pricing 和默认策略。
           </td>
         </tr>
         <tr>
-          <th>默认模型</th>
+          <th>默认策略</th>
           <td>
-            <span class="code">src/services/deepseek/config.ts</span> 改为从 profile 导出默认模型，
-            保持 <span class="code">deepseek-v4-pro</span> 作为默认入口。
+            新增 <span class="code">getDeepSeekModelFamily()</span> 和
+            <span class="code">getDefaultDeepSeekModelForAnthropicModel()</span>；
+            Haiku 默认走 V4 Flash，Sonnet/Opus 默认走 V4 Pro。
+          </td>
+        </tr>
+        <tr>
+          <th>OpenAI 兼容入口</th>
+          <td>
+            <span class="code">src/services/api/openai/env.ts</span> 在 DeepSeek env/config 下优先读取 profile
+            默认策略，保留 <span class="code">DEEPSEEK_MODEL</span>、<span class="code">OPENAI_MODEL</span>
+            和 <span class="code">DEEPSEEK_DEFAULT_*_MODEL</span> 显式覆盖。
           </td>
         </tr>
         <tr>
           <th>Thinking / Effort</th>
           <td>
-            <span class="code">src/services/api/openai/requestBody.ts</span> 改为通过 profile 判断 DeepSeek thinking 默认值；
-            开启 thinking 时写入 <span class="code">reasoning_effort</span>，并把 <span class="code">xhigh</span>
-            映射为 DeepSeek 支持的 <span class="code">max</span>。
+            OpenAI 请求体通过 profile 判断 thinking 默认值，并透传 DeepSeek
+            <span class="code">reasoning_effort</span>；<span class="code">xhigh</span>
+            会映射为 DeepSeek 支持的 <span class="code">max</span>。
           </td>
         </tr>
         <tr>
-          <th>Context / Output</th>
+          <th>Context / Cost</th>
           <td>
-            <span class="code">src/utils/context.ts</span> 现在优先读取 DeepSeek profile 的
-            <span class="code">contextWindowTokens</span> 和 <span class="code">maxOutputTokens</span>。
-          </td>
-        </tr>
-        <tr>
-          <th>成本统计</th>
-          <td>
-            <span class="code">src/utils/modelCost.ts</span> 用 DeepSeek profile pricing 计算 input、output、
-            cache read 和 cache write 成本，不再落到未知模型默认价格。
+            <span class="code">src/utils/context.ts</span> 和 <span class="code">src/utils/modelCost.ts</span>
+            已读取 DeepSeek profile 的 context、max output 和 pricing，不再各自猜模型能力。
           </td>
         </tr>
       </table>
@@ -317,8 +319,8 @@
         <div class="status">
           <strong>Focused Tests</strong>
           <span>
-            <span class="code">bun test src/services/deepseek/__tests__/modelProfiles.test.ts src/services/api/openai/__tests__/thinking.test.ts src/services/api/openai/__tests__/env.test.ts src/utils/__tests__/effort.test.ts</span>
-            通过，93 pass。
+            <span class="code">bun test src/services/deepseek/__tests__/modelProfiles.test.ts src/services/api/openai/__tests__/env.test.ts</span>
+            通过，16 pass。
           </span>
         </div>
         <div class="status">
@@ -327,14 +329,25 @@
         </div>
         <div class="status">
           <strong>Lint</strong>
-          <span><span class="code">bun run lint ...</span> 通过，Biome 未发现问题。</span>
+          <span><span class="code">bun run lint ...</span> 通过，Biome checked 3169 files。</span>
+        </div>
+        <div class="status">
+          <strong>Unavailable Script</strong>
+          <span><span class="code">bun run test:all</span> 在当前 <span class="code">package.json</span> 中不存在，无法按文档命令执行。</span>
         </div>
         <div class="status">
           <strong>Full Test</strong>
           <span>
-            <span class="code">bun run test:all</span> 不存在；改跑 <span class="code">bun test</span>。
-            全量结果：5377 pass / 5 fail。失败项集中在 skill search/skillLearning 的既有状态污染，以及
-            OpenAI env 测试在全量并发环境下的 process.env/config 竞争；相关 DeepSeek 局部测试单独运行通过。
+            <span class="code">bun test</span> 已重新执行：5393 pass / 0 fail / 10123 expect。
+            之前的 skill search、skillLearning 和 OpenAI env 跨测试状态失败已修复。
+          </span>
+        </div>
+        <div class="status">
+          <strong>Isolation Fix</strong>
+          <span>
+            DeepSeek 测试配置改为测试态 override；skill search/learning 测试显式传递
+            <span class="code">cwd</span> 并清理模块级 discovery/cache 状态；Advisor 配置缓存为
+            <span class="code">null</span> 时降级为空对象，避免命令索引崩溃。
           </span>
         </div>
       </div>
@@ -345,13 +358,18 @@
       <div class="files">
         <div>src/services/deepseek/modelProfiles.ts</div>
         <div>src/services/deepseek/__tests__/modelProfiles.test.ts</div>
+        <div>src/services/api/openai/env.ts</div>
+        <div>src/services/api/openai/__tests__/env.test.ts</div>
+        <div>src/services/providerRegistry/loader.ts</div>
         <div>src/services/deepseek/config.ts</div>
         <div>src/services/api/openai/requestBody.ts</div>
-        <div>src/services/api/openai/__tests__/thinking.test.ts</div>
-        <div>src/services/api/openai/index.ts</div>
-        <div>src/utils/effort.ts</div>
-        <div>src/utils/__tests__/effort.test.ts</div>
+        <div>src/services/skillSearch/prefetch.ts</div>
+        <div>src/services/skillSearch/__tests__/prefetch.test.ts</div>
+        <div>src/services/skillLearning/__tests__/skillLearningSmoke.test.ts</div>
+        <div>src/commands/skill-learning/skill-learning.ts</div>
+        <div>src/utils/advisor.ts</div>
         <div>src/utils/context.ts</div>
+        <div>src/utils/effort.ts</div>
         <div>src/utils/modelCost.ts</div>
       </div>
     </section>
@@ -359,18 +377,17 @@
     <section id="risks">
       <h2>剩余风险</h2>
       <ul>
-        <li>DeepSeek 官方价格和促销截止日期仍是外部事实，后续版本应定期复核 profile pricing。</li>
-        <li>全量 <span class="code">bun test</span> 仍有 5 个跨测试状态/并发环境失败，当前未在本轮修复。</li>
-        <li>OpenAI SDK 类型尚未包含 DeepSeek 的 <span class="code">reasoning_effort: max</span>，调用点使用双重断言透传兼容字段。</li>
+        <li>DeepSeek 官方价格和促销截止日期是外部事实，后续版本需要定期复核 profile pricing。</li>
+        <li>OpenAI SDK 类型尚未包含 DeepSeek 的 <span class="code">reasoning_effort: max</span>，调用点仍用双重断言透传兼容字段。</li>
+        <li>全量测试当前为绿色；剩余风险主要是 DeepSeek profile pricing 需要随官方价格变化定期复核。</li>
       </ul>
     </section>
 
     <section>
       <h2>建议下一步</h2>
       <ul>
-        <li>把 OpenAI env/config 测试改成隔离进程或 mock 配置存储，消除全量并发下的环境变量竞争。</li>
-        <li>如果继续做“任务感知模型路由”，基于本次 profile 输出模型/effort 建议，不要在 provider adapter 里散落策略。</li>
         <li>补一个低副作用的成本计算测试入口，直接覆盖 DeepSeek pricing 到 <span class="code">calculateUSDCost()</span> 的映射。</li>
+        <li>如果后续要让任务感知路由直连 DeepSeek，可直接复用本次 profile 的 family 默认策略。</li>
       </ul>
     </section>
 

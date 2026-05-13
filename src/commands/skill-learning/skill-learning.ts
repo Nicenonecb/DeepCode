@@ -23,10 +23,13 @@ import {
 
 export const call: LocalCommandCall = async (
   args,
+  context,
 ): Promise<{ type: 'text'; value: string }> => {
   const parts = args.trim().split(/\s+/).filter(Boolean)
   const sub = parts[0] ?? 'status'
-  const project = resolveProjectContext(process.cwd())
+  const contextCwd = (context as Record<string, unknown>).cwd
+  const cwd = typeof contextCwd === 'string' ? contextCwd : process.cwd()
+  const project = resolveProjectContext(cwd)
   const rootDir = process.env.CLAUDE_SKILL_LEARNING_HOME
   const options = { project, rootDir }
 
@@ -79,12 +82,12 @@ export const call: LocalCommandCall = async (
     case 'evolve': {
       const generate = parts.includes('--generate')
       const instincts = await loadInstincts(options)
-      const drafts = generateSkillCandidates(instincts, { cwd: process.cwd() })
+      const drafts = generateSkillCandidates(instincts, { cwd })
       const written = []
       if (generate) {
         for (const draft of drafts) {
           const roots = [
-            join(process.cwd(), '.claude', 'skills'),
+            join(cwd, '.claude', 'skills'),
             join(getClaudeConfigHomeDir(), 'skills'),
           ]
           const existing = await compareExistingSkills(draft, roots)

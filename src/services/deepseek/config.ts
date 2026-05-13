@@ -16,12 +16,22 @@ export interface StoredDeepSeekConfig {
   model?: string
 }
 
+let storedDeepSeekConfigForTesting: StoredDeepSeekConfig | null = null
+
 function clean(value: string | undefined): string | undefined {
   const trimmed = value?.trim()
   return trimmed ? trimmed : undefined
 }
 
 export function getStoredDeepSeekConfig(): StoredDeepSeekConfig {
+  if (process.env.NODE_ENV === 'test' && storedDeepSeekConfigForTesting) {
+    return {
+      apiKey: clean(storedDeepSeekConfigForTesting.apiKey),
+      baseURL: clean(storedDeepSeekConfigForTesting.baseURL),
+      model: clean(storedDeepSeekConfigForTesting.model),
+    }
+  }
+
   const config = getGlobalConfig()
   return {
     apiKey: clean(config.deepSeekApiKey),
@@ -65,6 +75,15 @@ export async function saveDeepSeekConfig(input: {
     }
   }
 
+  if (process.env.NODE_ENV === 'test' && storedDeepSeekConfigForTesting) {
+    storedDeepSeekConfigForTesting = {
+      apiKey,
+      baseURL,
+      model: clean(input.model),
+    }
+    return
+  }
+
   saveGlobalConfig(current => ({
     ...current,
     deepSeekApiKey: apiKey,
@@ -78,6 +97,7 @@ export async function saveDeepSeekConfig(input: {
 }
 
 export function removeDeepSeekConfigForTesting(): void {
+  storedDeepSeekConfigForTesting = {}
   saveGlobalConfig(current => ({
     ...current,
     deepSeekApiKey: undefined,

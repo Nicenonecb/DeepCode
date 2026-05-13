@@ -3,7 +3,9 @@ import {
   DEEPSEEK_DEFAULT_MODEL,
   DEEPSEEK_FAST_MODEL,
   DEEPSEEK_MODEL_PROFILES,
+  getDeepSeekModelFamily,
   getDeepSeekModelProfile,
+  getDefaultDeepSeekModelForAnthropicModel,
   getDefaultDeepSeekModelForFamily,
   getDeepSeekThinkingDefault,
   resolveDeepSeekReasoningEffort,
@@ -37,6 +39,19 @@ describe('DeepSeek model profiles', () => {
     expect(profile.maxOutputTokens).toBe(384_000)
     expect(profile.defaultStrategy.useForFastMode).toBe(true)
     expect(getDefaultDeepSeekModelForFamily('haiku')).toBe('deepseek-v4-flash')
+  })
+
+  test('maps Anthropic families to profile defaults', () => {
+    expect(getDeepSeekModelFamily('claude-haiku-4-5-20251001')).toBe('haiku')
+    expect(
+      getDefaultDeepSeekModelForAnthropicModel('claude-haiku-4-5-20251001'),
+    ).toBe('deepseek-v4-flash')
+    expect(getDefaultDeepSeekModelForAnthropicModel('claude-sonnet-4-6')).toBe(
+      'deepseek-v4-pro',
+    )
+    expect(getDefaultDeepSeekModelForAnthropicModel('claude-opus-4-6')).toBe(
+      'deepseek-v4-pro',
+    )
   })
 
   test('declares V3.2 legacy context and thinking budget', () => {

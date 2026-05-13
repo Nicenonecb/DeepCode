@@ -34,6 +34,8 @@ export type DeepSeekDefaultStrategy = {
   familyDefaults: readonly ('haiku' | 'sonnet' | 'opus')[]
 }
 
+export type DeepSeekModelFamily = 'haiku' | 'sonnet' | 'opus'
+
 export type DeepSeekModelProfile = {
   id: DeepSeekModelId
   displayName: string
@@ -185,7 +187,7 @@ export function findDeepSeekModelAlias(model: string): AliasMatch | undefined {
 }
 
 export function getDefaultDeepSeekModelForFamily(
-  family: 'haiku' | 'sonnet' | 'opus' | null,
+  family: DeepSeekModelFamily | null,
 ): DeepSeekModelId {
   if (!family) return DEEPSEEK_DEFAULT_MODEL
 
@@ -193,6 +195,23 @@ export function getDefaultDeepSeekModelForFamily(
     p.defaultStrategy.familyDefaults.includes(family),
   )
   return profile?.id ?? DEEPSEEK_DEFAULT_MODEL
+}
+
+export function getDeepSeekModelFamily(
+  model: string,
+): DeepSeekModelFamily | null {
+  if (/haiku/i.test(model)) return 'haiku'
+  if (/opus/i.test(model)) return 'opus'
+  if (/sonnet/i.test(model)) return 'sonnet'
+  return null
+}
+
+export function getDefaultDeepSeekModelForAnthropicModel(
+  anthropicModel: string,
+): DeepSeekModelId {
+  return getDefaultDeepSeekModelForFamily(
+    getDeepSeekModelFamily(anthropicModel),
+  )
 }
 
 export function getDeepSeekThinkingDefault(model: string): boolean {
