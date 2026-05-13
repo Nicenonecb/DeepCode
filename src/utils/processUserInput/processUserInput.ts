@@ -59,6 +59,9 @@ import {
   hasUltraplanKeyword,
   replaceUltraplanKeyword,
 } from '../ultraplan/keyword.js'
+import { parseUserSpecifiedModel } from '../model/model.js'
+import { getTaskAwareModelRoutingConfig } from '../taskAwareModelRoutingConfig.js'
+import type { TaskAwareModelRoutingConfig } from '../taskAwareModelRouter.js'
 import { getTaskAwareModelRoutePatch } from '../taskAwareModelRouter.js'
 import { processTextPrompt } from './processTextPrompt.js'
 export type ProcessUserInputContext = ToolUseContext & LocalJSXCommandContext
@@ -624,14 +627,16 @@ function addImageMetadataMessage(
   return result
 }
 
-function applyTaskAwareModelRoute(
+export function applyTaskAwareModelRoute(
   result: ProcessUserInputBaseResult,
   input: string | null,
   context: ProcessUserInputContext,
+  config: TaskAwareModelRoutingConfig = getTaskAwareModelRoutingConfig(),
 ): ProcessUserInputBaseResult {
   const appState = context.getAppState()
   const patch = getTaskAwareModelRoutePatch({
     input,
+    config,
     hasModelOverride:
       result.model !== undefined ||
       appState.mainLoopModel !== null ||
@@ -646,7 +651,7 @@ function applyTaskAwareModelRoute(
 
   return {
     ...result,
-    ...(patch.model ? { model: patch.model } : {}),
+    ...(patch.model ? { model: parseUserSpecifiedModel(patch.model) } : {}),
     ...(patch.effort ? { effort: patch.effort } : {}),
   }
 }

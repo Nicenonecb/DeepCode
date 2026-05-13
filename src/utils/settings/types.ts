@@ -77,6 +77,27 @@ export const PermissionsSchema = lazySchema(() =>
     .passthrough(),
 )
 
+export const TaskAwareModelRouteSettingsSchema = lazySchema(() =>
+  z
+    .object({
+      model: z
+        .string()
+        .optional()
+        .describe(
+          'Model alias or model ID to use when this task route matches.',
+        ),
+      effort: z
+        .enum(
+          process.env.USER_TYPE === 'ant'
+            ? ['low', 'medium', 'high', 'xhigh', 'max']
+            : ['low', 'medium', 'high', 'xhigh'],
+        )
+        .optional()
+        .describe('Reasoning effort to use when this task route matches.'),
+    })
+    .passthrough(),
+)
+
 /**
  * Schema for extra marketplaces defined in repository settings
  * Same as KnownMarketplace but without lastUpdated (which is managed automatically)
@@ -395,6 +416,29 @@ export const SettingsSchema = lazySchema(() =>
           'Override mapping from Anthropic model ID (e.g. "claude-opus-4-6") to provider-specific ' +
             'model ID (e.g. a Bedrock inference profile ARN). Typically set in managed settings by ' +
             'enterprise administrators.',
+        ),
+      taskAwareModelRouting: z
+        .object({
+          enabled: z
+            .boolean()
+            .optional()
+            .describe(
+              'Whether task-aware model routing is enabled when the TASK_AWARE_MODEL_ROUTING feature is available.',
+            ),
+          routes: z
+            .object({
+              explain: TaskAwareModelRouteSettingsSchema().optional(),
+              bugfix: TaskAwareModelRouteSettingsSchema().optional(),
+              complex: TaskAwareModelRouteSettingsSchema().optional(),
+            })
+            .optional()
+            .describe(
+              'Per-task routing overrides. explain is used for explanation/Q&A prompts, bugfix for clear fixes, and complex for refactors or large changes.',
+            ),
+        })
+        .optional()
+        .describe(
+          'Configure task-aware model routing without changing CLI or API call sites.',
         ),
       // Whether to automatically approve all MCP servers in the project
       enableAllProjectMcpServers: z

@@ -239,15 +239,15 @@
   <main class="wrap">
     <header>
       <p class="eyebrow">DeepCode Progress Report</p>
-      <h1>当前进度：DeepSeek Model Profile 收口完成</h1>
+      <h1>当前进度：任务感知模型路由已配置化</h1>
       <p class="lead">
-        本轮复查并补齐 DeepSeek Model Profile：V4 Pro / V4 Flash / V3.2 的 context、thinking、
-        effort、tool protocol、价格和默认策略已经集中声明，并继续收口 DeepSeek 默认模型解析，
-        让 Haiku/Sonnet/Opus family 默认策略从 profile 生效。
+        本轮完成第三步：任务感知路由继续受 <span class="code">TASK_AWARE_MODEL_ROUTING</span>
+        feature flag 控制，同时新增 <span class="code">taskAwareModelRouting</span> settings 配置入口。
+        解释/问答、bugfix、复杂改造的默认模型/effort 不再散落在 CLI 或 API 层，调用侧只读取统一配置并应用路由 patch。
       </p>
       <div class="meta">
         <span class="pill">状态：已实现</span>
-        <span class="pill">风险：低</span>
+        <span class="pill">风险：低-中</span>
         <span class="pill">代码改动：已完成</span>
         <span class="pill">验证：全量测试、类型检查、lint 通过</span>
       </div>
@@ -264,8 +264,8 @@
     <section>
       <h2>本轮目标</h2>
       <p>
-        完成 DeepSeek 模型能力的统一声明与运行时接入，并修正默认策略未完全成为单一来源的问题：
-        DeepSeek env/config 下的默认模型解析现在会通过 profile 的 familyDefaults 决定 V4 Flash / V4 Pro。
+        接入现有配置体系和 feature flag，让任务类型到模型/effort 的映射可以通过 settings 覆盖或关闭；
+        默认策略集中在路由模块，processUserInput 只负责在 feature 开启时读取配置并应用。
       </p>
     </section>
 
@@ -273,41 +273,43 @@
       <h2>已完成改动</h2>
       <table class="table">
         <tr>
-          <th>模型画像</th>
+          <th>配置入口</th>
           <td>
-            <span class="code">src/services/deepseek/modelProfiles.ts</span> 集中声明 V4 Pro / V4 Flash / V3.2
-            的 context、max output、thinking 默认值、supported effort、tool protocol、pricing 和默认策略。
+            新增 <span class="code">src/utils/taskAwareModelRoutingConfig.ts</span>，
+            从 settings 解析 <span class="code">taskAwareModelRouting.enabled</span> 和
+            <span class="code">taskAwareModelRouting.routes</span>，并与默认路由策略合并。
           </td>
         </tr>
         <tr>
-          <th>默认策略</th>
+          <th>Settings Schema</th>
           <td>
-            新增 <span class="code">getDeepSeekModelFamily()</span> 和
-            <span class="code">getDefaultDeepSeekModelForAnthropicModel()</span>；
-            Haiku 默认走 V4 Flash，Sonnet/Opus 默认走 V4 Pro。
+            <span class="code">src/utils/settings/types.ts</span> 接受
+            <span class="code">taskAwareModelRouting</span> 配置块，可配置
+            <span class="code">explain</span>、<span class="code">bugfix</span>、
+            <span class="code">complex</span> 三类路由的 <span class="code">model</span>
+            和 <span class="code">effort</span>。
           </td>
         </tr>
         <tr>
-          <th>OpenAI 兼容入口</th>
+          <th>路由策略</th>
           <td>
-            <span class="code">src/services/api/openai/env.ts</span> 在 DeepSeek env/config 下优先读取 profile
-            默认策略，保留 <span class="code">DEEPSEEK_MODEL</span>、<span class="code">OPENAI_MODEL</span>
-            和 <span class="code">DEEPSEEK_DEFAULT_*_MODEL</span> 显式覆盖。
+            <span class="code">src/utils/taskAwareModelRouter.ts</span> 现在导出默认配置和 route kinds；
+            分类器只根据配置返回 route target，默认仍是解释/问答 -> Flash + low、
+            bugfix -> Pro + high、复杂改造 -> Pro + max。
           </td>
         </tr>
         <tr>
-          <th>Thinking / Effort</th>
+          <th>调用侧收敛</th>
           <td>
-            OpenAI 请求体通过 profile 判断 thinking 默认值，并透传 DeepSeek
-            <span class="code">reasoning_effort</span>；<span class="code">xhigh</span>
-            会映射为 DeepSeek 支持的 <span class="code">max</span>。
+            <span class="code">src/utils/processUserInput/processUserInput.ts</span> 继续只在普通 prompt
+            分支、且 feature flag 开启时应用路由；CLI/API 层不写任务类型映射。
           </td>
         </tr>
         <tr>
-          <th>Context / Cost</th>
+          <th>既有收口</th>
           <td>
-            <span class="code">src/utils/context.ts</span> 和 <span class="code">src/utils/modelCost.ts</span>
-            已读取 DeepSeek profile 的 context、max output 和 pricing，不再各自猜模型能力。
+            保留前一轮修复：headless/SDK 路径使用路由后的模型生成 system prompt，
+            路由模型别名先解析为实际模型名，避免 max effort 被裸别名判断降级。
           </td>
         </tr>
       </table>
@@ -319,8 +321,8 @@
         <div class="status">
           <strong>Focused Tests</strong>
           <span>
-            <span class="code">bun test src/services/deepseek/__tests__/modelProfiles.test.ts src/services/api/openai/__tests__/env.test.ts</span>
-            通过，16 pass。
+            <span class="code">bun test src/utils/__tests__/taskAwareModelRouter.test.ts src/utils/__tests__/taskAwareModelRoutingConfig.test.ts src/utils/processUserInput/__tests__/taskAwareRouting.test.ts src/utils/settings/__tests__/config.test.ts</span>
+            通过，80 pass。
           </span>
         </div>
         <div class="status">
@@ -329,7 +331,7 @@
         </div>
         <div class="status">
           <strong>Lint</strong>
-          <span><span class="code">bun run lint ...</span> 通过，Biome checked 3169 files。</span>
+          <span><span class="code">bun run lint</span> 通过，Biome checked 3172 files。</span>
         </div>
         <div class="status">
           <strong>Unavailable Script</strong>
@@ -338,16 +340,8 @@
         <div class="status">
           <strong>Full Test</strong>
           <span>
-            <span class="code">bun test</span> 已重新执行：5393 pass / 0 fail / 10123 expect。
-            之前的 skill search、skillLearning 和 OpenAI env 跨测试状态失败已修复。
-          </span>
-        </div>
-        <div class="status">
-          <strong>Isolation Fix</strong>
-          <span>
-            DeepSeek 测试配置改为测试态 override；skill search/learning 测试显式传递
-            <span class="code">cwd</span> 并清理模块级 discovery/cache 状态；Advisor 配置缓存为
-            <span class="code">null</span> 时降级为空对象，避免命令索引崩溃。
+            <span class="code">bun test</span> 已重新执行：5403 pass / 0 fail / 10137 expect。
+            新增路由配置测试已并入全量套件。
           </span>
         </div>
       </div>
@@ -356,38 +350,32 @@
     <section>
       <h2>主要影响文件</h2>
       <div class="files">
-        <div>src/services/deepseek/modelProfiles.ts</div>
-        <div>src/services/deepseek/__tests__/modelProfiles.test.ts</div>
-        <div>src/services/api/openai/env.ts</div>
-        <div>src/services/api/openai/__tests__/env.test.ts</div>
-        <div>src/services/providerRegistry/loader.ts</div>
-        <div>src/services/deepseek/config.ts</div>
-        <div>src/services/api/openai/requestBody.ts</div>
-        <div>src/services/skillSearch/prefetch.ts</div>
-        <div>src/services/skillSearch/__tests__/prefetch.test.ts</div>
-        <div>src/services/skillLearning/__tests__/skillLearningSmoke.test.ts</div>
-        <div>src/commands/skill-learning/skill-learning.ts</div>
-        <div>src/utils/advisor.ts</div>
-        <div>src/utils/context.ts</div>
-        <div>src/utils/effort.ts</div>
-        <div>src/utils/modelCost.ts</div>
+        <div>src/QueryEngine.ts</div>
+        <div>src/utils/processUserInput/processUserInput.ts</div>
+        <div>src/utils/taskAwareModelRouter.ts</div>
+        <div>src/utils/taskAwareModelRoutingConfig.ts</div>
+        <div>src/utils/__tests__/taskAwareModelRouter.test.ts</div>
+        <div>src/utils/__tests__/taskAwareModelRoutingConfig.test.ts</div>
+        <div>src/utils/processUserInput/__tests__/taskAwareRouting.test.ts</div>
+        <div>src/utils/settings/types.ts</div>
+        <div>src/utils/settings/__tests__/config.test.ts</div>
       </div>
     </section>
 
     <section id="risks">
       <h2>剩余风险</h2>
       <ul>
-        <li>DeepSeek 官方价格和促销截止日期是外部事实，后续版本需要定期复核 profile pricing。</li>
-        <li>OpenAI SDK 类型尚未包含 DeepSeek 的 <span class="code">reasoning_effort: max</span>，调用点仍用双重断言透传兼容字段。</li>
-        <li>全量测试当前为绿色；剩余风险主要是 DeepSeek profile pricing 需要随官方价格变化定期复核。</li>
+        <li>分类器仍是启发式关键词规则，真实提示词里可能需要继续微调“解释 vs 修复 vs 重构”的边界。</li>
+        <li>如果用户在 settings/env/CLI 中显式配置了模型，当前实现会尊重该配置，只补 effort；这是保守策略。</li>
+        <li>settings 覆盖现在支持 route target，不支持自定义关键词；后续如需调关键词，可扩展同一配置块。</li>
       </ul>
     </section>
 
     <section>
       <h2>建议下一步</h2>
       <ul>
-        <li>补一个低副作用的成本计算测试入口，直接覆盖 DeepSeek pricing 到 <span class="code">calculateUSDCost()</span> 的映射。</li>
-        <li>如果后续要让任务感知路由直连 DeepSeek，可直接复用本次 profile 的 family 默认策略。</li>
+        <li>Dogfood 一组真实中文任务提示，确认当前默认策略是否需要通过 settings 在项目级覆盖。</li>
+        <li>需要排查线上路由效果时，可增加低噪音 debug event，记录命中类别、配置来源和显式覆盖跳过原因。</li>
       </ul>
     </section>
 

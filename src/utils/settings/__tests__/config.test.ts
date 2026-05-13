@@ -39,6 +39,20 @@ describe('SettingsSchema', () => {
     expect(result.success).toBe(true)
   })
 
+  test('accepts task-aware model routing settings', () => {
+    const result = SettingsSchema().safeParse({
+      taskAwareModelRouting: {
+        enabled: true,
+        routes: {
+          explain: { model: 'haiku', effort: 'low' },
+          bugfix: { model: 'opus', effort: 'high' },
+        },
+      },
+    })
+
+    expect(result.success).toBe(true)
+  })
+
   test('accepts permissions block with allow rules', () => {
     const result = SettingsSchema().safeParse({
       permissions: { allow: ['Bash(npm install)'] },

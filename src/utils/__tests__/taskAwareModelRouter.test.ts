@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import {
   classifyTaskAwareModelRoute,
+  DEFAULT_TASK_AWARE_MODEL_ROUTING_CONFIG,
   getTaskAwareModelRoutePatch,
 } from '../taskAwareModelRouter.js'
 
@@ -69,6 +70,31 @@ describe('classifyTaskAwareModelRoute', () => {
 
   test('does not route unrelated short prompts', () => {
     expect(classifyTaskAwareModelRoute('继续')).toBeUndefined()
+  })
+
+  test('uses configured route targets', () => {
+    expect(
+      classifyTaskAwareModelRoute('解释一下这个模块', {
+        ...DEFAULT_TASK_AWARE_MODEL_ROUTING_CONFIG,
+        routes: {
+          ...DEFAULT_TASK_AWARE_MODEL_ROUTING_CONFIG.routes,
+          explain: { model: 'custom-flash', effort: 'medium' },
+        },
+      }),
+    ).toEqual({
+      kind: 'explain',
+      model: 'custom-flash',
+      effort: 'medium',
+    })
+  })
+
+  test('does not route when config disables task-aware routing', () => {
+    expect(
+      classifyTaskAwareModelRoute('修复登录失败的问题', {
+        ...DEFAULT_TASK_AWARE_MODEL_ROUTING_CONFIG,
+        enabled: false,
+      }),
+    ).toBeUndefined()
   })
 })
 
