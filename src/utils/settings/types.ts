@@ -98,6 +98,52 @@ export const TaskAwareModelRouteSettingsSchema = lazySchema(() =>
     .passthrough(),
 )
 
+export const VerificationRunnerCommandSchema = lazySchema(() =>
+  z.union([
+    z.string().min(1),
+    z
+      .object({
+        kind: z.enum(['typecheck', 'lint', 'test']).optional(),
+        name: z.string().optional(),
+        command: z.string().min(1),
+        args: z.array(z.string()).optional(),
+        timeoutMs: z.number().int().positive().optional(),
+      })
+      .passthrough(),
+  ]),
+)
+
+export const VerificationRunnerSettingsSchema = lazySchema(() =>
+  z
+    .object({
+      enabled: z
+        .boolean()
+        .optional()
+        .describe('Whether VerificationRunner is enabled. Defaults to true.'),
+      commands: z
+        .array(VerificationRunnerCommandSchema())
+        .optional()
+        .describe(
+          'Commands to run for verification. When omitted, package scripts are auto-detected. String commands are shell-tokenized; object commands may provide command and args separately.',
+        ),
+      timeoutMs: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe(
+          'Default timeout in milliseconds for each verification command.',
+        ),
+      runOnCompletion: z
+        .boolean()
+        .optional()
+        .describe(
+          'Whether to run VerificationRunner automatically when the agent is about to finish after file changes. Defaults to true.',
+        ),
+    })
+    .passthrough(),
+)
+
 /**
  * Schema for extra marketplaces defined in repository settings
  * Same as KnownMarketplace but without lastUpdated (which is managed automatically)
@@ -439,6 +485,11 @@ export const SettingsSchema = lazySchema(() =>
         .optional()
         .describe(
           'Configure task-aware model routing without changing CLI or API call sites.',
+        ),
+      verificationRunner: VerificationRunnerSettingsSchema()
+        .optional()
+        .describe(
+          'Configure automatic verification commands and completion-time verification behavior.',
         ),
       // Whether to automatically approve all MCP servers in the project
       enableAllProjectMcpServers: z

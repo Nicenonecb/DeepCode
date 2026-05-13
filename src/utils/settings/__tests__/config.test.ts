@@ -53,6 +53,28 @@ describe('SettingsSchema', () => {
     expect(result.success).toBe(true)
   })
 
+  test('accepts verification runner settings', () => {
+    const result = SettingsSchema().safeParse({
+      verificationRunner: {
+        enabled: true,
+        runOnCompletion: false,
+        timeoutMs: 120_000,
+        commands: [
+          'bun run typecheck',
+          {
+            kind: 'test',
+            name: 'Focused tests',
+            command: 'bun',
+            args: ['test', 'src/services/verification/__tests__'],
+            timeoutMs: 60_000,
+          },
+        ],
+      },
+    })
+
+    expect(result.success).toBe(true)
+  })
+
   test('accepts permissions block with allow rules', () => {
     const result = SettingsSchema().safeParse({
       permissions: { allow: ['Bash(npm install)'] },

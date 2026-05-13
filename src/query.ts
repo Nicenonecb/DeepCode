@@ -114,6 +114,14 @@ import { handleStopHooks } from './query/stopHooks.js'
 import { buildQueryConfig } from './query/config.js'
 import { productionDeps, type QueryDeps } from './query/deps.js'
 import type { Terminal, Continue } from './query/transitions.js'
+import {
+  VerificationRunner,
+  formatVerificationStatusMessage,
+  formatVerificationSummary,
+  shouldRunVerificationOnCompletion,
+  type VerificationRunnerSettings,
+} from './services/verification/index.js'
+import { getCwd } from './utils/cwd.js'
 import { feature } from 'bun:bundle'
 import {
   getCurrentTurnTokenBudget,
@@ -445,6 +453,7 @@ async function* queryLoop(
   // Snapshot immutable env/statsig/session state once at entry. See QueryConfig
   // for what's included and why feature() gates are intentionally excluded.
   const config = buildQueryConfig()
+  let lastVerificationMessageCount = 0
 
   // Fired once per user turn — the prompt is invariant across loop iterations,
   // so per-iteration firing would ask sideQuery the same question N times.
@@ -1629,6 +1638,59 @@ async function* queryLoop(
         }
       }
 
+      const verificationRunnerSettings =
+        toolUseContext.getAppState().settings.verificationRunner
+      const verificationInputMessages =
+        messagesForQuery.concat(assistantMessages)
+      if (
+        shouldRunCompletionVerification(
+          verificationInputMessages,
+          lastVerificationMessageCount,
+          toolUseContext,
+          querySource,
+          state.transition,
+          verificationRunnerSettings,
+        )
+      ) {
+        yield createSystemMessage('Running verification commands...', 'info')
+        const verificationSummary = await new VerificationRunner({
+          cwd: getCwd(),
+          settings: verificationRunnerSettings,
+        }).run()
+        const formattedSummary = formatVerificationSummary(verificationSummary)
+        const visibleStatus =
+          formatVerificationStatusMessage(verificationSummary)
+        lastVerificationMessageCount = verificationInputMessages.length
+
+        if (verificationSummary.status !== 'passed') {
+          yield createSystemMessage(
+            `${visibleStatus} Feeding results back into the model.`,
+            'warning',
+          )
+          state = {
+            messages: [
+              ...verificationInputMessages,
+              createUserMessage({
+                content: formattedSummary,
+                isMeta: true,
+              }),
+            ],
+            toolUseContext,
+            autoCompactTracking: tracking,
+            maxOutputTokensRecoveryCount: 0,
+            hasAttemptedReactiveCompact: false,
+            maxOutputTokensOverride: undefined,
+            pendingToolUseSummary: undefined,
+            stopHookActive: undefined,
+            turnCount,
+            transition: { reason: 'verification_failed' },
+          }
+          continue
+        }
+
+        yield createSystemMessage(visibleStatus, 'info')
+      }
+
       return { reason: 'completed' }
     }
 
@@ -2039,4 +2101,39 @@ async function* queryLoop(
     }
     state = next
   } // while (true)
+}
+
+function shouldRunCompletionVerification(
+  messages: Message[],
+  lastVerificationMessageCount: number,
+  toolUseContext: ToolUseContext,
+  querySource: QuerySource,
+  transition: Continue | undefined,
+  settings: VerificationRunnerSettings | undefined,
+): boolean {
+  if (!shouldRunVerificationOnCompletion(settings)) return false
+  if (transition?.reason === 'verification_failed') return false
+  if (toolUseContext.agentId) return false
+  if (toolUseContext.options.isNonInteractiveSession) return false
+  if (
+    typeof querySource !== 'string' ||
+    !querySource.startsWith('repl_main_thread')
+  ) {
+    return false
+  }
+  return hasFileChangeSince(messages, lastVerificationMessageCount)
+}
+
+function hasFileChangeSince(
+  messages: Message[],
+  lastVerificationMessageCount: number,
+): boolean {
+  return messages.slice(lastVerificationMessageCount).some(message => {
+    if (message.type !== 'attachment') return false
+    const attachmentType = message.attachment?.type
+    return (
+      attachmentType === 'edited_text_file' ||
+      attachmentType === 'edited_image_file'
+    )
+  })
 }

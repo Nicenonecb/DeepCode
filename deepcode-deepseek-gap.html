@@ -266,6 +266,60 @@
     .rewrite .tag { background: var(--violet); }
     .paper .tag { background: var(--amber); color: #241a0e; }
 
+    .status-chip {
+      display: inline-block;
+      margin: 0 0 8px;
+      padding: 5px 8px;
+      color: #fff;
+      background: var(--deep-2);
+      font: 800 12px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+
+    .status-chip.done { background: var(--green); }
+    .status-chip.next { background: var(--violet); }
+    .status-chip.todo { background: var(--red); }
+    .status-chip.watch { background: var(--amber); color: #241a0e; }
+
+    .done-row td {
+      background: rgba(63,125,85,.08);
+    }
+
+    .done-row td:first-child {
+      color: #244e36;
+    }
+
+    .done-row td:last-child {
+      border-right: 4px solid var(--green);
+    }
+
+    .progress-board {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+      margin-top: 18px;
+    }
+
+    .progress-note {
+      min-height: 140px;
+      padding: 18px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      box-shadow: 0 10px 26px rgba(42,32,18,.07);
+    }
+
+    .progress-note h3 {
+      margin: 0 0 8px;
+      font-size: 18px;
+      line-height: 1.15;
+    }
+
+    .progress-note p {
+      margin: 0;
+      color: #4c4943;
+      font-size: 15px;
+      overflow-wrap: anywhere;
+    }
+
     .wide-table {
       width: 100%;
       border-collapse: collapse;
@@ -281,6 +335,7 @@
       border-bottom: 1px solid var(--line);
       text-align: left;
       vertical-align: top;
+      overflow-wrap: anywhere;
     }
 
     .wide-table th {
@@ -396,6 +451,7 @@
       }
       header { min-height: auto; }
       .grid { grid-template-columns: 1fr; }
+      .progress-board { grid-template-columns: 1fr; }
       .score-grid { grid-template-columns: 1fr; }
       .wide-table {
         display: block;
@@ -414,28 +470,29 @@
         <div class="verdict">
           <span class="pill">结论：底盘已具备</span>
           <span class="pill">短板：DeepSeek 原生层不足</span>
-          <span class="pill">优先：VerificationRunner + Model Profile</span>
+          <span class="pill">优先：VerificationRunner + ContextPacker</span>
+          <span class="pill">开源删减：3 / 12 已完成</span>
         </div>
       </div>
       <aside class="scoreboard">
         <h2>当前判断</h2>
         <div class="score-grid">
-          <div class="metric"><strong>18</strong><span>项底层能力已具备</span></div>
-          <div class="metric"><strong>10</strong><span>项关键能力未产品化</span></div>
+          <div class="metric"><strong>20</strong><span>项底层能力已具备</span></div>
+          <div class="metric"><strong>8</strong><span>项关键能力未产品化</span></div>
           <div class="metric"><strong>5</strong><span>项应优先开工</span></div>
-          <div class="metric"><strong>12</strong><span>项开源版应剥离</span></div>
+          <div class="metric"><strong>3/12</strong><span>项开源删减已同步状态</span></div>
         </div>
       </aside>
     </header>
 
     <nav class="report-switch" aria-label="报告导航">
       <a href="index.html">报告入口</a>
-      <a href="report.html">当前进度看板</a>
+      <a href="report.html">旧 report 记录</a>
     </nav>
 
     <nav aria-label="页面目录">
       <a href="#done">已实现</a>
-      <a href="#missing">没实现</a>
+      <a href="#missing">缺口状态</a>
       <a href="#optimize">可优化</a>
       <a href="#rewrite">要重写</a>
       <a href="#paper">论文新增</a>
@@ -465,17 +522,32 @@
         </div>
       </section>
 
+      <section id="progress">
+        <div class="section-head">
+          <h2>本轮进度</h2>
+          <p>推进 VerificationRunner 第四段：Query 级集成测试、JUnit/reporter 深解析和可见状态提示。</p>
+        </div>
+        <div class="progress-board">
+          <article class="progress-note"><span class="status-chip done">DONE</span><h3>本轮目标</h3><p>完成下一步：补 Query 级 verification 回灌集成测试、JUnit XML / reporter 失败解析，并把验证通过/失败摘要作为可见 system status 展示。</p></article>
+          <article class="progress-note"><span class="status-chip done">DONE</span><h3>已完成改动</h3><p>测试解析器现在能从 JUnit testcase failure/error、Bun/Jest/Vitest 风格 reporter 行和附近 stack location 提取失败测试名、文件、行列；Query 测试验证失败 summary 会进入第二次模型调用。</p></article>
+          <article class="progress-note"><span class="status-chip done">PASS</span><h3>验证命令和结果</h3><p>`bun test src/services/verification/__tests__/`：19 pass，0 fail。`bun test src/__tests__/queryAutonomyProviderBoundary.test.ts`：3 pass，0 fail。`bun run typecheck`：通过。`bunx biome lint ...`：通过。</p></article>
+          <article class="progress-note"><span class="status-chip done">FILES</span><h3>主要影响文件</h3><p>`src/services/verification/VerificationRunner.ts`、`src/services/verification/index.ts`、`src/services/verification/__tests__/VerificationRunner.test.ts`、`src/query.ts`、`src/__tests__/queryAutonomyProviderBoundary.test.ts`。</p></article>
+          <article class="progress-note"><span class="status-chip watch">WATCH</span><h3>剩余风险</h3><p>JUnit XML 解析采用轻量正则，足够覆盖常见 reporter 输出，但不是完整 XML parser；status 目前通过 REPL system message 展示，还未接入 footer/status line 常驻组件。</p></article>
+          <article class="progress-note"><span class="status-chip next">NEXT</span><h3>建议下一步</h3><p>后续可把 verification 状态落到 AppState，用 footer/status line 常驻展示最近一次验证结果，并补更多真实框架 reporter fixture。</p></article>
+        </div>
+      </section>
+
       <section id="missing">
         <div class="section-head">
-          <h2>还没实现</h2>
-          <p>这些决定 DeepSeek V4 Pro 能不能真正发挥 120%，不是锦上添花。</p>
+          <h2>缺口状态</h2>
+          <p>这张表保留原始差距，同时把已经落地的两项标成完成态，避免路线图和代码状态脱节。</p>
         </div>
         <table class="wide-table">
           <thead><tr><th>缺口</th><th>现在的问题</th><th>应该做成什么</th></tr></thead>
           <tbody>
-            <tr><td>DeepSeek Model Profile</td><td>现在靠模型名字符串和环境变量拼能力。</td><td>统一声明 V4 Pro / V4 Flash / V3.2 的 context、thinking、effort、tool protocol、价格和默认策略。</td></tr>
-            <tr><td>任务感知路由</td><td>简单任务和复杂任务没有稳定分流。</td><td>解释用 Flash/low，bugfix 用 Pro/high，疑难重构用 Pro/max。</td></tr>
-            <tr><td>VerificationRunner</td><td>跑测试主要靠模型自觉。</td><td>系统自动检测、运行、解析 test/lint/typecheck，并把结果结构化回灌。</td></tr>
+            <tr class="done-row"><td><span class="status-chip done">DONE</span><br>DeepSeek Model Profile</td><td>已从散落字符串判断收敛到 `src/services/deepseek/modelProfiles.ts`，并被 context window、max output、effort、thinking、OpenAI model resolution、cost 计算复用。</td><td><strong>已完成。</strong>统一声明 V4 Pro / V4 Flash / V3.2 的 context、thinking、effort、tool protocol、价格和默认策略；相关单测覆盖 profile、family 映射、别名、默认 effort。</td></tr>
+            <tr class="done-row"><td><span class="status-chip done">DONE</span><br>任务感知路由</td><td>已新增 explain / bugfix / complex 分类器、route patch、settings schema 和输入处理接入；在 feature flag 启用时自动补 model / effort，且尊重用户显式覆盖。</td><td><strong>已完成。</strong>解释走 low，bugfix 走 high，疑难重构走 max；当前默认目标使用 `haiku` / `opus` family alias，可通过 DeepSeek profile 映射或 settings 覆盖成具体 V4 Flash / V4 Pro。</td></tr>
+            <tr><td><span class="status-chip watch">CORE</span><br>VerificationRunner</td><td>核心运行层、失败解析、回灌摘要、配置层和 Query 级闭环测试已完成：能检测或配置验证命令，解析 TypeScript/lint/test/JUnit/reporter 失败，按 settings 控制 completion 自动验证，并展示可见验证状态。</td><td><strong>进行中。</strong>失败结果已可作为 meta message 回灌给 agent loop 继续修；下一步可做 AppState/footer 常驻状态和更多真实 reporter fixture。</td></tr>
             <tr><td>ContextPacker</td><td>1M context 只是窗口变大。</td><td>按任务打包 repo map、diff、错误栈、相关文件、LSP 符号、测试文件。</td></tr>
             <tr><td>WorkingMemory</td><td>长任务靠聊天历史维持状态。</td><td>结构化保存目标、事实、排除假设、已改文件、命令、测试状态、下一步。</td></tr>
             <tr><td>DSML Gateway</td><td>还没有 V4 论文里的 DSML 工具协议。</td><td>增加 DSML parser/serializer，与 OpenAI function calling A/B。</td></tr>
@@ -547,18 +619,18 @@
         <table class="wide-table">
           <thead><tr><th>模块/机制</th><th>当前作用</th><th>开源 DeepCode 处理方式</th></tr></thead>
           <tbody>
-            <tr><td>Anthropic / Claude OAuth</td><td>`src/services/oauth/`、`src/utils/auth.ts`、Claude.ai token、订阅账号判断。</td><td><strong>删除主路径。</strong>只保留 OpenAI-compatible API Key。用户不需要 Claude 登录。</td></tr>
-            <tr><td>`/login` 账号流</td><td>`src/commands/login/` 里包含 Claude account、subscription、managed key 等逻辑。</td><td><strong>替换。</strong>改成 `/config` 或首次启动向导，只填 `API_KEY`、`BASE_URL`、`MODEL`。</td></tr>
-            <tr><td>Pro / Max / Team / Enterprise 判断</td><td>`isProSubscriber`、`isMaxSubscriber`、`isTeamSubscriber`、policy/source 相关判断影响功能开关。</td><td><strong>删除。</strong>开源版不应该按账号等级启用能力，功能由本地配置决定。</td></tr>
-            <tr><td>firstParty Anthropic provider</td><td>默认 provider 是 `firstParty`，并混有 Anthropic beta headers、OAuth、API key 来源判断。</td><td><strong>重构。</strong>默认 provider 改成 `openai-compatible`，DeepSeek/Ollama/vLLM 都走同一路径。</td></tr>
-            <tr><td>Bedrock / Vertex / Foundry</td><td>企业云 provider 兼容层。</td><td><strong>先移出主包。</strong>开源最小版不需要，后续可插件化。</td></tr>
-            <tr><td>Gemini / Grok provider</td><td>额外第三方 provider。</td><td><strong>可选插件。</strong>主线聚焦 DeepSeek/OpenAI-compatible，避免配置面太大。</td></tr>
-            <tr><td>Remote / Bridge / ACP 云控制</td><td>`src/remote/`、`src/bridge/`、`src/services/acp/`、`packages/remote-control-server/` 依赖 token、WebSocket、HTTPS、远程会话。</td><td><strong>默认移除或禁用。</strong>本地开源 CLI 不需要远程控制和 HTTPS 验证。</td></tr>
-            <tr><td>Remote Agent Task</td><td>`src/tasks/RemoteAgentTask/` 处理云端/远程 agent。</td><td><strong>删除主路径。</strong>保留 local/background/worktree agent 即可。</td></tr>
-            <tr><td>MCP OAuth / HTTP auth</td><td>MCP 远程 server 的 OAuth、浏览器认证、token 存储。</td><td><strong>先关掉。</strong>保留 stdio MCP；HTTP/SSE/OAuth MCP 做插件或高级功能。</td></tr>
-            <tr><td>Analytics / GrowthBook / Sentry</td><td>遥测、远程 feature flag、错误上报、版本门控。</td><td><strong>删除或 no-op。</strong>开源版不应依赖远程开关；feature flag 用本地配置文件。</td></tr>
-            <tr><td>Auto updater / version gate</td><td>自动更新、服务端版本配置、包完整性/发布渠道判断。</td><td><strong>删除。</strong>开源版交给 npm/bun/github release，不做官方客户端校验。</td></tr>
-            <tr><td>反篡改 / 官方环境判断</td><td>类似 `USER_TYPE === "ant"`、homespace、first-party URL、bundle integrity、内部 beta 能力。</td><td><strong>重写为开源能力开关。</strong>不判断用户是不是官方/是否篡改；只判断本地配置是否启用。</td></tr>
+            <tr class="done-row"><td><span class="status-chip done">DONE</span><br>Anthropic / Claude OAuth</td><td>`src/services/oauth/`、`src/utils/auth.ts`、Claude.ai token、订阅账号判断。</td><td><strong>已完成。</strong>主路径已切到 OpenAI-compatible API Key，用户不需要 Claude 登录。</td></tr>
+            <tr class="done-row"><td><span class="status-chip done">DONE</span><br>`/login` 账号流</td><td>`src/commands/login/` 里包含 Claude account、subscription、managed key 等逻辑。</td><td><strong>已完成。</strong>账号登录流已改为本地配置入口，只需要 API Key、Base URL 和模型名。</td></tr>
+            <tr class="done-row"><td><span class="status-chip done">DONE</span><br>Pro / Max / Team / Enterprise 判断</td><td>`isProSubscriber`、`isMaxSubscriber`、`isTeamSubscriber`、policy/source 相关判断影响功能开关。</td><td><strong>已完成。</strong>账号等级判断已从主路径移除，能力由本地配置决定。</td></tr>
+            <tr><td><span class="status-chip next">NEXT</span><br>firstParty Anthropic provider</td><td>默认 provider 是 `firstParty`，并混有 Anthropic beta headers、OAuth、API key 来源判断。</td><td><strong>重构。</strong>默认 provider 改成 `openai-compatible`，DeepSeek/Ollama/vLLM 都走同一路径。</td></tr>
+            <tr><td><span class="status-chip todo">TODO</span><br>Bedrock / Vertex / Foundry</td><td>企业云 provider 兼容层。</td><td><strong>先移出主包。</strong>开源最小版不需要，后续可插件化。</td></tr>
+            <tr><td><span class="status-chip todo">TODO</span><br>Gemini / Grok provider</td><td>额外第三方 provider。</td><td><strong>可选插件。</strong>主线聚焦 DeepSeek/OpenAI-compatible，避免配置面太大。</td></tr>
+            <tr><td><span class="status-chip todo">TODO</span><br>Remote / Bridge / ACP 云控制</td><td>`src/remote/`、`src/bridge/`、`src/services/acp/`、`packages/remote-control-server/` 依赖 token、WebSocket、HTTPS、远程会话。</td><td><strong>默认移除或禁用。</strong>本地开源 CLI 不需要远程控制和 HTTPS 验证。</td></tr>
+            <tr><td><span class="status-chip todo">TODO</span><br>Remote Agent Task</td><td>`src/tasks/RemoteAgentTask/` 处理云端/远程 agent。</td><td><strong>删除主路径。</strong>保留 local/background/worktree agent 即可。</td></tr>
+            <tr><td><span class="status-chip todo">TODO</span><br>MCP OAuth / HTTP auth</td><td>MCP 远程 server 的 OAuth、浏览器认证、token 存储。</td><td><strong>先关掉。</strong>保留 stdio MCP；HTTP/SSE/OAuth MCP 做插件或高级功能。</td></tr>
+            <tr><td><span class="status-chip todo">TODO</span><br>Analytics / GrowthBook / Sentry</td><td>遥测、远程 feature flag、错误上报、版本门控。</td><td><strong>删除或 no-op。</strong>开源版不应依赖远程开关；feature flag 用本地配置文件。</td></tr>
+            <tr><td><span class="status-chip todo">TODO</span><br>Auto updater / version gate</td><td>自动更新、服务端版本配置、包完整性/发布渠道判断。</td><td><strong>删除。</strong>开源版交给 npm/bun/github release，不做官方客户端校验。</td></tr>
+            <tr><td><span class="status-chip todo">TODO</span><br>反篡改 / 官方环境判断</td><td>类似 `USER_TYPE === "ant"`、homespace、first-party URL、bundle integrity、内部 beta 能力。</td><td><strong>重写为开源能力开关。</strong>不判断用户是不是官方/是否篡改；只判断本地配置是否启用。</td></tr>
           </tbody>
         </table>
 
@@ -573,14 +645,14 @@
         <div class="priority">
           <div class="big-callout">
             <h2>真正要先做什么？</h2>
-            <p>如果只开一个方向：先做 VerificationRunner + DeepSeek Model Profile。前者保证结果可靠，后者保证 DeepSeek 能力被正确调用。</p>
+            <p>如果只开一个方向：先做 VerificationRunner + ContextPacker。前者保证结果可靠，后者保证 DeepSeek 的长上下文吃到关键证据。</p>
             <div class="formula">120% = DeepSeek V4 Pro Max + 高质量上下文 + 严格工具协议 + 自动验证 + 工作记忆 + 多轨迹修复</div>
           </div>
           <ol class="ranked">
-            <li><div><strong>DeepSeek Model Profile</strong><span>统一 V4 Pro / Flash / V3.2 能力、1M、thinking、effort、tool protocol。</span></div></li>
             <li><div><strong>VerificationRunner</strong><span>把测试、lint、typecheck、回归检测变成默认闭环。</span></div></li>
             <li><div><strong>ContextPacker</strong><span>让 1M context 放关键证据，而不是堆垃圾上下文。</span></div></li>
             <li><div><strong>WorkingMemory</strong><span>长任务不丢目标、事实、已试方案、验证状态。</span></div></li>
+            <li><div><strong>Tool Call Repair</strong><span>把 parse/schema/runtime error 结构化，允许局部修复重试。</span></div></li>
             <li><div><strong>Benchmark Harness</strong><span>用真实任务量化 DeepCode 是否比其他 CLI / agent 强。</span></div></li>
           </ol>
         </div>

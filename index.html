@@ -176,42 +176,42 @@
         <p class="eyebrow">DeepCode Reports</p>
         <h1>把当前实现、边界和后续方向分开看。</h1>
         <p class="lead">
-          这里是根目录报告入口。当前 OAuth/login 删除工作和早先 DeepSeek V4 Pro 实现差距决策板分成两个页面，避免一个 HTML 变成难维护的长卷。
+          这里是根目录报告入口。DeepSeek V4 Pro 实现差距决策板是当前固定进度看板，旧 report 页面只保留为历史记录。
         </p>
       </div>
       <aside class="stamp">
         当前结构<br>
         index.html<br>
-        report.html<br>
-        deepcode-deepseek-gap.html
+        deepcode-deepseek-gap.html<br>
+        report.html
       </aside>
     </header>
 
     <section class="grid" aria-label="报告列表">
-      <a class="card" href="report.html">
+      <a class="card" href="deepcode-deepseek-gap.html">
         <div>
           <h2>当前进度看板</h2>
-          <p>固定记录当前目标、已完成改动、验证结果、影响文件、剩余风险和下一步。</p>
+          <p>固定记录 DeepSeek V4 Pro 实现差距、已完成状态、后续优先级和开源删减进展。</p>
           <div class="meta">
-            <span class="pill">OAuth/login</span>
-            <span class="pill">风险：中高</span>
-            <span class="pill">已验证</span>
+            <span class="pill">DeepSeek V4 Pro</span>
+            <span class="pill">实现差距</span>
+            <span class="pill">3/12 已同步</span>
           </div>
         </div>
         <span class="action">打开看板</span>
       </a>
 
-      <a class="card" href="deepcode-deepseek-gap.html">
+      <a class="card" href="report.html">
         <div>
-          <h2>DeepSeek 差距决策板</h2>
-          <p>恢复之前的实现差距分析，保留已实现、没实现、可优化、要重写和优先级判断。</p>
+          <h2>旧 report 记录</h2>
+          <p>保留上一阶段 OAuth/login 删除工作的目标、验证结果、影响文件、剩余风险和下一步。</p>
           <div class="meta">
-            <span class="pill">DeepSeek V4 Pro</span>
-            <span class="pill">实现差距</span>
-            <span class="pill">优先级</span>
+            <span class="pill">OAuth/login</span>
+            <span class="pill">历史记录</span>
+            <span class="pill">已验证</span>
           </div>
         </div>
-        <span class="action">打开决策板</span>
+        <span class="action">打开记录</span>
       </a>
     </section>
 

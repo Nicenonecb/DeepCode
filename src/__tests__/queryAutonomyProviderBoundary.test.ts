@@ -9,12 +9,17 @@ import {
 import { query } from '../query'
 import { getEmptyToolPermissionContext } from '../Tool'
 import type { AssistantMessage } from '../types/message'
+import { createAttachmentMessage } from '../utils/attachments'
 import { asSystemPrompt } from '../utils/systemPromptType'
 import {
   createAssistantAPIErrorMessage,
   createUserMessage,
 } from '../utils/messages'
-import { cleanupTempDir, createTempDir } from '../../tests/mocks/file-system'
+import {
+  cleanupTempDir,
+  createTempDir,
+  writeTempFile,
+} from '../../tests/mocks/file-system'
 import {
   enqueue,
   getCommandsByMaxPriority,
@@ -94,10 +99,46 @@ function createToolUseAssistantMessage(): AssistantMessage {
   } as unknown as AssistantMessage
 }
 
-function createToolUseContext(): any {
+function createTextAssistantMessage(text: string): AssistantMessage {
+  return {
+    type: 'assistant',
+    uuid: randomUUID(),
+    timestamp: new Date().toISOString(),
+    requestId: undefined,
+    message: {
+      id: `msg_${randomUUID()}`,
+      type: 'message',
+      role: 'assistant',
+      model: 'test-model',
+      stop_reason: 'end_turn',
+      stop_sequence: null,
+      usage: {
+        input_tokens: 1,
+        output_tokens: 1,
+        cache_creation_input_tokens: 0,
+        cache_read_input_tokens: 0,
+      },
+      content: [
+        {
+          type: 'text',
+          text,
+        },
+      ],
+    },
+  } as unknown as AssistantMessage
+}
+
+function createToolUseContext({
+  isNonInteractiveSession = true,
+  settings = {},
+}: {
+  isNonInteractiveSession?: boolean
+  settings?: Record<string, unknown>
+} = {}): any {
   let inProgressToolUseIds = new Set<string>()
   let responseLength = 0
   let appState = {
+    settings,
     toolPermissionContext: getEmptyToolPermissionContext(),
     fastMode: false,
     mcp: {
@@ -119,7 +160,7 @@ function createToolUseContext(): any {
       thinkingConfig: { type: 'disabled' },
       mcpClients: [],
       mcpResources: {},
-      isNonInteractiveSession: true,
+      isNonInteractiveSession,
       agentDefinitions: {
         activeAgents: [],
         allowedAgentTypes: [],
@@ -144,6 +185,94 @@ function createToolUseContext(): any {
 }
 
 describe('query autonomy/provider boundary', () => {
+  test('completion verification failure is fed back into a second model pass', async () => {
+    await writeTempFile(
+      tempDir,
+      'package.json',
+      JSON.stringify({
+        type: 'module',
+        scripts: {
+          verify:
+            'echo "src/failing.test.ts(7,3): error TS2304: Cannot find name nope." >&2; exit 1',
+        },
+      }),
+    )
+
+    const toolUseContext = createToolUseContext({
+      isNonInteractiveSession: false,
+      settings: {
+        verificationRunner: {
+          commands: ['bun run verify'],
+          timeoutMs: 5_000,
+          runOnCompletion: true,
+        },
+      },
+    })
+
+    const modelInputs: unknown[] = []
+    let callCount = 0
+    const deps = {
+      uuid: () => 'query-chain-id',
+      microcompact: async (messages: unknown[]) => ({ messages }),
+      autocompact: async () => ({
+        compactionResult: undefined,
+        consecutiveFailures: 0,
+      }),
+      callModel: async function* ({ messages }: { messages: unknown[] }) {
+        callCount += 1
+        modelInputs.push(messages)
+        yield createTextAssistantMessage(
+          callCount === 1
+            ? 'I changed the file.'
+            : 'I fixed it after verification.',
+        )
+      },
+    }
+
+    const generator = query({
+      messages: [
+        createUserMessage({
+          content: 'make a change',
+        }),
+        createAttachmentMessage({
+          type: 'edited_text_file',
+          filename: `${tempDir}/src/failing.test.ts`,
+          snippet: '1  const nope = missing',
+        }),
+      ],
+      systemPrompt: asSystemPrompt([]),
+      userContext: {},
+      systemContext: {},
+      canUseTool: async (_tool, input) => ({
+        behavior: 'allow',
+        updatedInput: input,
+      }),
+      toolUseContext,
+      querySource: 'repl_main_thread',
+      maxTurns: 3,
+      deps: deps as never,
+    })
+
+    const emitted: any[] = []
+    let next = await generator.next()
+    while (!next.done) {
+      emitted.push(next.value)
+      next = await generator.next()
+    }
+
+    expect(next.value.reason).toBe('completed')
+    expect(callCount).toBe(2)
+    expect(JSON.stringify(modelInputs[1])).toContain('<verification_result>')
+    expect(JSON.stringify(modelInputs[1])).toContain('verification failed')
+    expect(
+      emitted.some(
+        message =>
+          message.type === 'system' &&
+          message.content.includes('Verification failed: 0/1 commands passed'),
+      ),
+    ).toBe(true)
+  })
+
   test('provider api-error messages fail a consumed autonomy run instead of advancing the flow', async () => {
     const previousDisableAttachments =
       process.env.CLAUDE_CODE_DISABLE_ATTACHMENTS
