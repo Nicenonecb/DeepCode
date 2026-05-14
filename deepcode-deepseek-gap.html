@@ -292,34 +292,6 @@
       border-right: 4px solid var(--green);
     }
 
-    .progress-board {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 14px;
-      margin-top: 18px;
-    }
-
-    .progress-note {
-      min-height: 140px;
-      padding: 18px;
-      border: 1px solid var(--line);
-      background: var(--panel);
-      box-shadow: 0 10px 26px rgba(42,32,18,.07);
-    }
-
-    .progress-note h3 {
-      margin: 0 0 8px;
-      font-size: 18px;
-      line-height: 1.15;
-    }
-
-    .progress-note p {
-      margin: 0;
-      color: #4c4943;
-      font-size: 15px;
-      overflow-wrap: anywhere;
-    }
-
     .wide-table {
       width: 100%;
       border-collapse: collapse;
@@ -451,7 +423,6 @@
       }
       header { min-height: auto; }
       .grid { grid-template-columns: 1fr; }
-      .progress-board { grid-template-columns: 1fr; }
       .score-grid { grid-template-columns: 1fr; }
       .wide-table {
         display: block;
@@ -470,7 +441,8 @@
         <div class="verdict">
           <span class="pill">结论：底盘已具备</span>
           <span class="pill">短板：DeepSeek 原生层不足</span>
-          <span class="pill">优先：VerificationRunner + ContextPacker</span>
+          <span class="pill">优先：VerificationRunner + ContextPacker + WorkingMemory</span>
+          <span class="pill">后续：LSP Collector + Patch Search</span>
           <span class="pill">开源删减：3 / 12 已完成</span>
         </div>
       </div>
@@ -478,8 +450,8 @@
         <h2>当前判断</h2>
         <div class="score-grid">
           <div class="metric"><strong>20</strong><span>项底层能力已具备</span></div>
-          <div class="metric"><strong>8</strong><span>项关键能力未产品化</span></div>
-          <div class="metric"><strong>5</strong><span>项应优先开工</span></div>
+          <div class="metric"><strong>7</strong><span>项关键能力未产品化</span></div>
+          <div class="metric"><strong>4</strong><span>项应优先开工</span></div>
           <div class="metric"><strong>3/12</strong><span>项开源删减已同步状态</span></div>
         </div>
       </aside>
@@ -493,8 +465,8 @@
     </nav>
 
     <nav aria-label="页面目录">
+      <a href="#current">本轮更新</a>
       <a href="#done">已实现</a>
-      <a href="#progress">本轮进度</a>
       <a href="#missing">缺口状态</a>
       <a href="#optimize">可优化</a>
       <a href="#rewrite">要重写</a>
@@ -504,6 +476,24 @@
     </nav>
 
     <main>
+      <section id="current">
+        <div class="section-head">
+          <h2>本轮更新</h2>
+          <p>完成 WorkingMemory 第 4 步：接 compact / 持久化，让结构化记忆跨压缩和磁盘边界保留下来。</p>
+        </div>
+        <table class="wide-table">
+          <thead><tr><th>项目</th><th>当前记录</th><th>下一步落点</th></tr></thead>
+          <tbody>
+            <tr><td>本轮目标</td><td>把 WorkingMemory 接入 `src/services/compact/compact.ts` 和磁盘持久化：compact boundary 保留 checkpoint，`persistToDisk` 可写入项目级 `.deepcode/working-memory.json`，并补 Query/compact 集成测试。</td><td>第 4 步主线已完成；后续可继续做 resume 场景的端到端覆盖。</td></tr>
+            <tr class="done-row"><td><span class="status-chip done">DONE</span><br>已完成改动</td><td>compact / partial compact 创建 boundary 时会附带 `workingMemoryCheckpoint`，并按 settings 写盘；`QueryEngine` 启动时优先从最近 compact checkpoint 恢复 WorkingMemory，再回退到磁盘；`WorkingMemoryRuntime` 新增项目级 `.deepcode/working-memory.json` 路径、checkpoint attach/restore helper。</td><td>`workingMemory.persistToDisk` 现在会写 session 副本和项目副本；未启用时不会写盘或注入。</td></tr>
+            <tr><td>验证命令和结果</td><td>`bun test src/services/workingMemory/__tests__/WorkingMemoryStore.test.ts src/services/workingMemory/__tests__/WorkingMemorySummarizer.test.ts src/services/workingMemory/__tests__/WorkingMemoryRuntime.test.ts src/services/compact/__tests__/workingMemoryCheckpoint.test.ts src/__tests__/queryAutonomyProviderBoundary.test.ts` 通过：23 pass。`bun test` 全量通过：5460 pass，0 fail。`bun run typecheck` 通过，TypeScript strict 零错误。</td><td>`bun run test:all` 当前脚本不存在，实际使用 `bun test` + `bun run typecheck` 完成验证。</td></tr>
+            <tr><td>主要影响文件</td><td>`src/services/workingMemory/WorkingMemoryRuntime.ts`、`src/services/workingMemory/index.ts`、`src/services/compact/compact.ts`、`src/services/compact/__tests__/workingMemoryCheckpoint.test.ts`、`src/QueryEngine.ts`、`src/__tests__/queryAutonomyProviderBoundary.test.ts`、`src/services/workingMemory/__tests__/WorkingMemoryRuntime.test.ts`、`deepcode-deepseek-gap.html`。</td><td>没有新增专题报告，因此无需更新 `index.html`。</td></tr>
+            <tr><td>剩余风险</td><td>checkpoint 已能跨 compact 保留，但 resume 从真实 transcript 到 AppState 的完整 UI/SDK 路径还需要更高层测试；WorkingMemory 的规则总结仍可能累积陈旧 nextSteps。</td><td>下一步补 resume fixture，并给 WorkingMemory 增加陈旧项替换或完成态清理语义。</td></tr>
+            <tr><td>建议下一步</td><td>进入 WorkingMemory 收尾：resume 端到端测试、陈旧项清理、以及 UI/debug 状态展示；随后回到 LSP Collector 或多轨迹 Patch Search。</td><td>完成后继续更新本看板的验证结果、影响文件和剩余风险。</td></tr>
+          </tbody>
+        </table>
+      </section>
+
       <section id="done">
         <div class="section-head">
           <h2>已经实现</h2>
@@ -525,21 +515,6 @@
         </div>
       </section>
 
-      <section id="progress">
-        <div class="section-head">
-          <h2>本轮进度</h2>
-          <p>ContextPacker 第 4 轮 LSP / 符号增强已落地；pack 现在能围绕改动文件和验证失败文件保留 diagnostics、nearest symbols 和相关测试线索。</p>
-        </div>
-        <div class="progress-board">
-          <article class="progress-note"><span class="status-chip done">DONE</span><h3>本轮目标</h3><p>完成 ContextPacker 第 4 轮：复用 LSPDiagnosticRegistry 和 LSPTool symbolContext，把 diagnostics / nearest symbols 接进证据收集器。</p></article>
-          <article class="progress-note"><span class="status-chip done">DONE</span><h3>已完成改动</h3><p>新增 LSP diagnostics 只读 peek；collector 会按 changed files 和 verification issue filePath 过滤 LSP 诊断，并从错误位置提取 nearest symbol；related files 会合并 related test、typecheck、lint、test 和 LSP diagnostic 原因。</p></article>
-          <article class="progress-note"><span class="status-chip done">PASS</span><h3>验证命令和结果</h3><p>`bun test src/services/contextPacker/__tests__/`：13 pass，0 fail。`bun test src/__tests__/queryAutonomyProviderBoundary.test.ts`：5 pass，0 fail。`bun run typecheck`：通过。`bunx biome lint ...`：通过。`git diff --check`：通过。</p></article>
-          <article class="progress-note"><span class="status-chip done">FILES</span><h3>主要影响文件</h3><p>`src/services/contextPacker/ContextCollectors.ts`、`src/services/contextPacker/ContextPacker.ts`、`src/services/lsp/LSPDiagnosticRegistry.ts`、`src/services/contextPacker/__tests__/ContextCollectors.test.ts`、`src/services/contextPacker/__tests__/ContextPacker.test.ts`、`deepcode-deepseek-gap.html`。</p></article>
-          <article class="progress-note"><span class="status-chip watch">WATCH</span><h3>剩余风险</h3><p>当前默认做 pending diagnostics + nearest symbols，不主动向 LSP server 发 findReferences / documentSymbol 请求；references 字段和 formatter 已预留，可在下一轮接真实 LSP 请求。</p></article>
-          <article class="progress-note"><span class="status-chip next">NEXT</span><h3>建议下一步</h3><p>补真实 LSP request collector：对高优先级错误位置按预算请求 documentSymbol / findReferences，并把 verification summary 的最近一次失败状态接入 Query 的 pack 输入。</p></article>
-        </div>
-      </section>
-
       <section id="missing">
         <div class="section-head">
           <h2>缺口状态</h2>
@@ -551,8 +526,8 @@
             <tr class="done-row"><td><span class="status-chip done">DONE</span><br>DeepSeek Model Profile</td><td>已从散落字符串判断收敛到 `src/services/deepseek/modelProfiles.ts`，并被 context window、max output、effort、thinking、OpenAI model resolution、cost 计算复用。</td><td><strong>已完成。</strong>统一声明 V4 Pro / V4 Flash / V3.2 的 context、thinking、effort、tool protocol、价格和默认策略；相关单测覆盖 profile、family 映射、别名、默认 effort。</td></tr>
             <tr class="done-row"><td><span class="status-chip done">DONE</span><br>任务感知路由</td><td>已新增 explain / bugfix / complex 分类器、route patch、settings schema 和输入处理接入；在 feature flag 启用时自动补 model / effort，且尊重用户显式覆盖。</td><td><strong>已完成。</strong>解释走 low，bugfix 走 high，疑难重构走 max；当前默认目标使用 `haiku` / `opus` family alias，可通过 DeepSeek profile 映射或 settings 覆盖成具体 V4 Flash / V4 Pro。</td></tr>
             <tr class="done-row"><td><span class="status-chip done">DONE</span><br>VerificationRunner</td><td>核心运行层、失败解析、回灌摘要、配置层、Query 级闭环测试、AppState 持久状态和 footer 可见状态均已完成：能检测或配置验证命令，解析 TypeScript/lint/test/JUnit/reporter 失败，按 settings 控制 completion 自动验证，并把失败 meta message 回灌给 agent loop 继续修。</td><td><strong>已完成当前阶段。</strong>下一步是扩充真实 reporter fixture corpus、验证历史面板和更细粒度失败建议。</td></tr>
-            <tr class="done-row"><td><span class="status-chip done">DONE</span><br>ContextPacker</td><td>第 1-4 轮已完成：`ContextPacker.ts` 负责预算内结构化打包且优先保留 verification/LSP 错误；`ContextCollectors.ts` 收集 git/package/test/verification/LSP 证据；`src/query.ts` 在 settings 显式启用时把 pack 作为 meta context 注入 API 输入。已删除完成分步卡，避免下一轮 agent 重复执行旧步骤。<br><strong>当前搜索起点：</strong>`src/services/contextPacker/ContextCollectors.ts` 的 `collectLspEvidence()`，`src/services/lsp/LSPDiagnosticRegistry.ts` 的 `peekPendingLSPDiagnostics()`，`packages/builtin-tools/src/tools/LSPTool/symbolContext.ts` 的 `getSymbolAtPosition()`。</td><td><strong>已完成当前阶段。</strong>后续增强不再按旧分步推进，改为独立任务：主动 LSP 请求和 runtime verification 接入；在 `src/services/lsp/manager.ts` / `LSPServerManager.ts` 上按预算请求 `textDocument/documentSymbol`、`textDocument/references`，并把 `verificationStatus` 或最近 VerificationSummary 接进 Query pack。</td></tr>
-            <tr><td>WorkingMemory</td><td>长任务靠聊天历史维持状态。<br><strong>搜索起点：</strong>`src/QueryEngine.ts` 的消息生命周期、compact boundary 写入和 `loadedNestedMemoryPaths`；`src/query.ts` verification 回灌段；已有记忆系统在 `src/memdir/`、`src/utils/memory/`、`src/commands/memory/`。</td><td>结构化保存目标、事实、排除假设、已改文件、命令、测试状态、下一步。<br><strong>建议落点：</strong>新增 `src/services/workingMemory/WorkingMemoryStore.ts`、`WorkingMemorySummarizer.ts`、`__tests__/WorkingMemoryStore.test.ts`；配置接 `src/utils/settings/types.ts`；compact 关联看 `src/services/compact/compact.ts`。</td></tr>
+            <tr class="done-row"><td><span class="status-chip done">DONE</span><br>ContextPacker</td><td>第 1-4 轮已完成：`ContextPacker.ts` 负责预算内结构化打包且优先保留 verification/LSP 错误；`ContextCollectors.ts` 收集 git/package/test/verification/LSP 证据；`src/query.ts` 在 settings 显式启用时把 pack 作为 meta context 注入 API 输入。已删除完成分步卡，避免下一轮 agent 重复执行旧步骤。<br><strong>当前搜索起点：</strong>`src/services/contextPacker/ContextCollectors.ts` 的 `collectLspEvidence()`，`src/services/lsp/LSPDiagnosticRegistry.ts` 的 `peekPendingLSPDiagnostics()`，`packages/builtin-tools/src/tools/LSPTool/symbolContext.ts` 的 `getSymbolAtPosition()`。</td><td><strong>已完成当前阶段。</strong>后续增强拆两步：1. 主动 LSP request collector，接 `documentSymbol` / `findReferences`，只对高优先级错误位置按预算请求；2. Verification runtime summary 接入 Query pack，把最近一次 `VerificationSummary` 或 `verificationStatus` 喂进 ContextPacker。</td></tr>
+            <tr><td><span class="status-chip watch">STEP 4 DONE</span><br>WorkingMemory</td><td>长任务靠聊天历史维持状态的问题已推进到 compact / 持久化：第 1-2 步完成 Store / Summarizer；第 3 步完成 QueryEngine / query runtime；第 4 步完成 compact boundary checkpoint、项目级 `.deepcode/working-memory.json` 写入、checkpoint 恢复和 Query/compact 测试。<br><strong>搜索起点：</strong>`src/services/workingMemory/WorkingMemoryRuntime.ts`、`src/services/compact/compact.ts`、`src/QueryEngine.ts`、`src/query.ts`。</td><td>结构化保存目标、事实、排除假设、已改文件、命令、测试状态、下一步。<br><strong>下一步：</strong>补 resume 端到端测试、陈旧项替换/完成态清理、以及可见 debug/status 面板。</td></tr>
             <tr><td>DSML Gateway</td><td>还没有 V4 论文里的 DSML 工具协议。<br><strong>搜索起点：</strong>OpenAI 兼容转换在 `src/services/api/openai/index.ts`、`requestBody.ts`、`responsesAdapter.ts`；Anthropic 请求构建在 `src/services/api/claude.ts`；工具 schema 来源是 `src/Tool.ts`、`src/tools.ts`、`src/utils/api.ts`。</td><td>增加 DSML parser/serializer，与 OpenAI function calling A/B。<br><strong>建议落点：</strong>新增 `src/services/dsml/parser.ts`、`serializer.ts`、`gateway.ts`、`__tests__/dsml.test.ts`；先在 `queryModelOpenAI()` 的 message/tool 转换前后做 feature/settings 开关 A/B。</td></tr>
             <tr><td>Tool Call Repair</td><td>工具参数错、解析错时缺少专门修复层。<br><strong>搜索起点：</strong>`src/services/tools/toolExecution.ts` 的 `runToolUse()`、`safeParse`、`InputValidationError` 和 runtime error 分支；并行执行在 `src/services/tools/toolOrchestration.ts`、streaming 执行在 `src/services/tools/StreamingToolExecutor.ts`。</td><td>把 parse/schema/runtime error 结构化，允许局部修复重试。<br><strong>建议落点：</strong>新增 `src/services/toolRepair/ToolCallRepair.ts`、`types.ts`、`__tests__/ToolCallRepair.test.ts`；把结构化错误接回 `src/query.ts` tool-result 后续轮，避免重跑整批无关工具。</td></tr>
             <tr><td>多轨迹 Patch Search</td><td>有 sub-agent，但没有候选 patch 竞争机制。<br><strong>搜索起点：</strong>Agent 执行在 `packages/builtin-tools/src/tools/AgentTool/AgentTool.tsx`、`runAgent.ts`、`forkSubagent.ts`；多 agent helper 在 `packages/builtin-tools/src/tools/shared/spawnMultiAgent.ts`；worktree 基础在 `src/utils/worktree.ts` 和 `packages/builtin-tools/src/tools/EnterWorktreeTool/`。</td><td>多个 worktree 并行尝试，验证后选择最优 patch。<br><strong>建议落点：</strong>新增 `src/services/patchSearch/PatchSearchRunner.ts`、`CandidateEvaluator.ts`、`__tests__/PatchSearchRunner.test.ts`；评分直接复用 `src/services/verification/VerificationRunner.ts`，状态展示接 `src/state/AppStateStore.ts` / footer。</td></tr>

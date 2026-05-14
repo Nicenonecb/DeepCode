@@ -128,6 +128,13 @@ import {
   ContextPacker,
   type ContextPackerSettings,
 } from './services/contextPacker/index.js'
+import {
+  createWorkingMemoryPrompt,
+  persistWorkingMemory,
+  shouldUseWorkingMemory,
+  updateWorkingMemoryForVerification,
+  type WorkingMemorySettings,
+} from './services/workingMemory/index.js'
 import { getCwd } from './utils/cwd.js'
 import { feature } from 'bun:bundle'
 import {
@@ -895,6 +902,11 @@ async function* queryLoop(
         | ContextPackerSettings
         | undefined,
     )
+    const messagesWithMetaContext = buildWorkingMemoryMessages(
+      messagesWithContextPack,
+      toolUseContext,
+      toolUseContext.getAppState().settings.workingMemory,
+    )
 
     let attemptWithFallback = true
 
@@ -906,7 +918,7 @@ async function* queryLoop(
           let streamingFallbackOccured = false
           queryCheckpoint('query_api_streaming_start')
           for await (const message of deps.callModel({
-            messages: prependUserContext(messagesWithContextPack, userContext),
+            messages: prependUserContext(messagesWithMetaContext, userContext),
             systemPrompt: fullSystemPrompt,
             thinkingConfig: toolUseContext.options.thinkingConfig,
             tools: toolUseContext.options.tools,
@@ -1675,18 +1687,31 @@ async function* queryLoop(
         const formattedSummary = formatVerificationSummary(verificationSummary)
         const visibleStatus =
           formatVerificationStatusMessage(verificationSummary)
-        toolUseContext.setAppState(prev => ({
-          ...prev,
-          verificationStatus: {
-            status: verificationSummary.status,
-            total: verificationSummary.total,
-            passed: verificationSummary.passed,
-            failed: verificationSummary.failed,
-            timedOut: verificationSummary.timedOut,
-            updatedAt: Date.now(),
-            summary: visibleStatus,
-          },
-        }))
+        let updatedWorkingMemory = toolUseContext.getAppState().workingMemory
+        toolUseContext.setAppState(prev => {
+          updatedWorkingMemory = updateWorkingMemoryForVerification(
+            prev.workingMemory,
+            verificationSummary,
+            prev.settings.workingMemory,
+          )
+          return {
+            ...prev,
+            verificationStatus: {
+              status: verificationSummary.status,
+              total: verificationSummary.total,
+              passed: verificationSummary.passed,
+              failed: verificationSummary.failed,
+              timedOut: verificationSummary.timedOut,
+              updatedAt: Date.now(),
+              summary: visibleStatus,
+            },
+            workingMemory: updatedWorkingMemory,
+          }
+        })
+        persistWorkingMemory(
+          updatedWorkingMemory,
+          toolUseContext.getAppState().settings.workingMemory,
+        )
         lastVerificationMessageCount = verificationInputMessages.length
 
         if (verificationSummary.status !== 'passed') {
@@ -2162,6 +2187,37 @@ async function buildContextPackedMessages(
     )
     return messages
   }
+}
+
+function buildWorkingMemoryMessages(
+  messages: Message[],
+  toolUseContext: ToolUseContext,
+  settings: WorkingMemorySettings | undefined,
+): Message[] {
+  if (!shouldInjectWorkingMemory(toolUseContext, settings)) return messages
+
+  const prompt = createWorkingMemoryPrompt(
+    toolUseContext.getAppState().workingMemory,
+    settings,
+  )
+  if (!prompt) return messages
+
+  return [
+    ...messages,
+    createUserMessage({
+      content: prompt,
+      isMeta: true,
+    }),
+  ]
+}
+
+function shouldInjectWorkingMemory(
+  toolUseContext: ToolUseContext,
+  settings: WorkingMemorySettings | undefined,
+): boolean {
+  if (!shouldUseWorkingMemory(settings)) return false
+  if (toolUseContext.agentId) return false
+  return true
 }
 
 function shouldInjectContextPack(

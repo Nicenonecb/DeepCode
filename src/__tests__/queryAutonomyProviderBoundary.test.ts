@@ -7,7 +7,9 @@ import {
   setProjectRoot,
 } from '../bootstrap/state'
 import { query } from '../query'
+import { createWorkingMemory } from '../services/workingMemory/index'
 import { getEmptyToolPermissionContext } from '../Tool'
+import type { WorkingMemory } from '../services/workingMemory/index'
 import type { AssistantMessage } from '../types/message'
 import { createAttachmentMessage } from '../utils/attachments'
 import { asSystemPrompt } from '../utils/systemPromptType'
@@ -131,14 +133,17 @@ function createTextAssistantMessage(text: string): AssistantMessage {
 function createToolUseContext({
   isNonInteractiveSession = true,
   settings = {},
+  workingMemory,
 }: {
   isNonInteractiveSession?: boolean
   settings?: Record<string, unknown>
+  workingMemory?: WorkingMemory
 } = {}): any {
   let inProgressToolUseIds = new Set<string>()
   let responseLength = 0
   let appState = {
     settings,
+    workingMemory,
     toolPermissionContext: getEmptyToolPermissionContext(),
     fastMode: false,
     mcp: {
@@ -406,6 +411,72 @@ describe('query autonomy/provider boundary', () => {
 
     expect(next.value.reason).toBe('completed')
     expect(JSON.stringify(modelInputs[0])).not.toContain('<context_pack>')
+  })
+
+  test('working memory injects checkpoint context before the model call', async () => {
+    const toolUseContext = createToolUseContext({
+      settings: {
+        workingMemory: {
+          enabled: true,
+          maxChars: 4_000,
+          includeInPrompt: true,
+        },
+      },
+      workingMemory: createWorkingMemory(
+        {
+          goal: 'Preserve compact checkpoint in query',
+          verificationStatus: {
+            status: 'failed',
+            summary: 'typecheck failed',
+          },
+          nextSteps: ['Fix the failing typecheck before final response'],
+        },
+        123,
+      ),
+    })
+    const modelInputs: unknown[] = []
+    const deps = {
+      uuid: () => 'query-chain-id',
+      microcompact: async (messages: unknown[]) => ({ messages }),
+      autocompact: async () => ({
+        compactionResult: undefined,
+        consecutiveFailures: 0,
+      }),
+      callModel: async function* ({ messages }: { messages: unknown[] }) {
+        modelInputs.push(messages)
+        yield createTextAssistantMessage('working memory received.')
+      },
+    }
+
+    const generator = query({
+      messages: [
+        createUserMessage({
+          content: 'continue after compact',
+        }),
+      ],
+      systemPrompt: asSystemPrompt([]),
+      userContext: {},
+      systemContext: {},
+      canUseTool: async (_tool, input) => ({
+        behavior: 'allow',
+        updatedInput: input,
+      }),
+      toolUseContext,
+      querySource: 'sdk',
+      maxTurns: 1,
+      deps: deps as never,
+    })
+
+    let next = await generator.next()
+    while (!next.done) {
+      next = await generator.next()
+    }
+
+    const serializedInput = JSON.stringify(modelInputs[0])
+    expect(next.value.reason).toBe('completed')
+    expect(serializedInput).toContain('<working_memory>')
+    expect(serializedInput).toContain('Preserve compact checkpoint in query')
+    expect(serializedInput).toContain('typecheck failed')
   })
 
   test('provider api-error messages fail a consumed autonomy run instead of advancing the flow', async () => {

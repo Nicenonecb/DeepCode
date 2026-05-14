@@ -8,6 +8,7 @@ import type {
   MCPServerConnection,
   ServerResource,
 } from '../services/mcp/types.js'
+import type { WorkingMemory } from '../services/workingMemory/index.js'
 import { shouldEnablePromptSuggestion } from '../services/PromptSuggestion/promptSuggestion.js'
 import {
   getEmptyToolPermissionContext,
@@ -104,6 +105,7 @@ export type AppState = DeepImmutable<{
   mainLoopModelForSession: ModelSetting
   statusLineText: string | undefined
   verificationStatus: VerificationFooterStatus | undefined
+  workingMemory: WorkingMemory | undefined
   expandedView: 'none' | 'tasks' | 'teammates'
   isBriefOnly: boolean
   // Optional - only present when ENABLE_AGENT_SWARMS is true (for dead code elimination)
@@ -489,6 +491,7 @@ export function getDefaultAppState(): AppState {
     mainLoopModelForSession: null,
     statusLineText: undefined,
     verificationStatus: undefined,
+    workingMemory: undefined,
     expandedView: 'none',
     isBriefOnly: false,
     showTeammateMessagePreview: false,

@@ -122,6 +122,10 @@ import {
   getCompactUserSummaryMessage,
   getPartialCompactPrompt,
 } from './prompt.js'
+import {
+  attachWorkingMemoryCheckpoint,
+  persistWorkingMemory,
+} from '../workingMemory/index.js'
 
 export const POST_COMPACT_MAX_FILES_TO_RESTORE = 5
 export const POST_COMPACT_TOKEN_BUDGET = 50_000
@@ -622,10 +626,19 @@ export async function compactConversation(
 
     // Create the compact boundary marker and summary messages before the
     // event so we can compute the true resulting-context size.
-    const boundaryMarker = createCompactBoundaryMessage(
+    let boundaryMarker = createCompactBoundaryMessage(
       isAutoCompact ? 'auto' : 'manual',
       preCompactTokenCount ?? 0,
       messages.at(-1)?.uuid,
+    )
+    boundaryMarker = attachWorkingMemoryCheckpoint(
+      boundaryMarker,
+      appState.workingMemory,
+      appState.settings.workingMemory,
+    )
+    persistWorkingMemory(
+      appState.workingMemory,
+      appState.settings.workingMemory,
     )
     // Carry loaded-tool state — the summary doesn't preserve tool_reference
     // blocks, so the post-compact schema filter needs this to keep sending
@@ -1045,12 +1058,22 @@ export async function partialCompactConversation(
         ? allMessages.slice(0, pivotIndex).findLast(m => m.type !== 'progress')
             ?.uuid
         : messagesToKeep.at(-1)?.uuid
-    const boundaryMarker = createCompactBoundaryMessage(
+    let boundaryMarker = createCompactBoundaryMessage(
       'manual',
       preCompactTokenCount ?? 0,
       lastPreCompactUuid,
       userFeedback,
       messagesToSummarize.length,
+    )
+    const appState = context.getAppState()
+    boundaryMarker = attachWorkingMemoryCheckpoint(
+      boundaryMarker,
+      appState.workingMemory,
+      appState.settings.workingMemory,
+    )
+    persistWorkingMemory(
+      appState.workingMemory,
+      appState.settings.workingMemory,
     )
     // allMessages not just messagesToSummarize — set union is idempotent,
     // simpler than tracking which half each tool lived in.

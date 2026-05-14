@@ -36,6 +36,12 @@ import { hasAutoMemPathOverride } from './memdir/paths.js'
 import { query } from './query.js'
 import { categorizeRetryableAPIError } from './services/api/errors.js'
 import type { MCPServerConnection } from './services/mcp/types.js'
+import {
+  getLatestWorkingMemoryCheckpoint,
+  loadPersistedWorkingMemory,
+  persistWorkingMemory,
+  updateWorkingMemoryForMessages,
+} from './services/workingMemory/index.js'
 import type { AppState } from './state/AppState.js'
 import { type Tools, type ToolUseContext, toolMatchesName } from './Tool.js'
 import type { AgentDefinition } from '@deepcode/builtin-tools/tools/AgentTool/loadAgentsDir.js'
@@ -197,6 +203,7 @@ export class QueryEngine {
   private totalUsage: NonNullableUsage
   private hasHandledOrphanedPermission = false
   private readFileState: FileStateCache
+  private hasLoadedPersistedWorkingMemory = false
   // Turn-scoped skill discovery tracking (feeds was_discovered on
   // tengu_skill_tool_invocation). Must persist across the two
   // processUserInputContext rebuilds inside submitMessage, but is cleared
@@ -246,6 +253,7 @@ export class QueryEngine {
     this.discoveredSkillNames.clear()
     this.permissionDenials = []
     setCwd(cwd)
+    this.hydratePersistedWorkingMemory(getAppState, setAppState)
     const persistSession = !isSessionPersistenceDisabled()
     const startTime = Date.now()
 
@@ -596,6 +604,8 @@ export class QueryEngine {
         }
       }
 
+      this.updateWorkingMemoryFromMessages(setAppState)
+
       yield {
         type: 'result',
         subtype: 'success',
@@ -902,6 +912,7 @@ export class QueryEngine {
                 await flushSessionStorage()
               }
             }
+            this.updateWorkingMemoryFromMessages(setAppState)
             yield {
               type: 'result',
               subtype: 'error_max_turns',
@@ -1039,6 +1050,7 @@ export class QueryEngine {
             await flushSessionStorage()
           }
         }
+        this.updateWorkingMemoryFromMessages(setAppState)
         yield {
           type: 'result',
           subtype: 'error_max_budget_usd',
@@ -1084,6 +1096,7 @@ export class QueryEngine {
               await flushSessionStorage()
             }
           }
+          this.updateWorkingMemoryFromMessages(setAppState)
           yield {
             type: 'result',
             subtype: 'error_max_structured_output_retries',
@@ -1146,6 +1159,7 @@ export class QueryEngine {
     }
 
     if (!isResultSuccessful(result, lastStopReason)) {
+      this.updateWorkingMemoryFromMessages(setAppState)
       yield {
         type: 'result',
         subtype: 'error_during_execution',
@@ -1201,6 +1215,8 @@ export class QueryEngine {
       isApiError = Boolean(result.isApiErrorMessage)
     }
 
+    this.updateWorkingMemoryFromMessages(setAppState)
+
     yield {
       type: 'result',
       subtype: 'success',
@@ -1222,6 +1238,51 @@ export class QueryEngine {
       ),
       uuid: randomUUID(),
     }
+  }
+
+  private hydratePersistedWorkingMemory(
+    getAppState: () => AppState,
+    setAppState: (f: (prev: AppState) => AppState) => void,
+  ): void {
+    if (this.hasLoadedPersistedWorkingMemory) return
+    this.hasLoadedPersistedWorkingMemory = true
+
+    const appState = getAppState()
+    if (appState.workingMemory) return
+
+    const memory =
+      getLatestWorkingMemoryCheckpoint(
+        this.mutableMessages,
+        appState.settings.workingMemory,
+      ) ?? loadPersistedWorkingMemory(appState.settings.workingMemory)
+    if (!memory) return
+
+    setAppState(prev => ({
+      ...prev,
+      workingMemory: prev.workingMemory ?? memory,
+    }))
+  }
+
+  private updateWorkingMemoryFromMessages(
+    setAppState: (f: (prev: AppState) => AppState) => void,
+  ): void {
+    let updatedWorkingMemory: AppState['workingMemory']
+    setAppState(prev => {
+      updatedWorkingMemory = updateWorkingMemoryForMessages(
+        prev.workingMemory,
+        this.mutableMessages,
+        prev.settings.workingMemory,
+      )
+      if (updatedWorkingMemory === prev.workingMemory) return prev
+      return {
+        ...prev,
+        workingMemory: updatedWorkingMemory,
+      }
+    })
+    persistWorkingMemory(
+      updatedWorkingMemory,
+      this.config.getAppState().settings.workingMemory,
+    )
   }
 
   interrupt(): void {

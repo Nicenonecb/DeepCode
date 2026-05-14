@@ -179,6 +179,37 @@ export const ContextPackerSettingsSchema = lazySchema(() =>
     .passthrough(),
 )
 
+export const WorkingMemorySettingsSchema = lazySchema(() =>
+  z
+    .object({
+      enabled: z
+        .boolean()
+        .optional()
+        .describe(
+          'Whether WorkingMemory updates and prompt injection are enabled. Defaults to false.',
+        ),
+      maxChars: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('Maximum character budget for serialized WorkingMemory.'),
+      includeInPrompt: z
+        .boolean()
+        .optional()
+        .describe(
+          'Whether WorkingMemory is injected as meta context before model calls. Defaults to true when enabled.',
+        ),
+      persistToDisk: z
+        .boolean()
+        .optional()
+        .describe(
+          'Whether WorkingMemory is persisted to the session working-memory file. Defaults to false.',
+        ),
+    })
+    .passthrough(),
+)
+
 /**
  * Schema for extra marketplaces defined in repository settings
  * Same as KnownMarketplace but without lastUpdated (which is managed automatically)
@@ -530,6 +561,11 @@ export const SettingsSchema = lazySchema(() =>
         .optional()
         .describe(
           'Configure task-scoped ContextPacker evidence injection into model input.',
+        ),
+      workingMemory: WorkingMemorySettingsSchema()
+        .optional()
+        .describe(
+          'Configure structured WorkingMemory updates, prompt injection, and optional session persistence.',
         ),
       // Whether to automatically approve all MCP servers in the project
       enableAllProjectMcpServers: z
