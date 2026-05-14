@@ -135,6 +135,7 @@ import {
   updateWorkingMemoryForVerification,
   type WorkingMemorySettings,
 } from './services/workingMemory/index.js'
+import type { DSMLGatewaySettings } from './services/dsml/index.js'
 import { getCwd } from './utils/cwd.js'
 import { feature } from 'bun:bundle'
 import {
@@ -956,6 +957,11 @@ async function* queryLoop(
               advisorModel: appState.advisorModel,
               skipCacheWrite,
               agentId: toolUseContext.agentId,
+              dsmlGateway: resolveDSMLGatewaySettings(
+                appState.settings.dsmlGateway as
+                  | DSMLGatewaySettings
+                  | undefined,
+              ),
               addNotification: toolUseContext.addNotification,
               ...(params.taskBudget && {
                 taskBudget: {
@@ -2187,6 +2193,18 @@ async function buildContextPackedMessages(
     )
     return messages
   }
+}
+
+function resolveDSMLGatewaySettings(
+  settings: DSMLGatewaySettings | undefined,
+): DSMLGatewaySettings | undefined {
+  if (feature('DSML_GATEWAY')) {
+    return {
+      ...settings,
+      enabled: true,
+    }
+  }
+  return settings
 }
 
 function buildWorkingMemoryMessages(

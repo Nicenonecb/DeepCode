@@ -210,6 +210,37 @@ export const WorkingMemorySettingsSchema = lazySchema(() =>
     .passthrough(),
 )
 
+export const DSMLGatewaySettingsSchema = lazySchema(() =>
+  z
+    .object({
+      enabled: z
+        .boolean()
+        .optional()
+        .describe(
+          'Whether to serialize OpenAI-compatible tool schemas into a DSML prompt instead of native OpenAI function calling. Defaults to false.',
+        ),
+      tagStyle: z
+        .enum(['fullwidth', 'ascii'])
+        .optional()
+        .describe(
+          'Which DSML tag spelling to show in the request prompt. Defaults to fullwidth.',
+        ),
+      maxPromptChars: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('Maximum character budget for the DSML tool schema prompt.'),
+      malformedResponseStrategy: z
+        .enum(['text', 'tool_use'])
+        .optional()
+        .describe(
+          'How to handle malformed DSML responses. text keeps the original assistant text; tool_use emits any parseable tool calls.',
+        ),
+    })
+    .passthrough(),
+)
+
 /**
  * Schema for extra marketplaces defined in repository settings
  * Same as KnownMarketplace but without lastUpdated (which is managed automatically)
@@ -566,6 +597,11 @@ export const SettingsSchema = lazySchema(() =>
         .optional()
         .describe(
           'Configure structured WorkingMemory updates, prompt injection, and optional session persistence.',
+        ),
+      dsmlGateway: DSMLGatewaySettingsSchema()
+        .optional()
+        .describe(
+          'Configure DSML tool protocol serialization for OpenAI-compatible providers.',
         ),
       // Whether to automatically approve all MCP servers in the project
       enableAllProjectMcpServers: z

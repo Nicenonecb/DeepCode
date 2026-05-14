@@ -68,6 +68,11 @@ import {
   isDeferredTool,
   SEARCH_EXTRA_TOOLS_TOOL_NAME,
 } from '@deepcode/builtin-tools/tools/SearchExtraToolsTool/prompt.js'
+import { applyDSMLRequestGateway } from './dsmlRequest.js'
+import {
+  applyDSMLResponseGateway,
+  createDSMLToolUseId,
+} from './dsmlResponse.js'
 
 function convertToResponsesReasoningEffort(
   effortValue: unknown,
@@ -149,6 +154,7 @@ function assembleFinalAssistantOutputs(params: {
   }
   stopReason: string | null
   maxTokens: number
+  dsmlGateway: Options['dsmlGateway']
 }): (AssistantMessage | SystemAPIErrorMessage)[] {
   const {
     partialMessage,
@@ -158,13 +164,21 @@ function assembleFinalAssistantOutputs(params: {
     usage,
     stopReason,
     maxTokens,
+    dsmlGateway,
   } = params
   const outputs: (AssistantMessage | SystemAPIErrorMessage)[] = []
 
-  const allBlocks = Object.keys(contentBlocks)
+  const rawBlocks = Object.keys(contentBlocks)
     .sort((a, b) => Number(a) - Number(b))
     .map(k => contentBlocks[Number(k)])
     .filter(Boolean)
+  const dsmlResponse = applyDSMLResponseGateway({
+    contentBlocks: rawBlocks,
+    settings: dsmlGateway,
+    createToolUseId: createDSMLToolUseId,
+  })
+  const allBlocks = dsmlResponse.contentBlocks
+  const effectiveStopReason = dsmlResponse.hasToolUse ? 'tool_use' : stopReason
 
   if (allBlocks.length > 0) {
     outputs.push({
@@ -176,7 +190,7 @@ function assembleFinalAssistantOutputs(params: {
           agentId as AgentId | undefined,
         ),
         usage,
-        stop_reason: stopReason,
+        stop_reason: effectiveStopReason,
         stop_sequence: null,
       },
       requestId: undefined,
@@ -293,13 +307,29 @@ export async function* queryModelOpenAI(
       deferredToolNames,
       useSearchExtraTools,
     )
+    const nativeOpenAITools = anthropicToolsToOpenAI(standardTools)
+    const nativeOpenAIToolChoice = anthropicToolChoiceToOpenAI(
+      options.toolChoice,
+    )
+    const requestToolProtocol = applyDSMLRequestGateway({
+      messages: messagesWithDeferredToolList,
+      standardTools: standardTools as unknown as Array<Record<string, unknown>>,
+      nativeTools: nativeOpenAITools,
+      nativeToolChoice: nativeOpenAIToolChoice,
+      settings: options.dsmlGateway,
+      createMetaMessage: content =>
+        createUserMessage({
+          content,
+          isMeta: true,
+        }),
+    })
     const openaiMessages = anthropicMessagesToOpenAI(
-      messagesWithDeferredToolList,
+      requestToolProtocol.messages,
       systemPrompt,
       { enableThinking },
     )
-    const openaiTools = anthropicToolsToOpenAI(standardTools)
-    const openaiToolChoice = anthropicToolChoiceToOpenAI(options.toolChoice)
+    const openaiTools = requestToolProtocol.tools
+    const openaiToolChoice = requestToolProtocol.toolChoice
     const reasoningEffort = getChatGPTResponsesReasoningEffort(
       options.effortValue,
     )
@@ -468,6 +498,7 @@ export async function* queryModelOpenAI(
               contentBlocks,
               tools,
               agentId: options.agentId,
+              dsmlGateway: options.dsmlGateway,
               usage,
               stopReason,
               maxTokens,
@@ -524,6 +555,7 @@ export async function* queryModelOpenAI(
         contentBlocks,
         tools,
         agentId: options.agentId,
+        dsmlGateway: options.dsmlGateway,
         usage,
         stopReason,
         maxTokens,
