@@ -338,6 +338,30 @@ export function checkForLSPDiagnostics(): Array<{
 }
 
 /**
+ * Peek at pending LSP diagnostics without marking them delivered.
+ *
+ * Context assembly uses this read-only view so it can enrich the model prompt
+ * without stealing diagnostics from the normal attachment delivery path.
+ */
+export function peekPendingLSPDiagnostics(): Array<{
+  serverName: string
+  files: DiagnosticFile[]
+}> {
+  const result: Array<{ serverName: string; files: DiagnosticFile[] }> = []
+
+  for (const diagnostic of pendingDiagnostics.values()) {
+    if (!diagnostic.attachmentSent) {
+      result.push({
+        serverName: diagnostic.serverName,
+        files: diagnostic.files,
+      })
+    }
+  }
+
+  return result
+}
+
+/**
  * Clear all pending diagnostics.
  * Used during cleanup/shutdown or for testing.
  * Note: Does NOT clear deliveredDiagnostics - that's for cross-turn deduplication

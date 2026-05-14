@@ -279,6 +279,135 @@ describe('query autonomy/provider boundary', () => {
     ).toBe(true)
   })
 
+  test('context packer injects an explicit settings-enabled pack before the model call', async () => {
+    await writeTempFile(
+      tempDir,
+      'package.json',
+      JSON.stringify({
+        type: 'module',
+        scripts: {
+          typecheck: 'bunx tsc --noEmit',
+          test: 'bun test',
+        },
+      }),
+    )
+
+    const toolUseContext = createToolUseContext({
+      settings: {
+        contextPacker: {
+          enabled: true,
+          maxChars: 4_000,
+        },
+      },
+    })
+    const modelInputs: unknown[] = []
+    const deps = {
+      uuid: () => 'query-chain-id',
+      microcompact: async (messages: unknown[]) => ({ messages }),
+      autocompact: async () => ({
+        compactionResult: undefined,
+        consecutiveFailures: 0,
+      }),
+      callModel: async function* ({ messages }: { messages: unknown[] }) {
+        modelInputs.push(messages)
+        yield createTextAssistantMessage('packed context received.')
+      },
+    }
+
+    const generator = query({
+      messages: [
+        createUserMessage({
+          content: 'wire ContextPacker into query',
+        }),
+      ],
+      systemPrompt: asSystemPrompt([]),
+      userContext: {},
+      systemContext: {},
+      canUseTool: async (_tool, input) => ({
+        behavior: 'allow',
+        updatedInput: input,
+      }),
+      toolUseContext,
+      querySource: 'sdk',
+      maxTurns: 1,
+      deps: deps as never,
+    })
+
+    let next = await generator.next()
+    while (!next.done) {
+      next = await generator.next()
+    }
+
+    const serializedInput = JSON.stringify(modelInputs[0])
+    expect(next.value.reason).toBe('completed')
+    expect(serializedInput).toContain('<context_pack>')
+    expect(serializedInput).toContain('wire ContextPacker into query')
+    expect(serializedInput).toContain('package_scripts')
+    expect(serializedInput).toContain('typecheck: bunx tsc --noEmit')
+  })
+
+  test('context packer does not inject when explicitly disabled', async () => {
+    await writeTempFile(
+      tempDir,
+      'package.json',
+      JSON.stringify({
+        type: 'module',
+        scripts: {
+          typecheck: 'bunx tsc --noEmit',
+        },
+      }),
+    )
+
+    const toolUseContext = createToolUseContext({
+      settings: {
+        contextPacker: {
+          enabled: false,
+          maxChars: 4_000,
+        },
+      },
+    })
+    const modelInputs: unknown[] = []
+    const deps = {
+      uuid: () => 'query-chain-id',
+      microcompact: async (messages: unknown[]) => ({ messages }),
+      autocompact: async () => ({
+        compactionResult: undefined,
+        consecutiveFailures: 0,
+      }),
+      callModel: async function* ({ messages }: { messages: unknown[] }) {
+        modelInputs.push(messages)
+        yield createTextAssistantMessage('plain context received.')
+      },
+    }
+
+    const generator = query({
+      messages: [
+        createUserMessage({
+          content: 'do not pack this request',
+        }),
+      ],
+      systemPrompt: asSystemPrompt([]),
+      userContext: {},
+      systemContext: {},
+      canUseTool: async (_tool, input) => ({
+        behavior: 'allow',
+        updatedInput: input,
+      }),
+      toolUseContext,
+      querySource: 'sdk',
+      maxTurns: 1,
+      deps: deps as never,
+    })
+
+    let next = await generator.next()
+    while (!next.done) {
+      next = await generator.next()
+    }
+
+    expect(next.value.reason).toBe('completed')
+    expect(JSON.stringify(modelInputs[0])).not.toContain('<context_pack>')
+  })
+
   test('provider api-error messages fail a consumed autonomy run instead of advancing the flow', async () => {
     const previousDisableAttachments =
       process.env.CLAUDE_CODE_DISABLE_ATTACHMENTS

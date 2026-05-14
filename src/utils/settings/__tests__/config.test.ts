@@ -75,6 +75,20 @@ describe('SettingsSchema', () => {
     expect(result.success).toBe(true)
   })
 
+  test('accepts context packer settings', () => {
+    const result = SettingsSchema().safeParse({
+      contextPacker: {
+        enabled: true,
+        maxChars: 12_000,
+        includeDiff: true,
+        includeVerification: false,
+        includeLsp: true,
+      },
+    })
+
+    expect(result.success).toBe(true)
+  })
+
   test('accepts permissions block with allow rules', () => {
     const result = SettingsSchema().safeParse({
       permissions: { allow: ['Bash(npm install)'] },

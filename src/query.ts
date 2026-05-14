@@ -55,6 +55,7 @@ import {
   createToolUseSummaryMessage,
   createMicrocompactBoundaryMessage,
   stripSignatureBlocks,
+  getUserMessageText,
 } from './utils/messages.js'
 import { generateToolUseSummary } from './services/toolUseSummary/toolUseSummaryGenerator.js'
 import { prependUserContext, appendSystemContext } from './utils/api.js'
@@ -121,6 +122,12 @@ import {
   shouldRunVerificationOnCompletion,
   type VerificationRunnerSettings,
 } from './services/verification/index.js'
+import {
+  collectContextPackInput,
+  formatContextPackForPrompt,
+  ContextPacker,
+  type ContextPackerSettings,
+} from './services/contextPacker/index.js'
 import { getCwd } from './utils/cwd.js'
 import { feature } from 'bun:bundle'
 import {
@@ -881,6 +888,14 @@ async function* queryLoop(
       }
     }
 
+    const messagesWithContextPack = await buildContextPackedMessages(
+      messagesForQuery,
+      toolUseContext,
+      toolUseContext.getAppState().settings.contextPacker as
+        | ContextPackerSettings
+        | undefined,
+    )
+
     let attemptWithFallback = true
 
     queryCheckpoint('query_api_loop_start')
@@ -891,7 +906,7 @@ async function* queryLoop(
           let streamingFallbackOccured = false
           queryCheckpoint('query_api_streaming_start')
           for await (const message of deps.callModel({
-            messages: prependUserContext(messagesForQuery, userContext),
+            messages: prependUserContext(messagesWithContextPack, userContext),
             systemPrompt: fullSystemPrompt,
             thinkingConfig: toolUseContext.options.thinkingConfig,
             tools: toolUseContext.options.tools,
@@ -2113,6 +2128,61 @@ async function* queryLoop(
     }
     state = next
   } // while (true)
+}
+
+async function buildContextPackedMessages(
+  messages: Message[],
+  toolUseContext: ToolUseContext,
+  settings: ContextPackerSettings | undefined,
+): Promise<Message[]> {
+  if (!shouldInjectContextPack(toolUseContext, settings)) return messages
+
+  try {
+    const contextPackInput = await collectContextPackInput({
+      cwd: getCwd(),
+      taskPrompt: getLatestUserPrompt(messages),
+    })
+    const contextPack = new ContextPacker().pack({
+      ...contextPackInput,
+      settings,
+    })
+
+    if (contextPack.sections.length === 0) return messages
+
+    return [
+      ...messages,
+      createUserMessage({
+        content: formatContextPackForPrompt(contextPack),
+        isMeta: true,
+      }),
+    ]
+  } catch (error) {
+    logForDebugging(
+      `[ContextPacker] Failed to build context pack: ${error instanceof Error ? error.message : String(error)}`,
+    )
+    return messages
+  }
+}
+
+function shouldInjectContextPack(
+  toolUseContext: ToolUseContext,
+  settings: ContextPackerSettings | undefined,
+): boolean {
+  if (settings?.enabled !== true) return false
+  if (toolUseContext.agentId) return false
+  return true
+}
+
+function getLatestUserPrompt(messages: Message[]): string | undefined {
+  for (let index = messages.length - 1; index >= 0; index--) {
+    const message = messages[index]
+    if (!message || message.type !== 'user' || message.isMeta) continue
+
+    const text = getUserMessageText(message)
+    if (text?.trim()) return text.trim()
+  }
+
+  return undefined
 }
 
 function shouldRunCompletionVerification(

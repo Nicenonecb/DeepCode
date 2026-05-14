@@ -144,6 +144,41 @@ export const VerificationRunnerSettingsSchema = lazySchema(() =>
     .passthrough(),
 )
 
+export const ContextPackerSettingsSchema = lazySchema(() =>
+  z
+    .object({
+      enabled: z
+        .boolean()
+        .optional()
+        .describe(
+          'Whether ContextPacker injects task evidence into model input. Defaults to false at the query integration layer.',
+        ),
+      maxChars: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('Maximum character budget for the generated ContextPack.'),
+      includeDiff: z
+        .boolean()
+        .optional()
+        .describe('Whether to include git diff evidence in the ContextPack.'),
+      includeVerification: z
+        .boolean()
+        .optional()
+        .describe(
+          'Whether to include verification summary evidence when available.',
+        ),
+      includeLsp: z
+        .boolean()
+        .optional()
+        .describe(
+          'Whether to include LSP diagnostics and symbols when available.',
+        ),
+    })
+    .passthrough(),
+)
+
 /**
  * Schema for extra marketplaces defined in repository settings
  * Same as KnownMarketplace but without lastUpdated (which is managed automatically)
@@ -490,6 +525,11 @@ export const SettingsSchema = lazySchema(() =>
         .optional()
         .describe(
           'Configure automatic verification commands and completion-time verification behavior.',
+        ),
+      contextPacker: ContextPackerSettingsSchema()
+        .optional()
+        .describe(
+          'Configure task-scoped ContextPacker evidence injection into model input.',
         ),
       // Whether to automatically approve all MCP servers in the project
       enableAllProjectMcpServers: z
