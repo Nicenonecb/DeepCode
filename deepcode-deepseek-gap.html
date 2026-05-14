@@ -525,15 +525,15 @@
       <section id="progress">
         <div class="section-head">
           <h2>本轮进度</h2>
-          <p>推进 VerificationRunner 第四段：Query 级集成测试、JUnit/reporter 深解析和可见状态提示。</p>
+          <p>完成 VerificationRunner 第五段：AppState/footer 常驻状态、更多 reporter fixture 和闭环验证。</p>
         </div>
         <div class="progress-board">
-          <article class="progress-note"><span class="status-chip done">DONE</span><h3>本轮目标</h3><p>完成下一步：补 Query 级 verification 回灌集成测试、JUnit XML / reporter 失败解析，并把验证通过/失败摘要作为可见 system status 展示。</p></article>
-          <article class="progress-note"><span class="status-chip done">DONE</span><h3>已完成改动</h3><p>测试解析器现在能从 JUnit testcase failure/error、Bun/Jest/Vitest 风格 reporter 行和附近 stack location 提取失败测试名、文件、行列；Query 测试验证失败 summary 会进入第二次模型调用。</p></article>
-          <article class="progress-note"><span class="status-chip done">PASS</span><h3>验证命令和结果</h3><p>`bun test src/services/verification/__tests__/`：19 pass，0 fail。`bun test src/__tests__/queryAutonomyProviderBoundary.test.ts`：3 pass，0 fail。`bun run typecheck`：通过。`bunx biome lint ...`：通过。</p></article>
-          <article class="progress-note"><span class="status-chip done">FILES</span><h3>主要影响文件</h3><p>`src/services/verification/VerificationRunner.ts`、`src/services/verification/index.ts`、`src/services/verification/__tests__/VerificationRunner.test.ts`、`src/query.ts`、`src/__tests__/queryAutonomyProviderBoundary.test.ts`。</p></article>
-          <article class="progress-note"><span class="status-chip watch">WATCH</span><h3>剩余风险</h3><p>JUnit XML 解析采用轻量正则，足够覆盖常见 reporter 输出，但不是完整 XML parser；status 目前通过 REPL system message 展示，还未接入 footer/status line 常驻组件。</p></article>
-          <article class="progress-note"><span class="status-chip next">NEXT</span><h3>建议下一步</h3><p>后续可把 verification 状态落到 AppState，用 footer/status line 常驻展示最近一次验证结果，并补更多真实框架 reporter fixture。</p></article>
+          <article class="progress-note"><span class="status-chip done">DONE</span><h3>本轮目标</h3><p>把 verification 最新结果落到 AppState，并在 PromptInput footer 常驻展示；同时补真实 reporter 风格 fixture，确认闭环测试覆盖 UI 状态存储。</p></article>
+          <article class="progress-note"><span class="status-chip done">DONE</span><h3>已完成改动</h3><p>新增 `verificationStatus` AppState 字段；completion 验证完成后写入最近一次结果；footer 显示 `verify ok/failed/timed out`；新增 suite-file reporter 和 JUnit CDATA stack fixture。</p></article>
+          <article class="progress-note"><span class="status-chip done">PASS</span><h3>验证命令和结果</h3><p>`bun test src/services/verification/__tests__/`：21 pass，0 fail。`bun test src/__tests__/queryAutonomyProviderBoundary.test.ts`：3 pass，0 fail。`bun run typecheck`：通过。`bunx biome lint ...`：通过。</p></article>
+          <article class="progress-note"><span class="status-chip done">FILES</span><h3>主要影响文件</h3><p>`src/state/AppStateStore.ts`、`src/components/PromptInput/PromptInputFooterLeftSide.tsx`、`src/query.ts`、`src/main.tsx`、verification 测试和 Query 闭环测试。</p></article>
+          <article class="progress-note"><span class="status-chip watch">WATCH</span><h3>剩余风险</h3><p>footer 只展示紧凑状态，完整失败细节仍在 system status / meta summary；JUnit XML 仍是轻量解析器，后续可引入真实 reporter fixture corpus。</p></article>
+          <article class="progress-note"><span class="status-chip next">NEXT</span><h3>建议下一步</h3><p>补验证历史面板、更多 Vitest/Jest/Bun/JUnit 真实输出样本，以及基于失败类型的更细下一步建议。</p></article>
         </div>
       </section>
 
@@ -547,7 +547,7 @@
           <tbody>
             <tr class="done-row"><td><span class="status-chip done">DONE</span><br>DeepSeek Model Profile</td><td>已从散落字符串判断收敛到 `src/services/deepseek/modelProfiles.ts`，并被 context window、max output、effort、thinking、OpenAI model resolution、cost 计算复用。</td><td><strong>已完成。</strong>统一声明 V4 Pro / V4 Flash / V3.2 的 context、thinking、effort、tool protocol、价格和默认策略；相关单测覆盖 profile、family 映射、别名、默认 effort。</td></tr>
             <tr class="done-row"><td><span class="status-chip done">DONE</span><br>任务感知路由</td><td>已新增 explain / bugfix / complex 分类器、route patch、settings schema 和输入处理接入；在 feature flag 启用时自动补 model / effort，且尊重用户显式覆盖。</td><td><strong>已完成。</strong>解释走 low，bugfix 走 high，疑难重构走 max；当前默认目标使用 `haiku` / `opus` family alias，可通过 DeepSeek profile 映射或 settings 覆盖成具体 V4 Flash / V4 Pro。</td></tr>
-            <tr><td><span class="status-chip watch">CORE</span><br>VerificationRunner</td><td>核心运行层、失败解析、回灌摘要、配置层和 Query 级闭环测试已完成：能检测或配置验证命令，解析 TypeScript/lint/test/JUnit/reporter 失败，按 settings 控制 completion 自动验证，并展示可见验证状态。</td><td><strong>进行中。</strong>失败结果已可作为 meta message 回灌给 agent loop 继续修；下一步可做 AppState/footer 常驻状态和更多真实 reporter fixture。</td></tr>
+            <tr class="done-row"><td><span class="status-chip done">CORE</span><br>VerificationRunner</td><td>核心运行层、失败解析、回灌摘要、配置层、Query 级闭环测试、AppState 持久状态和 footer 可见状态均已完成：能检测或配置验证命令，解析 TypeScript/lint/test/JUnit/reporter 失败，按 settings 控制 completion 自动验证，并把失败 meta message 回灌给 agent loop 继续修。</td><td><strong>已完成当前阶段。</strong>下一步是扩充真实 reporter fixture corpus、验证历史面板和更细粒度失败建议。</td></tr>
             <tr><td>ContextPacker</td><td>1M context 只是窗口变大。</td><td>按任务打包 repo map、diff、错误栈、相关文件、LSP 符号、测试文件。</td></tr>
             <tr><td>WorkingMemory</td><td>长任务靠聊天历史维持状态。</td><td>结构化保存目标、事实、排除假设、已改文件、命令、测试状态、下一步。</td></tr>
             <tr><td>DSML Gateway</td><td>还没有 V4 论文里的 DSML 工具协议。</td><td>增加 DSML parser/serializer，与 OpenAI function calling A/B。</td></tr>

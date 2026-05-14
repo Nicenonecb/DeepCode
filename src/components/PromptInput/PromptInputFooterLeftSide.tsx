@@ -224,6 +224,7 @@ function ModeIndicator({
   const showSpinnerTree = expandedView === 'teammates';
   const prStatus = usePrStatus(isLoading, isPrStatusEnabled());
   const hasTmuxSession = useAppState(s => process.env.USER_TYPE === 'ant' && s.tungstenActiveSession !== undefined);
+  const verificationStatus = useAppState(s => s.verificationStatus);
 
   const nextTickAt = useSyncExternalStore(
     proactiveModule?.subscribeToProactiveChanges ?? NO_OP_SUBSCRIBE,
@@ -373,6 +374,25 @@ function ModeIndicator({
             color={rssState.level === 'error' ? 'error' : rssState.level === 'warning' ? 'warning' : undefined}
           >
             {rssState.text} · pid:{process.pid}
+          </Text>,
+        ]
+      : []),
+    ...(verificationStatus
+      ? [
+          <Text
+            key="verification"
+            color={
+              verificationStatus.status === 'passed'
+                ? 'success'
+                : verificationStatus.status === 'timed_out'
+                  ? 'warning'
+                  : 'error'
+            }
+          >
+            verify {verificationStatus.status === 'passed' ? 'ok' : verificationStatus.status.replace('_', ' ')}{' '}
+            <Text dimColor>
+              {verificationStatus.passed}/{verificationStatus.total}
+            </Text>
           </Text>,
         ]
       : []),

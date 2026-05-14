@@ -3476,6 +3476,7 @@ async function run(): Promise<CommanderCommand> {
         coordinatorTaskIndex: -1,
         viewSelectionMode: 'none',
         footerSelection: null,
+        verificationStatus: undefined,
         toolPermissionContext: effectiveToolPermissionContext,
         agent: mainThreadAgentDefinition?.agentType,
         agentDefinitions,

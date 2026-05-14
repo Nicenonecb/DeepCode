@@ -1660,6 +1660,18 @@ async function* queryLoop(
         const formattedSummary = formatVerificationSummary(verificationSummary)
         const visibleStatus =
           formatVerificationStatusMessage(verificationSummary)
+        toolUseContext.setAppState(prev => ({
+          ...prev,
+          verificationStatus: {
+            status: verificationSummary.status,
+            total: verificationSummary.total,
+            passed: verificationSummary.passed,
+            failed: verificationSummary.failed,
+            timedOut: verificationSummary.timedOut,
+            updatedAt: Date.now(),
+            summary: visibleStatus,
+          },
+        }))
         lastVerificationMessageCount = verificationInputMessages.length
 
         if (verificationSummary.status !== 'passed') {

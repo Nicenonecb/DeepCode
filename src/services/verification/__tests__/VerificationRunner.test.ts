@@ -370,6 +370,48 @@ describe('parseVerificationOutput', () => {
     })
   })
 
+  test('extracts suite file reporter failures', () => {
+    const parsed = parseVerificationOutput(
+      { kind: 'test', name: 'Vitest' },
+      failedExecution(
+        `FAIL src/math.spec.ts > calculator > adds numbers
+AssertionError: expected 1 to be 2`,
+        '',
+      ),
+    )
+
+    expect(parsed.issues[0]).toMatchObject({
+      kind: 'test',
+      filePath: 'src/math.spec.ts',
+      testName: 'calculator > adds numbers',
+      message: 'calculator > adds numbers',
+    })
+  })
+
+  test('extracts JUnit CDATA failure locations', () => {
+    const parsed = parseVerificationOutput(
+      { kind: 'test', name: 'JUnit' },
+      failedExecution(
+        `<testsuite failures="1">
+  <testcase classname="api suite" name="returns 200">
+    <failure><![CDATA[Expected status 200
+    at src/api.spec.ts:88:11]]></failure>
+  </testcase>
+</testsuite>`,
+        '',
+      ),
+    )
+
+    expect(parsed.issues[0]).toMatchObject({
+      kind: 'test',
+      testName: 'api suite > returns 200',
+      message: 'Expected status 200',
+      filePath: 'src/api.spec.ts',
+      line: 88,
+      column: 11,
+    })
+  })
+
   test('falls back to key logs when a failing command has no structured issue', () => {
     const parsed = parseVerificationOutput(
       { kind: 'test', name: 'Test' },

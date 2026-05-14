@@ -264,6 +264,12 @@ describe('query autonomy/provider boundary', () => {
     expect(callCount).toBe(2)
     expect(JSON.stringify(modelInputs[1])).toContain('<verification_result>')
     expect(JSON.stringify(modelInputs[1])).toContain('verification failed')
+    expect(toolUseContext.getAppState().verificationStatus).toMatchObject({
+      status: 'failed',
+      total: 1,
+      passed: 0,
+      failed: 1,
+    })
     expect(
       emitted.some(
         message =>

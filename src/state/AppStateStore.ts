@@ -78,6 +78,16 @@ export type SpeculationState =
 
 export const IDLE_SPECULATION_STATE: SpeculationState = { status: 'idle' }
 
+export type VerificationFooterStatus = {
+  status: 'passed' | 'failed' | 'timed_out'
+  total: number
+  passed: number
+  failed: number
+  timedOut: number
+  updatedAt: number
+  summary: string
+}
+
 export type FooterItem =
   | 'tasks'
   | 'tmux'
@@ -93,6 +103,7 @@ export type AppState = DeepImmutable<{
   mainLoopModel: ModelSetting
   mainLoopModelForSession: ModelSetting
   statusLineText: string | undefined
+  verificationStatus: VerificationFooterStatus | undefined
   expandedView: 'none' | 'tasks' | 'teammates'
   isBriefOnly: boolean
   // Optional - only present when ENABLE_AGENT_SWARMS is true (for dead code elimination)
@@ -477,6 +488,7 @@ export function getDefaultAppState(): AppState {
     mainLoopModel: null, // alias, full name (as with --model or env var), or null (default)
     mainLoopModelForSession: null,
     statusLineText: undefined,
+    verificationStatus: undefined,
     expandedView: 'none',
     isBriefOnly: false,
     showTeammateMessagePreview: false,
