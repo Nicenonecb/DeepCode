@@ -131,6 +131,11 @@ import {
   runPreToolUseHooks,
 } from './toolHooks.js'
 import { isSkillLearningEnabled } from '../skillLearning/featureCheck.js'
+import { createToolCallRepairSummary } from '../toolRepair/ToolCallErrorClassifier.js'
+import type {
+  ToolCallErrorSource,
+  ToolCallRepairIssue,
+} from '../toolRepair/types.js'
 
 // Cached import promise for the skill-learning wrapper — paid once, not per call.
 let _skillLearningWrapperCache:
@@ -298,6 +303,45 @@ export type MessageUpdateLazy<M extends Message = Message> = {
   }
 }
 
+type ToolCallRepairMessage<M extends Message = Message> = M & {
+  toolCallRepairIssue: ToolCallRepairIssue
+}
+
+function withToolCallRepairIssue<M extends Message>(
+  message: M,
+  issue: ToolCallRepairIssue,
+): ToolCallRepairMessage<M> {
+  return {
+    ...message,
+    toolCallRepairIssue: issue,
+  }
+}
+
+function buildToolCallRepairIssue({
+  toolUseID,
+  toolName,
+  input,
+  message,
+  error,
+  source,
+}: {
+  toolUseID: string
+  toolName: string
+  input: unknown
+  message?: string
+  error?: unknown
+  source?: ToolCallErrorSource
+}): ToolCallRepairIssue {
+  return createToolCallRepairSummary({
+    toolUseId: toolUseID,
+    toolName,
+    input,
+    message,
+    error,
+    source,
+  })
+}
+
 export type McpServerType =
   | 'stdio'
   | 'sse'
@@ -422,19 +466,29 @@ export async function* runToolUse(
       }),
       ...mcpToolDetailsForAnalytics(toolName, mcpServerType, mcpServerBaseUrl),
     })
+    const repairIssue = buildToolCallRepairIssue({
+      toolUseID: toolUse.id,
+      toolName,
+      input: toolUse.input,
+      message: `Error: No such tool available: ${toolName}`,
+      source: 'unknown_tool',
+    })
     yield {
-      message: createUserMessage({
-        content: [
-          {
-            type: 'tool_result',
-            content: `<tool_use_error>Error: No such tool available: ${toolName}</tool_use_error>`,
-            is_error: true,
-            tool_use_id: toolUse.id,
-          },
-        ],
-        toolUseResult: `Error: No such tool available: ${toolName}`,
-        sourceToolAssistantUUID: assistantMessage.uuid,
-      }),
+      message: withToolCallRepairIssue(
+        createUserMessage({
+          content: [
+            {
+              type: 'tool_result',
+              content: `<tool_use_error>Error: No such tool available: ${toolName}</tool_use_error>`,
+              is_error: true,
+              tool_use_id: toolUse.id,
+            },
+          ],
+          toolUseResult: `Error: No such tool available: ${toolName}`,
+          sourceToolAssistantUUID: assistantMessage.uuid,
+        }),
+        repairIssue,
+      ),
     }
     return
   }
@@ -500,20 +554,31 @@ export async function* runToolUse(
     const errorMessage = error instanceof Error ? error.message : String(error)
     const toolInfo = tool ? ` (${tool.name})` : ''
     const detailedError = `Error calling tool${toolInfo}: ${errorMessage}`
+    const repairIssue = buildToolCallRepairIssue({
+      toolUseID: toolUse.id,
+      toolName,
+      input: toolUse.input,
+      message: detailedError,
+      error,
+      source: 'runtime_error',
+    })
 
     yield {
-      message: createUserMessage({
-        content: [
-          {
-            type: 'tool_result',
-            content: `<tool_use_error>${detailedError}</tool_use_error>`,
-            is_error: true,
-            tool_use_id: toolUse.id,
-          },
-        ],
-        toolUseResult: detailedError,
-        sourceToolAssistantUUID: assistantMessage.uuid,
-      }),
+      message: withToolCallRepairIssue(
+        createUserMessage({
+          content: [
+            {
+              type: 'tool_result',
+              content: `<tool_use_error>${detailedError}</tool_use_error>`,
+              is_error: true,
+              tool_use_id: toolUse.id,
+            },
+          ],
+          toolUseResult: detailedError,
+          sourceToolAssistantUUID: assistantMessage.uuid,
+        }),
+        repairIssue,
+      ),
     }
   }
 }
@@ -703,20 +768,31 @@ async function checkPermissionsAndCallTool(
       }),
       ...mcpToolDetailsForAnalytics(tool.name, mcpServerType, mcpServerBaseUrl),
     })
+    const repairIssue = buildToolCallRepairIssue({
+      toolUseID,
+      toolName: tool.name,
+      input,
+      message: `InputValidationError: ${errorContent}`,
+      error: parsedInput.error,
+      source: 'input_validation_error',
+    })
     return [
       {
-        message: createUserMessage({
-          content: [
-            {
-              type: 'tool_result',
-              content: `<tool_use_error>InputValidationError: ${errorContent}</tool_use_error>`,
-              is_error: true,
-              tool_use_id: toolUseID,
-            },
-          ],
-          toolUseResult: `InputValidationError: ${parsedInput.error.message}`,
-          sourceToolAssistantUUID: assistantMessage.uuid,
-        }),
+        message: withToolCallRepairIssue(
+          createUserMessage({
+            content: [
+              {
+                type: 'tool_result',
+                content: `<tool_use_error>InputValidationError: ${errorContent}</tool_use_error>`,
+                is_error: true,
+                tool_use_id: toolUseID,
+              },
+            ],
+            toolUseResult: `InputValidationError: ${parsedInput.error.message}`,
+            sourceToolAssistantUUID: assistantMessage.uuid,
+          }),
+          repairIssue,
+        ),
       },
     ]
   }
@@ -1103,13 +1179,23 @@ async function checkPermissionsAndCallTool(
       }
     }
 
+    const repairIssue = buildToolCallRepairIssue({
+      toolUseID,
+      toolName: tool.name,
+      input: processedInput,
+      message: errorMessage || 'Permission denied',
+      source: 'permission_error',
+    })
     resultingMessages.push({
-      message: createUserMessage({
-        content: messageContent,
-        imagePasteIds: rejectImageIds,
-        toolUseResult: `Error: ${errorMessage}`,
-        sourceToolAssistantUUID: assistantMessage.uuid,
-      }),
+      message: withToolCallRepairIssue(
+        createUserMessage({
+          content: messageContent,
+          imagePasteIds: rejectImageIds,
+          toolUseResult: `Error: ${errorMessage}`,
+          sourceToolAssistantUUID: assistantMessage.uuid,
+        }),
+        repairIssue,
+      ),
     })
 
     // Run PermissionDenied hooks for auto mode classifier denials.
@@ -1798,26 +1884,37 @@ async function checkPermissionsAndCallTool(
       hookMessages.push(hookResult)
     }
 
+    const repairIssue = buildToolCallRepairIssue({
+      toolUseID,
+      toolName: tool.name,
+      input: processedInput ?? input,
+      message: content,
+      error,
+      source: error instanceof AbortError ? 'abort_error' : 'runtime_error',
+    })
     return [
       {
-        message: createUserMessage({
-          content: [
-            {
-              type: 'tool_result',
-              content,
-              is_error: true,
-              tool_use_id: toolUseID,
-            },
-          ],
-          toolUseResult: `Error: ${content}`,
-          mcpMeta: toolUseContext.agentId
-            ? undefined
-            : error instanceof
-                McpToolCallError_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS
-              ? error.mcpMeta
-              : undefined,
-          sourceToolAssistantUUID: assistantMessage.uuid,
-        }),
+        message: withToolCallRepairIssue(
+          createUserMessage({
+            content: [
+              {
+                type: 'tool_result',
+                content,
+                is_error: true,
+                tool_use_id: toolUseID,
+              },
+            ],
+            toolUseResult: `Error: ${content}`,
+            mcpMeta: toolUseContext.agentId
+              ? undefined
+              : error instanceof
+                  McpToolCallError_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS
+                ? error.mcpMeta
+                : undefined,
+            sourceToolAssistantUUID: assistantMessage.uuid,
+          }),
+          repairIssue,
+        ),
       },
       ...hookMessages,
     ]
