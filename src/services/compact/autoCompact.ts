@@ -30,12 +30,22 @@ import { trySessionMemoryCompaction } from './sessionMemoryCompact.js'
 const MAX_OUTPUT_TOKENS_FOR_SUMMARY = 20_000
 
 // Returns the context window size minus the max output tokens for the model
-export function getEffectiveContextWindowSize(model: string): number {
+export function getEffectiveContextWindowSize(
+  model: string,
+  contextWindowOverrideTokens?: number,
+): number {
   const reservedTokensForSummary = Math.min(
     getMaxOutputTokensForModel(model),
     MAX_OUTPUT_TOKENS_FOR_SUMMARY,
   )
   let contextWindow = getContextWindowForModel(model, getSdkBetas())
+  if (
+    contextWindowOverrideTokens &&
+    Number.isInteger(contextWindowOverrideTokens) &&
+    contextWindowOverrideTokens > 0
+  ) {
+    contextWindow = Math.min(contextWindow, contextWindowOverrideTokens)
+  }
 
   const autoCompactWindow = process.env.CLAUDE_CODE_AUTO_COMPACT_WINDOW
   if (autoCompactWindow) {
@@ -74,8 +84,14 @@ const TOOL_RESULT_GROWTH_ESTIMATE = 15_000
  * headroom because a single turn can produce proportionally more tokens
  * (longer model outputs + larger tool results).
  */
-export function getAutocompactBufferTokens(model: string): number {
-  const effectiveWindow = getEffectiveContextWindowSize(model)
+export function getAutocompactBufferTokens(
+  model: string,
+  contextWindowOverrideTokens?: number,
+): number {
+  const effectiveWindow = getEffectiveContextWindowSize(
+    model,
+    contextWindowOverrideTokens,
+  )
   if (effectiveWindow >= 800_000) return 50_000
   if (effectiveWindow >= 400_000) return 30_000
   return AUTOCOMPACT_BUFFER_TOKENS
@@ -98,11 +114,18 @@ export function estimateMaxTurnGrowth(model: string): number {
 // in a single session, wasting ~250K API calls/day globally.
 const MAX_CONSECUTIVE_AUTOCOMPACT_FAILURES = 3
 
-export function getAutoCompactThreshold(model: string): number {
-  const effectiveContextWindow = getEffectiveContextWindowSize(model)
+export function getAutoCompactThreshold(
+  model: string,
+  contextWindowOverrideTokens?: number,
+): number {
+  const effectiveContextWindow = getEffectiveContextWindowSize(
+    model,
+    contextWindowOverrideTokens,
+  )
 
   const autocompactThreshold =
-    effectiveContextWindow - getAutocompactBufferTokens(model)
+    effectiveContextWindow -
+    getAutocompactBufferTokens(model, contextWindowOverrideTokens)
 
   // Override for easier testing of autocompact
   const envPercent = process.env.CLAUDE_AUTOCOMPACT_PCT_OVERRIDE
@@ -122,6 +145,7 @@ export function getAutoCompactThreshold(model: string): number {
 export function calculateTokenWarningState(
   tokenUsage: number,
   model: string,
+  contextWindowOverrideTokens?: number,
 ): {
   percentLeft: number
   isAboveWarningThreshold: boolean
@@ -129,10 +153,13 @@ export function calculateTokenWarningState(
   isAboveAutoCompactThreshold: boolean
   isAtBlockingLimit: boolean
 } {
-  const autoCompactThreshold = getAutoCompactThreshold(model)
+  const autoCompactThreshold = getAutoCompactThreshold(
+    model,
+    contextWindowOverrideTokens,
+  )
   const threshold = isAutoCompactEnabled()
     ? autoCompactThreshold
-    : getEffectiveContextWindowSize(model)
+    : getEffectiveContextWindowSize(model, contextWindowOverrideTokens)
 
   const percentLeft = Math.max(
     0,
@@ -148,7 +175,10 @@ export function calculateTokenWarningState(
   const isAboveAutoCompactThreshold =
     isAutoCompactEnabled() && tokenUsage >= autoCompactThreshold
 
-  const actualContextWindow = getEffectiveContextWindowSize(model)
+  const actualContextWindow = getEffectiveContextWindowSize(
+    model,
+    contextWindowOverrideTokens,
+  )
   const defaultBlockingLimit =
     actualContextWindow - MANUAL_COMPACT_BUFFER_TOKENS
 
@@ -194,6 +224,7 @@ export async function shouldAutoCompact(
   // pre-snip context, so tokenCountWithEstimation can't see the savings.
   // Subtract the rough-delta that snip already computed.
   snipTokensFreed = 0,
+  contextWindowOverrideTokens?: number,
 ): Promise<boolean> {
   // Recursion guards. session_memory and compact are forked agents that
   // would deadlock.
@@ -252,8 +283,11 @@ export async function shouldAutoCompact(
   }
 
   const tokenCount = tokenCountWithEstimation(messages) - snipTokensFreed
-  const threshold = getAutoCompactThreshold(model)
-  const effectiveWindow = getEffectiveContextWindowSize(model)
+  const threshold = getAutoCompactThreshold(model, contextWindowOverrideTokens)
+  const effectiveWindow = getEffectiveContextWindowSize(
+    model,
+    contextWindowOverrideTokens,
+  )
 
   logForDebugging(
     `autocompact: tokens=${tokenCount} threshold=${threshold} effectiveWindow=${effectiveWindow}${snipTokensFreed > 0 ? ` snipFreed=${snipTokensFreed}` : ''}`,
@@ -262,6 +296,7 @@ export async function shouldAutoCompact(
   const { isAboveAutoCompactThreshold } = calculateTokenWarningState(
     tokenCount,
     model,
+    contextWindowOverrideTokens,
   )
 
   return isAboveAutoCompactThreshold
@@ -299,6 +334,7 @@ export async function autoCompactIfNeeded(
     model,
     querySource,
     snipTokensFreed,
+    toolUseContext.options.contextWindowOverrideTokens,
   )
 
   if (!shouldCompact) {
@@ -309,7 +345,10 @@ export async function autoCompactIfNeeded(
     isRecompactionInChain: tracking?.compacted === true,
     turnsSincePreviousCompact: tracking?.turnCounter ?? -1,
     previousCompactTurnId: tracking?.turnId,
-    autoCompactThreshold: getAutoCompactThreshold(model),
+    autoCompactThreshold: getAutoCompactThreshold(
+      model,
+      toolUseContext.options.contextWindowOverrideTokens,
+    ),
     querySource,
   }
 

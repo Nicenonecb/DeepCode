@@ -2,6 +2,7 @@ export {
   ContextPacker,
   formatContextPackForPrompt,
   isContextPackerEnabled,
+  resolveContextPackMaxChars,
   summarizeDiff,
 } from './ContextPacker.js'
 export {
@@ -17,10 +18,12 @@ export {
 export type {
   ContextPack,
   ContextPackDiagnostic,
+  ContextPackEvidenceTier,
   ContextPackFile,
   ContextPackInput,
   ContextPackLspContext,
   ContextPackReference,
+  ContextPackRuntimeBudget,
   ContextPackSection,
   ContextPackSectionId,
   ContextPackSymbol,

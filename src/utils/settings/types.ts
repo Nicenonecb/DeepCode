@@ -165,6 +165,27 @@ export const ContextPackerSettingsSchema = lazySchema(() =>
         .positive()
         .optional()
         .describe('Maximum character budget for the generated ContextPack.'),
+      budgetSource: z
+        .enum(['settings', 'model-profile'])
+        .optional()
+        .describe(
+          'Whether ContextPacker uses explicit settings.maxChars or the active model effort profile context budget. Defaults to model-profile when available.',
+        ),
+      charsPerToken: z
+        .number()
+        .positive()
+        .optional()
+        .describe(
+          'Approximate character budget per model context token when deriving ContextPack size from a model profile.',
+        ),
+      contextWatermark: z
+        .number()
+        .positive()
+        .max(1)
+        .optional()
+        .describe(
+          'Optional watermark override for model-profile ContextPacker budgeting.',
+        ),
       includeDiff: z
         .boolean()
         .optional()

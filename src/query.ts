@@ -126,7 +126,9 @@ import {
   collectContextPackInput,
   formatContextPackForPrompt,
   ContextPacker,
+  resolveContextPackMaxChars,
   type ContextPackerSettings,
+  type ContextPackRuntimeBudget,
 } from './services/contextPacker/index.js'
 import {
   createWorkingMemoryPrompt,
@@ -136,7 +138,10 @@ import {
   type WorkingMemorySettings,
 } from './services/workingMemory/index.js'
 import type { DSMLGatewaySettings } from './services/dsml/index.js'
-import type { DeepSeekEffortBudgetSettings } from './services/deepseek/modelProfiles.js'
+import {
+  resolveDeepSeekRequestEffortProfile,
+  type DeepSeekEffortBudgetSettings,
+} from './services/deepseek/modelProfiles.js'
 import type { InterleavedThinkingRetentionOptions } from '@ant/model-provider'
 import type { ToolCallRepairIssue } from './services/toolRepair/types.js'
 import { runPatchSearchForHighRiskContext } from './services/patchSearch/PatchSearchIntegration.js'
@@ -1014,6 +1019,7 @@ async function* queryLoop(
       const { isAtBlockingLimit } = calculateTokenWarningState(
         tokenCountWithEstimation(messagesForQuery) - snipTokensFreed,
         toolUseContext.options.mainLoopModel,
+        toolUseContext.options.contextWindowOverrideTokens,
       )
       if (isAtBlockingLimit) {
         yield createAssistantAPIErrorMessage({
@@ -1034,7 +1040,10 @@ async function* queryLoop(
         tokenCountWithEstimation(messagesForQuery) - snipTokensFreed
       const estimatedGrowth = estimateMaxTurnGrowth(model)
       const predictiveThreshold =
-        getEffectiveContextWindowSize(model) - estimatedGrowth
+        getEffectiveContextWindowSize(
+          model,
+          toolUseContext.options.contextWindowOverrideTokens,
+        ) - estimatedGrowth
       if (currentTokens > predictiveThreshold) {
         const predictiveResult = await deps.autocompact(
           messagesForQuery,
@@ -1071,6 +1080,11 @@ async function* queryLoop(
       toolUseContext,
       toolUseContext.getAppState().settings.contextPacker as
         | ContextPackerSettings
+        | undefined,
+      currentModel,
+      appState.effortValue,
+      appState.settings.deepSeekEffortBudgets as
+        | DeepSeekEffortBudgetSettings
         | undefined,
     )
     const messagesWithMetaContext = buildWorkingMemoryMessages(
@@ -2397,10 +2411,18 @@ async function buildContextPackedMessages(
   messages: Message[],
   toolUseContext: ToolUseContext,
   settings: ContextPackerSettings | undefined,
+  model: string,
+  effortValue: unknown,
+  deepSeekEffortBudgets: DeepSeekEffortBudgetSettings | undefined,
 ): Promise<Message[]> {
   if (!shouldInjectContextPack(toolUseContext, settings)) return messages
 
   try {
+    const runtimeBudget = resolveContextPackRuntimeBudget(
+      model,
+      effortValue,
+      deepSeekEffortBudgets,
+    )
     const contextPackInput = await collectContextPackInput({
       cwd: getCwd(),
       taskPrompt: getLatestUserPrompt(messages),
@@ -2408,6 +2430,7 @@ async function buildContextPackedMessages(
     const contextPack = new ContextPacker().pack({
       ...contextPackInput,
       settings,
+      maxChars: resolveContextPackMaxChars(settings, runtimeBudget),
     })
 
     if (contextPack.sections.length === 0) return messages
@@ -2424,6 +2447,25 @@ async function buildContextPackedMessages(
       `[ContextPacker] Failed to build context pack: ${error instanceof Error ? error.message : String(error)}`,
     )
     return messages
+  }
+}
+
+function resolveContextPackRuntimeBudget(
+  model: string,
+  effortValue: unknown,
+  deepSeekEffortBudgets: DeepSeekEffortBudgetSettings | undefined,
+): ContextPackRuntimeBudget | undefined {
+  const profile = resolveDeepSeekRequestEffortProfile(
+    model,
+    effortValue,
+    deepSeekEffortBudgets,
+  )
+  if (!profile) return undefined
+
+  return {
+    maxContextTokens: profile.maxContextTokens,
+    contextWatermark: profile.contextWatermark,
+    source: `deepseek-v4-pro:${profile.tier}`,
   }
 }
 

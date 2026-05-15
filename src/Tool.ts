@@ -176,6 +176,8 @@ export type ToolUseContext = {
     appendSystemPrompt?: string
     /** Override querySource for analytics tracking */
     querySource?: QuerySource
+    /** Optional effective context window cap for subagent/fork query loops. */
+    contextWindowOverrideTokens?: number
     /** Optional callback to get the latest tools (e.g., after MCP servers connect mid-query) */
     refreshTools?: () => Tools
     /**

@@ -120,6 +120,9 @@ describe('SettingsSchema', () => {
       contextPacker: {
         enabled: true,
         maxChars: 12_000,
+        budgetSource: 'model-profile',
+        charsPerToken: 4,
+        contextWatermark: 0.8,
         includeDiff: true,
         includeVerification: false,
         includeLsp: true,

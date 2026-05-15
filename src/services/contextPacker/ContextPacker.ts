@@ -9,9 +9,12 @@ export type ContextPackSectionId =
   | 'test_hints'
   | 'lsp'
 
+export type ContextPackEvidenceTier = 'hot' | 'warm' | 'cold'
+
 export type ContextPackSection = {
   id: ContextPackSectionId
   title: string
+  tier: ContextPackEvidenceTier
   priority: number
   content: string
   charCount: number
@@ -30,6 +33,9 @@ export type ContextPack = {
 export type ContextPackerSettings = {
   enabled?: boolean
   maxChars?: number
+  budgetSource?: 'settings' | 'model-profile'
+  charsPerToken?: number
+  contextWatermark?: number
   includeRepoMap?: boolean
   includeDiff?: boolean
   includeVerification?: boolean
@@ -53,6 +59,12 @@ export type ContextPackInput = {
   maxChars?: number
   settings?: ContextPackerSettings
   generatedAt?: number
+}
+
+export type ContextPackRuntimeBudget = {
+  maxContextTokens: number
+  contextWatermark: number
+  source: string
 }
 
 export type ContextPackFile = {
@@ -97,7 +109,13 @@ export type ContextPackReference = {
 type DraftSection = Omit<ContextPackSection, 'charCount' | 'truncated'>
 
 const DEFAULT_MAX_CHARS = 24_000
+const DEFAULT_CHARS_PER_TOKEN = 4
 const TRUNCATION_MARKER = '\n...[context pack section truncated]...'
+const TIER_RANK: Record<ContextPackEvidenceTier, number> = {
+  hot: 3,
+  warm: 2,
+  cold: 1,
+}
 
 export class ContextPacker {
   pack(input: ContextPackInput): ContextPack {
@@ -127,6 +145,23 @@ export function isContextPackerEnabled(
   return settings?.enabled !== false
 }
 
+export function resolveContextPackMaxChars(
+  settings: ContextPackerSettings | undefined,
+  runtimeBudget?: ContextPackRuntimeBudget,
+): number {
+  if (settings?.maxChars) return normalizeMaxChars(settings.maxChars)
+  if (settings?.budgetSource === 'settings') return DEFAULT_MAX_CHARS
+  if (!runtimeBudget) return DEFAULT_MAX_CHARS
+
+  const watermark = normalizeWatermark(
+    settings?.contextWatermark ?? runtimeBudget.contextWatermark,
+  )
+  const charsPerToken = normalizeCharsPerToken(settings?.charsPerToken)
+  return normalizeMaxChars(
+    Math.floor(runtimeBudget.maxContextTokens * watermark * charsPerToken),
+  )
+}
+
 export function formatContextPackForPrompt(pack: ContextPack): string {
   const lines = [
     '<context_pack>',
@@ -134,13 +169,20 @@ export function formatContextPackForPrompt(pack: ContextPack): string {
     `budget: ${pack.totalChars}/${pack.maxChars} chars`,
   ]
 
-  for (const section of pack.sections) {
-    lines.push(
-      '',
-      `<section id="${section.id}" title="${section.title}" priority="${section.priority}">`,
-      section.content,
-      '</section>',
-    )
+  for (const tier of ['hot', 'warm', 'cold'] as const) {
+    const tierSections = pack.sections.filter(section => section.tier === tier)
+    if (tierSections.length === 0) continue
+
+    lines.push('', `<evidence_tier name="${tier}">`)
+    for (const section of tierSections) {
+      lines.push(
+        '',
+        `<section id="${section.id}" title="${section.title}" tier="${section.tier}" priority="${section.priority}">`,
+        section.content,
+        '</section>',
+      )
+    }
+    lines.push(`</evidence_tier>`)
   }
 
   lines.push('</context_pack>')
@@ -176,6 +218,7 @@ function buildDraftSections(
       sections.push({
         id: 'verification',
         title: 'Verification',
+        tier: 'hot',
         priority: 100,
         content,
       })
@@ -188,6 +231,7 @@ function buildDraftSections(
       sections.push({
         id: 'lsp',
         title: 'LSP',
+        tier: 'hot',
         priority: 95,
         content,
       })
@@ -198,6 +242,7 @@ function buildDraftSections(
     sections.push({
       id: 'task',
       title: 'Task',
+      tier: 'hot',
       priority: 90,
       content: input.taskPrompt.trim(),
     })
@@ -212,6 +257,7 @@ function buildDraftSections(
     sections.push({
       id: 'repo_map',
       title: 'Repo Map',
+      tier: 'cold',
       priority: 85,
       content: formatRepoMapSection(input),
     })
@@ -221,6 +267,7 @@ function buildDraftSections(
     sections.push({
       id: 'diff',
       title: 'Diff',
+      tier: 'hot',
       priority: 75,
       content: summarizeDiff(input.diff),
     })
@@ -233,6 +280,7 @@ function buildDraftSections(
     sections.push({
       id: 'related_files',
       title: 'Related Files',
+      tier: 'warm',
       priority: 82,
       content: formatRelatedFilesSection(input),
     })
@@ -242,12 +290,28 @@ function buildDraftSections(
     sections.push({
       id: 'test_hints',
       title: 'Test Hints',
+      tier: 'warm',
       priority: 70,
       content: input.testHints.map(hint => `- ${hint}`).join('\n'),
     })
   }
 
   return sections
+}
+
+function normalizeCharsPerToken(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0
+    ? value
+    : DEFAULT_CHARS_PER_TOKEN
+}
+
+function normalizeWatermark(value: unknown): number {
+  return typeof value === 'number' &&
+    Number.isFinite(value) &&
+    value > 0 &&
+    value <= 1
+    ? value
+    : 1
 }
 
 function hasPackageScripts(
@@ -382,7 +446,10 @@ function applyBudget(
   const ordered = drafts
     .map((section, index) => ({ section, index }))
     .sort(
-      (a, b) => b.section.priority - a.section.priority || a.index - b.index,
+      (a, b) =>
+        TIER_RANK[b.section.tier] - TIER_RANK[a.section.tier] ||
+        b.section.priority - a.section.priority ||
+        a.index - b.index,
     )
 
   const sections: ContextPackSection[] = []

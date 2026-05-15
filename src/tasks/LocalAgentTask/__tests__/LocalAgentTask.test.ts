@@ -101,6 +101,7 @@ const {
   failAgentTask,
   killAsyncAgent,
   enqueueAgentNotification,
+  registerAgentForeground,
   registerAsyncAgent,
   updateAgentProgress,
   isLocalAgentTask,
@@ -457,6 +458,54 @@ describe('enqueueAgentNotification', () => {
     })
 
     expect(enqueuedNotifications).toHaveLength(0)
+  })
+})
+
+describe('agent context cap metadata', () => {
+  test('registerAsyncAgent stores context cap evidence on task state', () => {
+    const { setAppState, getState } = createSetAppState()
+
+    const task = registerAsyncAgent({
+      agentId: 'agent-cap-001',
+      description: 'large refactor',
+      prompt: 'Refactor a large subsystem',
+      selectedAgent: { agentType: 'general-purpose' } as any,
+      setAppState: setAppState as any,
+      contextWindowOverrideTokens: 512_000,
+      parentContextWindowTokens: 1_000_000,
+      contextCapTier: 'large',
+    })
+
+    expect(task.contextWindowOverrideTokens).toBe(512_000)
+    expect(task.parentContextWindowTokens).toBe(1_000_000)
+    expect(task.contextCapTier).toBe('large')
+    expect(getState().tasks['agent-cap-001']).toMatchObject({
+      contextWindowOverrideTokens: 512_000,
+      parentContextWindowTokens: 1_000_000,
+      contextCapTier: 'large',
+    })
+  })
+
+  test('registerAgentForeground stores context cap evidence on task state', () => {
+    const { setAppState, getState } = createSetAppState()
+
+    registerAgentForeground({
+      agentId: 'agent-cap-foreground',
+      description: 'small read',
+      prompt: 'Read one file',
+      selectedAgent: { agentType: 'general-purpose' } as any,
+      setAppState: setAppState as any,
+      contextWindowOverrideTokens: 256_000,
+      parentContextWindowTokens: 1_000_000,
+      contextCapTier: 'standard',
+    })
+
+    expect(getState().tasks['agent-cap-foreground']).toMatchObject({
+      contextWindowOverrideTokens: 256_000,
+      parentContextWindowTokens: 1_000_000,
+      contextCapTier: 'standard',
+      isBackgrounded: false,
+    })
   })
 })
 

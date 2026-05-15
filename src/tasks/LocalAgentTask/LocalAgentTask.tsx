@@ -150,6 +150,9 @@ export type LocalAgentTaskState = TaskStateBase & {
   selectedAgent?: AgentDefinition;
   agentType: string;
   model?: string;
+  contextWindowOverrideTokens?: number;
+  parentContextWindowTokens?: number;
+  contextCapTier?: string;
   abortController?: AbortController;
   unregisterCleanup?: () => void;
   error?: string;
@@ -528,6 +531,9 @@ export function registerAsyncAgent({
   setAppState,
   parentAbortController,
   toolUseId,
+  contextWindowOverrideTokens,
+  parentContextWindowTokens,
+  contextCapTier,
 }: {
   agentId: string;
   description: string;
@@ -536,6 +542,9 @@ export function registerAsyncAgent({
   setAppState: SetAppState;
   parentAbortController?: AbortController;
   toolUseId?: string;
+  contextWindowOverrideTokens?: number;
+  parentContextWindowTokens?: number;
+  contextCapTier?: string;
 }): LocalAgentTaskState {
   void initTaskOutputAsSymlink(agentId, getAgentTranscriptPath(asAgentId(agentId)));
 
@@ -552,6 +561,9 @@ export function registerAsyncAgent({
     prompt,
     selectedAgent,
     agentType: selectedAgent.agentType ?? 'general-purpose',
+    contextWindowOverrideTokens,
+    parentContextWindowTokens,
+    contextCapTier,
     abortController,
     retrieved: false,
     lastReportedToolCount: 0,
@@ -592,6 +604,9 @@ export function registerAgentForeground({
   setAppState,
   autoBackgroundMs,
   toolUseId,
+  contextWindowOverrideTokens,
+  parentContextWindowTokens,
+  contextCapTier,
 }: {
   agentId: string;
   description: string;
@@ -600,6 +615,9 @@ export function registerAgentForeground({
   setAppState: SetAppState;
   autoBackgroundMs?: number;
   toolUseId?: string;
+  contextWindowOverrideTokens?: number;
+  parentContextWindowTokens?: number;
+  contextCapTier?: string;
 }): {
   taskId: string;
   backgroundSignal: Promise<void>;
@@ -621,6 +639,9 @@ export function registerAgentForeground({
     prompt,
     selectedAgent,
     agentType: selectedAgent.agentType ?? 'general-purpose',
+    contextWindowOverrideTokens,
+    parentContextWindowTokens,
+    contextCapTier,
     abortController,
     unregisterCleanup,
     retrieved: false,

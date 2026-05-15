@@ -3,6 +3,7 @@ import {
   ContextPacker,
   formatContextPackForPrompt,
   isContextPackerEnabled,
+  resolveContextPackMaxChars,
   summarizeDiff,
 } from '../ContextPacker.js'
 import type { VerificationSummary } from '../../verification/index.js'
@@ -65,10 +66,19 @@ describe('ContextPacker', () => {
       'verification',
       'lsp',
       'task',
-      'repo_map',
-      'related_files',
       'diff',
+      'related_files',
       'test_hints',
+      'repo_map',
+    ])
+    expect(pack.sections.map(section => section.tier)).toEqual([
+      'hot',
+      'hot',
+      'hot',
+      'hot',
+      'warm',
+      'warm',
+      'cold',
     ])
     expect(
       pack.sections.find(section => section.id === 'verification')?.content,
@@ -148,14 +158,88 @@ describe('ContextPacker', () => {
     })
 
     expect(formatContextPackForPrompt(pack)).toContain('<context_pack>')
-    expect(formatContextPackForPrompt(pack)).toContain('<section id="repo_map"')
+    expect(formatContextPackForPrompt(pack)).toContain(
+      '<evidence_tier name="hot">',
+    )
+    expect(formatContextPackForPrompt(pack)).toContain(
+      '<evidence_tier name="cold">',
+    )
+    expect(formatContextPackForPrompt(pack)).toContain(
+      '<section id="repo_map" title="Repo Map" tier="cold"',
+    )
     expect(formatContextPackForPrompt(pack)).toContain('src/index.ts')
+  })
+
+  test('keeps hot evidence before warm and cold evidence under budget', () => {
+    const pack = new ContextPacker().pack({
+      cwd: '/repo',
+      taskPrompt: 'Fix parser',
+      changedFiles: ['src/parser.ts'],
+      repoMap: 'src/parser.ts\n'.repeat(100),
+      relatedFiles: [
+        {
+          path: 'src/parser.ts',
+          reason: 'current target',
+          excerpt: 'export const parser = true\n'.repeat(40),
+        },
+      ],
+      maxChars: 300,
+    })
+
+    expect(pack.truncated).toBe(true)
+    expect(pack.sections.map(section => section.tier)).toEqual(['hot', 'warm'])
+    expect(pack.sections.map(section => section.id)).not.toContain('repo_map')
   })
 
   test('summarizes diff headers and changed lines', () => {
     expect(summarizeDiff(sampleDiff())).toContain('diff --git')
     expect(summarizeDiff(sampleDiff())).toContain('@@ -1,3 +1,3 @@')
     expect(summarizeDiff(sampleDiff())).toContain('+export const value = 2')
+  })
+
+  test('derives pack budget from the active model context profile', () => {
+    expect(
+      resolveContextPackMaxChars(
+        { enabled: true },
+        {
+          maxContextTokens: 800_000,
+          contextWatermark: 0.8,
+          source: 'deepseek-v4-pro:max',
+        },
+      ),
+    ).toBe(2_560_000)
+  })
+
+  test('lets explicit settings override model-profile pack budget', () => {
+    expect(
+      resolveContextPackMaxChars(
+        {
+          enabled: true,
+          maxChars: 120_000,
+        },
+        {
+          maxContextTokens: 800_000,
+          contextWatermark: 0.8,
+          source: 'deepseek-v4-pro:max',
+        },
+      ),
+    ).toBe(120_000)
+  })
+
+  test('can force legacy settings budget instead of model-profile budget', () => {
+    expect(
+      resolveContextPackMaxChars(
+        {
+          enabled: true,
+          budgetSource: 'settings',
+        },
+        {
+          maxContextTokens: 800_000,
+          contextWatermark: 0.8,
+          source: 'deepseek-v4-pro:max',
+        },
+      ),
+    ).toBe(24_000)
   })
 })
 
