@@ -8,7 +8,7 @@
 
 ## 背景
 
-Claude Code 使用三层门控系统：
+DeepCode 使用三层门控系统：
 1. **编译时 feature flag** — `feature('FLAG_NAME')` from `bun:bundle`
 2. **GrowthBook 远程开关** — `tengu_*` 前缀，通过 SDK 连接 Anthropic 服务端
 3. **运行时环境变量** — `USER_TYPE`、`CLAUDE_CODE_*` 等
@@ -197,7 +197,7 @@ CLAUDE_GB_ADAPTER_KEY=sdk-xxx
 ### P2-4. 深度链接
 - **Gate**: `tengu_lodestone_enabled` → `true`
 - **功能**: 注册 `claude://` URL 协议处理器
-- **效果**: 可从浏览器直接打开 Claude Code
+- **效果**: 可从浏览器直接打开 DeepCode
 - **风险**: 低
 
 ### P2-5. Agent 自动转后台

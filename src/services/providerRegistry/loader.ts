@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { logError } from '../../utils/log.js'
 import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
 import { ProvidersFileSchema, type ProviderConfig } from './types.js'
+import { DEEPSEEK_DEFAULT_MODEL } from '../deepseek/modelProfiles.js'
 
 /**
  * The four built-in OpenAI-compat providers.
@@ -43,7 +44,7 @@ export const DEFAULT_PROVIDERS: ProviderConfig[] = [
     kind: 'openai-compat',
     baseUrl: 'https://api.deepseek.com/v1',
     apiKeyEnv: 'DEEPSEEK_API_KEY',
-    defaultModel: 'deepseek-chat',
+    defaultModel: DEEPSEEK_DEFAULT_MODEL,
     compatRule: 'deepseek',
   },
 ]

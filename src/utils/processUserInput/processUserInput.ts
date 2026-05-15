@@ -37,7 +37,7 @@ import {
   getAttachmentMessages,
 } from '../attachments.js'
 import type { PastedContent } from '../config.js'
-import type { EffortValue } from '../effort.js'
+import { getEffortEnvOverride, type EffortValue } from '../effort.js'
 import { toArray } from '../generators.js'
 import {
   executeUserPromptSubmitHooks,
@@ -59,6 +59,10 @@ import {
   hasUltraplanKeyword,
   replaceUltraplanKeyword,
 } from '../ultraplan/keyword.js'
+import { parseUserSpecifiedModel } from '../model/model.js'
+import { getTaskAwareModelRoutingConfig } from '../taskAwareModelRoutingConfig.js'
+import type { TaskAwareModelRoutingConfig } from '../taskAwareModelRouter.js'
+import { getTaskAwareModelRoutePatch } from '../taskAwareModelRouter.js'
 import { processTextPrompt } from './processTextPrompt.js'
 export type ProcessUserInputContext = ToolUseContext & LocalJSXCommandContext
 
@@ -589,7 +593,7 @@ async function processUserInputBase(
   }
 
   // Regular user prompt
-  return addImageMetadataMessage(
+  const result = addImageMetadataMessage(
     processTextPrompt(
       normalizedInput,
       imageContentBlocks,
@@ -601,6 +605,10 @@ async function processUserInputBase(
     ),
     imageMetadataTexts,
   )
+  if (feature('TASK_AWARE_MODEL_ROUTING')) {
+    return applyTaskAwareModelRoute(result, inputString, context)
+  }
+  return result
 }
 
 // Adds image metadata texts as isMeta message to result
@@ -617,4 +625,33 @@ function addImageMetadataMessage(
     )
   }
   return result
+}
+
+export function applyTaskAwareModelRoute(
+  result: ProcessUserInputBaseResult,
+  input: string | null,
+  context: ProcessUserInputContext,
+  config: TaskAwareModelRoutingConfig = getTaskAwareModelRoutingConfig(),
+): ProcessUserInputBaseResult {
+  const appState = context.getAppState()
+  const patch = getTaskAwareModelRoutePatch({
+    input,
+    config,
+    hasModelOverride:
+      result.model !== undefined ||
+      appState.mainLoopModel !== null ||
+      appState.mainLoopModelForSession !== null,
+    hasEffortOverride:
+      result.effort !== undefined ||
+      appState.effortValue !== undefined ||
+      getEffortEnvOverride() !== undefined,
+  })
+
+  if (!patch) return result
+
+  return {
+    ...result,
+    ...(patch.model ? { model: parseUserSpecifiedModel(patch.model) } : {}),
+    ...(patch.effort ? { effort: patch.effort } : {}),
+  }
 }

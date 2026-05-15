@@ -1,7 +1,6 @@
 // biome-ignore-all assist/source/organizeImports: ANT-ONLY import markers must not be reordered
 import { isUltrathinkEnabled } from './thinking.js'
 import { getInitialSettings } from './settings/settings.js'
-import { isProSubscriber, isMaxSubscriber, isTeamSubscriber } from './auth.js'
 import { getFeatureValue_CACHED_MAY_BE_STALE } from 'src/services/analytics/growthbook.js'
 import { getAPIProvider } from './model/providers.js'
 import { get3PModelCapabilityOverride } from './model/modelSupportOverrides.js'
@@ -13,6 +12,7 @@ import {
   isChatGPTAuthMode,
   isChatGPTCodexReasoningModel,
 } from './model/chatgptModels.js'
+import { getDeepSeekModelProfile } from 'src/services/deepseek/modelProfiles.js'
 
 export type { EffortLevel }
 
@@ -36,6 +36,10 @@ export function modelSupportsEffort(model: string): boolean {
   if (supported3P !== undefined) {
     return supported3P
   }
+  const deepSeekProfile = getDeepSeekModelProfile(model)
+  if (deepSeekProfile) {
+    return deepSeekProfile.thinking.supported
+  }
   if (
     getAPIProvider() === 'openai' &&
     isChatGPTAuthMode() &&
@@ -47,8 +51,7 @@ export function modelSupportsEffort(model: string): boolean {
   if (
     m.includes('opus-4-7') ||
     m.includes('opus-4-6') ||
-    m.includes('sonnet-4-6') ||
-    m.includes('deepseek-v4-pro')
+    m.includes('sonnet-4-6')
   ) {
     return true
   }
@@ -75,9 +78,9 @@ export function modelSupportsMaxEffort(model: string): boolean {
   if (supported3P !== undefined) {
     return supported3P
   }
-  // Support DeepSeek V4 Pro specifically (Anthropic-compatible API)
-  if (model.toLowerCase().includes('deepseek-v4-pro')) {
-    return true
+  const deepSeekProfile = getDeepSeekModelProfile(model)
+  if (deepSeekProfile) {
+    return deepSeekProfile.thinking.supportedEfforts.includes('max')
   }
   if (
     model.toLowerCase().includes('opus-4-7') ||
@@ -214,6 +217,13 @@ export function resolveAppliedEffort(
   }
   const resolved =
     envOverride ?? appStateEffortValue ?? getDefaultEffortForModel(model)
+  const deepSeekProfile = getDeepSeekModelProfile(model)
+  if (
+    resolved === 'xhigh' &&
+    deepSeekProfile?.thinking.supportedEfforts.includes('max')
+  ) {
+    return 'max'
+  }
   // API rejects 'xhigh' on pre-Opus-4.7 models — downgrade to 'high'.
   if (resolved === 'xhigh' && !modelSupportsXhighEffort(model)) {
     return 'high'
@@ -383,21 +393,21 @@ export function getDefaultEffortForModel(
     return 'medium'
   }
 
-  // Default effort on Opus 4.6 to medium for Pro.
-  // Max/Team also get medium when the tengu_grey_step2 config is enabled.
+  const deepSeekProfile = getDeepSeekModelProfile(model)
+  if (deepSeekProfile) {
+    return deepSeekProfile.thinking.defaultEffort
+  }
+
+  if (modelSupportsMaxEffort(model)) {
+    return 'max'
+  }
+
+  // Opus gets the stronger local default without account-tier gating.
   if (
     model.toLowerCase().includes('opus-4-7') ||
     model.toLowerCase().includes('opus-4-6')
   ) {
-    if (isProSubscriber()) {
-      return 'high'
-    }
-    if (
-      getOpusDefaultEffortConfig().enabled &&
-      (isMaxSubscriber() || isTeamSubscriber())
-    ) {
-      return 'high'
-    }
+    return 'high'
   }
 
   // When ultrathink feature is on, default effort to medium (ultrathink bumps to high)

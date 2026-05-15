@@ -66,7 +66,7 @@ describe('switchProvider', () => {
     const { DEFAULT_PROVIDERS } = await import('../loader.js')
     const result = switchProvider('deepseek', DEFAULT_PROVIDERS)
     expect(result.env['DEEPSEEK_BASE_URL']).toBe('https://api.deepseek.com/v1')
-    expect(result.env['DEEPSEEK_MODEL']).toBe('deepseek-chat')
+    expect(result.env['DEEPSEEK_MODEL']).toBe('deepseek-v4-pro')
     expect(result.env['CLAUDE_CODE_USE_OPENAI']).toBeUndefined()
   })
 
@@ -144,7 +144,7 @@ describe('buildShellExportBlock', () => {
       'export DEEPSEEK_BASE_URL=https://api.deepseek.com/v1',
     )
     expect(block).toContain('export DEEPSEEK_API_KEY=$DEEPSEEK_API_KEY')
-    expect(block).toContain('export DEEPSEEK_MODEL=deepseek-chat')
+    expect(block).toContain('export DEEPSEEK_MODEL=deepseek-v4-pro')
     expect(block).not.toContain('OPENAI_API_KEY')
   })
 })

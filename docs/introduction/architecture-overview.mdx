@@ -1,17 +1,17 @@
 ---
-title: "架构全景 - Claude Code 五层架构详解"
-description: "从交互层到基础设施层，详解 Claude Code 的五层架构设计。基于 src/main.tsx、src/QueryEngine.ts、src/query.ts、src/tools.ts、src/services/api/claude.ts 的源码级数据流分析。"
-keywords: ["Claude Code 架构", "五层架构", "QueryEngine", "Agentic Loop", "数据流"]
+title: "架构全景 - DeepCode 五层架构详解"
+description: "从交互层到基础设施层，详解 DeepCode 的五层架构设计。基于 src/main.tsx、src/QueryEngine.ts、src/query.ts、src/tools.ts、src/services/api/claude.ts 的源码级数据流分析。"
+keywords: ["DeepCode 架构", "五层架构", "QueryEngine", "Agentic Loop", "数据流"]
 ---
 
 {/* 本章目标：一张图讲清楚整体架构，为后续章节建立坐标系 */}
 
 ## 五层架构
 
-Claude Code 从上到下分为五个层次，每一层职责清晰、边界分明：
+DeepCode 从上到下分为五个层次，每一层职责清晰、边界分明：
 
-<Frame caption="Claude Code 五层架构">
-  <img src="/docs/images/architecture-layers.png" alt="Claude Code 五层架构图" />
+<Frame caption="DeepCode 五层架构">
+  <img src="/docs/images/architecture-layers.png" alt="DeepCode 五层架构图" />
 </Frame>
 
 | 层次 | 职责 | 入口源码 | 关键词 |
@@ -25,7 +25,7 @@ Claude Code 从上到下分为五个层次，每一层职责清晰、边界分�
 ## 一条主数据流的源码追踪
 
 <Frame caption="核心数据流">
-  <img src="/docs/images/data-flow.png" alt="Claude Code 核心数据流" />
+  <img src="/docs/images/data-flow.png" alt="DeepCode 核心数据流" />
 </Frame>
 
 整个系统的运转可以浓缩为一条核心数据流，以下是每一步对应的源码路径：

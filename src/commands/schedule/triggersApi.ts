@@ -82,7 +82,7 @@ async function buildHeaders(): Promise<Record<string, string>> {
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err)
     throw new TriggersApiError(
-      `Not authenticated: ${msg}. Run /login to re-authenticate.`,
+      `Not authenticated: ${msg}. Configure ANTHROPIC_API_KEY or provider credentials.`,
       401,
     )
   }
@@ -104,7 +104,7 @@ function classifyError(err: unknown): TriggersApiError {
     const status = err.response?.status ?? 0
     if (status === 401) {
       return new TriggersApiError(
-        'Authentication failed. Please run /login to re-authenticate.',
+        'Authentication failed. Configure ANTHROPIC_API_KEY or provider credentials.',
         401,
       )
     }

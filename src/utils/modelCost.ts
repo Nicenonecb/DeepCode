@@ -22,6 +22,7 @@ import {
   getDefaultMainLoopModelSetting,
   type ModelShortName,
 } from './model/model.js'
+import { getDeepSeekModelProfile } from '../services/deepseek/modelProfiles.js'
 
 // @see https://platform.claude.com/docs/en/about-claude/pricing
 export type ModelCosts = {
@@ -125,6 +126,19 @@ export const MODEL_COSTS: Record<ModelShortName, ModelCosts> = {
     COST_TIER_5_25,
 }
 
+function getDeepSeekModelCosts(model: string): ModelCosts | undefined {
+  const profile = getDeepSeekModelProfile(model)
+  if (!profile) return undefined
+
+  return {
+    inputTokens: profile.pricing.inputCacheMiss,
+    outputTokens: profile.pricing.output,
+    promptCacheWriteTokens: profile.pricing.inputCacheMiss,
+    promptCacheReadTokens: profile.pricing.inputCacheHit,
+    webSearchRequests: 0,
+  }
+}
+
 /**
  * Calculates the USD cost based on token usage and model cost configuration
  */
@@ -142,6 +156,9 @@ function tokensToUSDCost(modelCosts: ModelCosts, usage: Usage): number {
 }
 
 export function getModelCosts(model: string, usage: Usage): ModelCosts {
+  const deepSeekCosts = getDeepSeekModelCosts(model)
+  if (deepSeekCosts) return deepSeekCosts
+
   const shortName = getCanonicalName(model)
 
   // Check if this is an Opus 4.6 model with fast mode active.

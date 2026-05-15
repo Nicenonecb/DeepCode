@@ -61,12 +61,6 @@ const COMMANDS: CmdSpec[] = [
   { mod: '../src/commands/share/index.ts', name: 'share', type: 'local' },
   { mod: '../src/commands/issue/index.ts', name: 'issue', type: 'local' },
   {
-    mod: '../src/commands/teleport/index.ts',
-    name: 'teleport',
-    sample: '',
-    type: 'local-jsx',
-  },
-  {
     mod: '../src/commands/autofix-pr/index.ts',
     name: 'autofix-pr',
     sample: 'stop',

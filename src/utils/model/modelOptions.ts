@@ -1,10 +1,5 @@
 // biome-ignore-all assist/source/organizeImports: ANT-ONLY import markers must not be reordered
 import { getInitialMainLoopModel } from '../../bootstrap/state.js'
-import {
-  isClaudeAISubscriber,
-  isMaxSubscriber,
-  isTeamPremiumSubscriber,
-} from '../auth.js'
 import { getModelStrings } from './modelStrings.js'
 import { getAntModels } from './antModels.js'
 import {
@@ -61,21 +56,13 @@ export function getDefaultOptionForUser(fastMode = false): ModelOption {
     }
   }
 
-  // Subscribers
-  if (isClaudeAISubscriber()) {
-    return {
-      value: null,
-      label: 'Default (recommended)',
-      description: getClaudeAiUserDefaultModelDescription(fastMode),
-    }
-  }
-
-  // PAYG
   const is3P = getAPIProvider() !== 'firstParty'
   return {
     value: null,
     label: 'Default (recommended)',
-    description: `Use the default model (currently ${renderDefaultModelSetting(getDefaultMainLoopModelSetting())})${is3P ? '' : ` · ${formatModelPricing(COST_TIER_3_15)}`}`,
+    description: is3P
+      ? `Use the default model (currently ${renderDefaultModelSetting(getDefaultMainLoopModelSetting())})`
+      : getClaudeAiUserDefaultModelDescription(fastMode),
   }
 }
 
@@ -283,7 +270,7 @@ function getHaikuOption(): ModelOption {
     : getHaiku35Option()
 }
 
-function getMaxOpusOption(fastMode = false): ModelOption {
+function getOpusDefaultOption(fastMode = false): ModelOption {
   return {
     value: 'opus',
     label: 'Opus 4.7',
@@ -291,22 +278,20 @@ function getMaxOpusOption(fastMode = false): ModelOption {
   }
 }
 
-export function getMaxSonnet46_1MOption(): ModelOption {
+export function getSonnet46LongContextOption(): ModelOption {
   const is3P = getAPIProvider() !== 'firstParty'
-  const billingInfo = isClaudeAISubscriber() ? ' · Billed as extra usage' : ''
   return {
     value: 'sonnet[1m]',
     label: 'Sonnet (1M context)',
-    description: `Sonnet 4.6 with 1M context${billingInfo}${is3P ? '' : ` · ${formatModelPricing(COST_TIER_3_15)}`}`,
+    description: `Sonnet 4.6 with 1M context${is3P ? '' : ` · ${formatModelPricing(COST_TIER_3_15)}`}`,
   }
 }
 
-export function getMaxOpus47_1MOption(fastMode = false): ModelOption {
-  const billingInfo = isClaudeAISubscriber() ? ' · Billed as extra usage' : ''
+export function getOpus47LongContextOption(fastMode = false): ModelOption {
   return {
     value: 'opus[1m]',
     label: 'Opus 4.7 (1M context)',
-    description: `Opus 4.7 with 1M context${billingInfo}${getOpusPricingSuffix(fastMode)}`,
+    description: `Opus 4.7 with 1M context${getOpusPricingSuffix(fastMode)}`,
   }
 }
 
@@ -321,13 +306,13 @@ function getMergedOpus1MOption(fastMode = false): ModelOption {
   }
 }
 
-const MaxSonnet46Option: ModelOption = {
+const Sonnet46Option: ModelOption = {
   value: 'sonnet',
   label: 'Sonnet',
   description: 'Sonnet 4.6 · Best for everyday tasks',
 }
 
-const MaxHaiku45Option: ModelOption = {
+const Haiku45Option: ModelOption = {
   value: 'haiku',
   label: 'Haiku',
   description: 'Haiku 4.5 · Fastest for quick answers',
@@ -359,7 +344,7 @@ function getChatGPTCodexModelOptions(): ModelOption[] {
 }
 
 // @[MODEL LAUNCH]: Update the model picker lists below to include/reorder options for the new model.
-// Each user tier (ant, Max/Team Premium, Pro/Team Standard/Enterprise, PAYG 1P, PAYG 3P) has its own list.
+// Options are based on local provider/model capabilities, not account tier.
 function getModelOptionsBase(fastMode = false): ModelOption[] {
   if (process.env.USER_TYPE === 'ant') {
     // Build options from antModels config
@@ -383,59 +368,24 @@ function getModelOptionsBase(fastMode = false): ModelOption[] {
     return getChatGPTCodexModelOptions()
   }
 
-  if (isClaudeAISubscriber()) {
-    if (isMaxSubscriber() || isTeamPremiumSubscriber()) {
-      // Max and Team Premium users: Default = Opus 4.7 1M (merged), plus Opus 4.6 1M
-      const premiumOptions = [getDefaultOptionForUser(fastMode)]
-      premiumOptions.push(getOpus46_1MOption(fastMode))
-
-      premiumOptions.push(MaxSonnet46Option)
-      if (checkSonnet1mAccess()) {
-        premiumOptions.push(getMaxSonnet46_1MOption())
-      }
-
-      premiumOptions.push(MaxHaiku45Option)
-      return premiumOptions
-    }
-
-    // Pro/Team Standard/Enterprise users: Sonnet is default, show Opus 4.7 1M + Opus 4.6 1M
-    const standardOptions = [getDefaultOptionForUser(fastMode)]
-
-    if (isOpus1mMergeEnabled()) {
-      standardOptions.push(getMergedOpus1MOption(fastMode))
-    } else {
-      standardOptions.push(getMaxOpusOption(fastMode))
-      if (checkOpus1mAccess()) {
-        standardOptions.push(getMaxOpus47_1MOption(fastMode))
-      }
-    }
-    standardOptions.push(getOpus46_1MOption(fastMode))
-
-    if (checkSonnet1mAccess()) {
-      standardOptions.push(getMaxSonnet46_1MOption())
-    }
-
-    standardOptions.push(MaxHaiku45Option)
-    return standardOptions
-  }
-
-  // PAYG 1P API: Default (Sonnet) + Opus 4.7 1M + Opus 4.6 1M + Sonnet 1M + Haiku
+  // First-party local/API mode: Default (Opus) + Sonnet + 1M variants + Haiku.
   if (getAPIProvider() === 'firstParty') {
-    const payg1POptions = [getDefaultOptionForUser(fastMode)]
+    const firstPartyOptions = [getDefaultOptionForUser(fastMode)]
     if (isOpus1mMergeEnabled()) {
-      payg1POptions.push(getMergedOpus1MOption(fastMode))
+      firstPartyOptions.push(getMergedOpus1MOption(fastMode))
     } else {
-      payg1POptions.push(getOpus47Option(fastMode))
+      firstPartyOptions.push(getOpus47Option(fastMode))
       if (checkOpus1mAccess()) {
-        payg1POptions.push(getOpus47_1MOption(fastMode))
+        firstPartyOptions.push(getOpus47_1MOption(fastMode))
       }
     }
-    payg1POptions.push(getOpus46_1MOption(fastMode))
+    firstPartyOptions.push(getOpus46_1MOption(fastMode))
+    firstPartyOptions.push(Sonnet46Option)
     if (checkSonnet1mAccess()) {
-      payg1POptions.push(getSonnet46_1MOption())
+      firstPartyOptions.push(getSonnet46LongContextOption())
     }
-    payg1POptions.push(getHaiku45Option())
-    return payg1POptions
+    firstPartyOptions.push(Haiku45Option)
+    return firstPartyOptions
   }
 
   // PAYG 3P: Default (Sonnet 4.5) + Sonnet (3P custom) or Sonnet 4.6/1M + Opus (3P custom) or Opus 4.7/Opus 4.6 Legacy/Opus 4.7 1M + Haiku
@@ -594,7 +544,7 @@ export function getModelOptions(fastMode = false): ModelOption[] {
   } else if (customModel === 'opus' && getAPIProvider() === 'firstParty') {
     return filterModelOptionsByAllowlist([
       ...options,
-      getMaxOpusOption(fastMode),
+      getOpusDefaultOption(fastMode),
     ])
   } else if (customModel === 'opus[1m]' && getAPIProvider() === 'firstParty') {
     return filterModelOptionsByAllowlist([

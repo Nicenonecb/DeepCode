@@ -1,12 +1,12 @@
 ---
 title: "MCP 配置 - 多来源合并、作用域与策略管控"
-description: "详细说明 Claude Code MCP 配置的来源层次、合并优先级、传输类型、企业策略管控、插件集成和保留名称机制。"
+description: "详细说明 DeepCode MCP 配置的来源层次、合并优先级、传输类型、企业策略管控、插件集成和保留名称机制。"
 keywords: ["MCP", "配置", "settings.json", ".mcp.json", "企业策略", "插件"]
 ---
 
 ## 配置来源与作用域
 
-Claude Code 的 MCP 配置来自多个来源，每个来源对应一个 `scope`（作用域）。配置按优先级合并，高优先级来源的同名配置覆盖低优先级。
+DeepCode 的 MCP 配置来自多个来源，每个来源对应一个 `scope`（作用域）。配置按优先级合并，高优先级来源的同名配置覆盖低优先级。
 
 ### 来源列表
 
@@ -190,7 +190,7 @@ for (const [name, config] of Object.entries(projectServers)) {
 }
 ```
 
-首次打开项目时，Claude Code 会提示用户审批 `.mcp.json` 中的每个服务器。审批状态持久化在本地配置中。
+首次打开项目时，DeepCode 会提示用户审批 `.mcp.json` 中的每个服务器。审批状态持久化在本地配置中。
 
 ## 插件 MCP 集成
 

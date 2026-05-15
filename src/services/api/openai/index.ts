@@ -1,4 +1,5 @@
 import type { BetaToolUnion } from '@anthropic-ai/sdk/resources/beta/messages/messages.mjs'
+import type { ChatCompletionCreateParamsStreaming } from 'openai/resources/chat/completions/completions.mjs'
 import type { SystemPrompt } from '../../../utils/systemPromptType.js'
 import type {
   Message,
@@ -12,11 +13,11 @@ import type { Tools } from '../../../Tool.js'
 import { getOpenAIClient } from './client.js'
 import {
   anthropicMessagesToOpenAI,
-  resolveOpenAIModel,
   adaptOpenAIStreamToAnthropic,
   anthropicToolsToOpenAI,
   anthropicToolChoiceToOpenAI,
 } from '@ant/model-provider'
+import { resolveOpenAICompatModel } from './env.js'
 import { isChatGPTAuthEnabled } from './chatgptAuth.js'
 import {
   adaptResponsesStreamToAnthropic,
@@ -66,7 +67,12 @@ import {
   formatDeferredToolLine,
   isDeferredTool,
   SEARCH_EXTRA_TOOLS_TOOL_NAME,
-} from '@claude-code-best/builtin-tools/tools/SearchExtraToolsTool/prompt.js'
+} from '@deepcode/builtin-tools/tools/SearchExtraToolsTool/prompt.js'
+import { applyDSMLRequestGateway } from './dsmlRequest.js'
+import {
+  applyDSMLResponseGateway,
+  createDSMLToolUseId,
+} from './dsmlResponse.js'
 
 function convertToResponsesReasoningEffort(
   effortValue: unknown,
@@ -148,6 +154,7 @@ function assembleFinalAssistantOutputs(params: {
   }
   stopReason: string | null
   maxTokens: number
+  dsmlGateway: Options['dsmlGateway']
 }): (AssistantMessage | SystemAPIErrorMessage)[] {
   const {
     partialMessage,
@@ -157,13 +164,21 @@ function assembleFinalAssistantOutputs(params: {
     usage,
     stopReason,
     maxTokens,
+    dsmlGateway,
   } = params
   const outputs: (AssistantMessage | SystemAPIErrorMessage)[] = []
 
-  const allBlocks = Object.keys(contentBlocks)
+  const rawBlocks = Object.keys(contentBlocks)
     .sort((a, b) => Number(a) - Number(b))
     .map(k => contentBlocks[Number(k)])
     .filter(Boolean)
+  const dsmlResponse = applyDSMLResponseGateway({
+    contentBlocks: rawBlocks,
+    settings: dsmlGateway,
+    createToolUseId: createDSMLToolUseId,
+  })
+  const allBlocks = dsmlResponse.contentBlocks
+  const effectiveStopReason = dsmlResponse.hasToolUse ? 'tool_use' : stopReason
 
   if (allBlocks.length > 0) {
     outputs.push({
@@ -175,7 +190,7 @@ function assembleFinalAssistantOutputs(params: {
           agentId as AgentId | undefined,
         ),
         usage,
-        stop_reason: stopReason,
+        stop_reason: effectiveStopReason,
         stop_sequence: null,
       },
       requestId: undefined,
@@ -218,7 +233,7 @@ export async function* queryModelOpenAI(
 > {
   try {
     // 1. Resolve model name
-    const openaiModel = resolveOpenAIModel(options.model)
+    const openaiModel = resolveOpenAICompatModel(options.model)
 
     // 2. Normalize messages using shared preprocessing
     const messagesForAPI = normalizeMessagesForAPI(messages, tools)
@@ -292,13 +307,29 @@ export async function* queryModelOpenAI(
       deferredToolNames,
       useSearchExtraTools,
     )
+    const nativeOpenAITools = anthropicToolsToOpenAI(standardTools)
+    const nativeOpenAIToolChoice = anthropicToolChoiceToOpenAI(
+      options.toolChoice,
+    )
+    const requestToolProtocol = applyDSMLRequestGateway({
+      messages: messagesWithDeferredToolList,
+      standardTools: standardTools as unknown as Array<Record<string, unknown>>,
+      nativeTools: nativeOpenAITools,
+      nativeToolChoice: nativeOpenAIToolChoice,
+      settings: options.dsmlGateway,
+      createMetaMessage: content =>
+        createUserMessage({
+          content,
+          isMeta: true,
+        }),
+    })
     const openaiMessages = anthropicMessagesToOpenAI(
-      messagesWithDeferredToolList,
+      requestToolProtocol.messages,
       systemPrompt,
       { enableThinking },
     )
-    const openaiTools = anthropicToolsToOpenAI(standardTools)
-    const openaiToolChoice = anthropicToolChoiceToOpenAI(options.toolChoice)
+    const openaiTools = requestToolProtocol.tools
+    const openaiToolChoice = requestToolProtocol.toolChoice
     const reasoningEffort = getChatGPTResponsesReasoningEffort(
       options.effortValue,
     )
@@ -376,7 +407,8 @@ export async function* queryModelOpenAI(
               enableThinking,
               maxTokens,
               temperatureOverride: options.temperatureOverride,
-            }),
+              effortValue: options.effortValue,
+            }) as unknown as ChatCompletionCreateParamsStreaming,
             { signal },
           ),
           openaiModel,
@@ -466,6 +498,7 @@ export async function* queryModelOpenAI(
               contentBlocks,
               tools,
               agentId: options.agentId,
+              dsmlGateway: options.dsmlGateway,
               usage,
               stopReason,
               maxTokens,
@@ -522,6 +555,7 @@ export async function* queryModelOpenAI(
         contentBlocks,
         tools,
         agentId: options.agentId,
+        dsmlGateway: options.dsmlGateway,
         usage,
         stopReason,
         maxTokens,

@@ -1,20 +1,20 @@
 ---
 title: "未公开功能巡礼 - 8 个隐藏功能深度解析"
-description: "深度解析 Claude Code 中 8 个最令人兴奋的隐藏功能：从永不下线的 AI 助手到 AI 吉祥物，揭示 88+ flags 中最具代表性的未公开特性。"
-keywords: ["隐藏功能", "未公开功能", "秘密功能", "Claude Code 彩蛋", "AI 助手"]
+description: "深度解析 DeepCode 中 8 个最令人兴奋的隐藏功能：从永不下线的 AI 助手到 AI 吉祥物，揭示 88+ flags 中最具代表性的未公开特性。"
+keywords: ["隐藏功能", "未公开功能", "秘密功能", "DeepCode 彩蛋", "AI 助手"]
 ---
 
 {/* 本章目标：逐一展示 8 个最重要的隐藏功能，分析它们背后的产品方向 */}
 
 ## 全景
 
-从 88+ 个构建时 flags 和 500+ 个运行时 flags 中，我们挑选了 8 个最具代表性的未公开功能。它们不仅展示了 Claude Code 当前的技术深度，更勾勒出 Anthropic 对"AI 编程助手"的未来愿景。
+从 88+ 个构建时 flags 和 500+ 个运行时 flags 中，我们挑选了 8 个最具代表性的未公开功能。它们不仅展示了 DeepCode 当前的技术深度，更勾勒出 Anthropic 对"AI 编程助手"的未来愿景。
 
 <AccordionGroup>
   <Accordion title="KAIROS：永不下线的 AI 助手">
     **门控**: `feature('KAIROS')` + `tengu_kairos`
 
-    KAIROS 是 Claude Code 最庞大的隐藏功能群——6 个独立 flag 控制着一个完整的"持久化 AI 助手"系统：
+    KAIROS 是 DeepCode 最庞大的隐藏功能群——6 个独立 flag 控制着一个完整的"持久化 AI 助手"系统：
 
     | Flag | 能力 |
     |------|------|
@@ -33,7 +33,7 @@ keywords: ["隐藏功能", "未公开功能", "秘密功能", "Claude Code 彩�
   <Accordion title="PROACTIVE：自主行动模式">
     **门控**: `feature('PROACTIVE')`
 
-    在标准模式中，Claude Code 是被动的——等待你输入，然后响应。PROACTIVE 模式颠覆了这一范式：
+    在标准模式中，DeepCode 是被动的——等待你输入，然后响应。PROACTIVE 模式颠覆了这一范式：
 
     - AI 拥有 `SleepTool`，可以主动"打盹"一段时间
     - 系统定期发送 `<tick>` 提示，触发 AI 检查是否有需要主动做的事
@@ -45,7 +45,7 @@ keywords: ["隐藏功能", "未公开功能", "秘密功能", "Claude Code 彩�
   <Accordion title="COORDINATOR_MODE：多 Agent 指挥官">
     **门控**: `feature('COORDINATOR_MODE')`
 
-    当前的 Claude Code 已经支持子 Agent（`AgentTool`），但 Coordinator Mode 将其提升到新的层次：
+    当前的 DeepCode 已经支持子 Agent（`AgentTool`），但 Coordinator Mode 将其提升到新的层次：
 
     - 一个"指挥官" Agent 分析任务并分解为子任务
     - 多个"工人" Agent 并行执行子任务
@@ -59,20 +59,20 @@ keywords: ["隐藏功能", "未公开功能", "秘密功能", "Claude Code 彩�
   <Accordion title="BRIDGE_MODE：远程遥控">
     **门控**: `feature('BRIDGE_MODE')`
 
-    Bridge Mode 让 Claude Code 可以通过 WebSocket 被远程控制：
+    Bridge Mode 让 DeepCode 可以通过 WebSocket 被远程控制：
 
     - `src/bridge/` 目录包含完整的 WebSocket 桥接实现
     - 支持 IDE 扩展作为远程前端
     - 包含 ant-only 的故障注入测试（`bridgeDebug.ts`）
     - 配合 `DIRECT_CONNECT` flag 可通过 `cc://` URL 直连
 
-    **推测方向**: Claude Code 的 UI 前端与后端执行分离——你可以在 VS Code 中操作，但 AI 在远程服务器上执行。
+    **推测方向**: DeepCode 的 UI 前端与后端执行分离——你可以在 VS Code 中操作，但 AI 在远程服务器上执行。
   </Accordion>
 
   <Accordion title="WEB_BROWSER_TOOL：内置浏览器">
     **门控**: `feature('WEB_BROWSER_TOOL')`
 
-    当前的 Claude Code 只有简化的 `WebFetchTool`（获取网页内容），但代码中存在更强大的浏览器工具：
+    当前的 DeepCode 只有简化的 `WebFetchTool`（获取网页内容），但代码中存在更强大的浏览器工具：
 
     - 基于 Bun 的 WebView 实现
     - 可以渲染和交互网页，而不仅仅是抓取文本
@@ -116,7 +116,7 @@ keywords: ["隐藏功能", "未公开功能", "秘密功能", "Claude Code 彩�
     - 通过 `CLAUDE_CODE_UNDERCOVER=1` 强制开启，无法强制关闭
     - 仅在仓库匹配内部白名单（~25 个私有仓库）时自动关闭
 
-    **意义**: 证实 Anthropic 员工确实在使用 Claude Code 进行日常开发，并且会向公开项目贡献代码。
+    **意义**: 证实 Anthropic 员工确实在使用 DeepCode 进行日常开发，并且会向公开项目贡献代码。
   </Accordion>
 </AccordionGroup>
 
@@ -130,4 +130,4 @@ keywords: ["隐藏功能", "未公开功能", "秘密功能", "Claude Code 彩�
 4. **从单兵到协同** — COORDINATOR_MODE 让多个 AI 并行协作
 5. **从本地到分布式** — BRIDGE_MODE、SSH_REMOTE 解耦前后端
 
-Claude Code 正在从一个"终端里的聊天机器人"进化为一个**自主、持久、多模态的 AI 编程同事**。
+DeepCode 正在从一个"终端里的聊天机器人"进化为一个**自主、持久、多模态的 AI 编程同事**。

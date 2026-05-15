@@ -1,0 +1,71 @@
+{
+  "id": "benchmark-smoke",
+  "dataset": {
+    "id": "deepcode-smoke",
+    "name": "DeepCode smoke benchmark",
+    "description": "Low-cost dry-run fixture for validating BenchmarkHarness wiring.",
+    "version": "1",
+    "tasks": [
+      {
+        "id": "tool-repair-summary",
+        "title": "Tool repair metadata summary",
+        "prompt": "Given a failed tool call with invalid JSON input, produce a concise repair summary and do not rerun successful tools.",
+        "category": "bugfix",
+        "difficulty": "easy",
+        "tags": ["tool-repair", "query"],
+        "targetFiles": [
+          { "path": "src/services/toolRepair/types.ts", "required": true },
+          { "path": "src/query.ts" }
+        ],
+        "expectedOutcome": {
+          "summary": "Only failed retryable tool calls are summarized for the next model turn.",
+          "requiredFiles": ["src/services/toolRepair/types.ts", "src/query.ts"],
+          "assertions": [
+            "Successful tool calls are not repeated.",
+            "Repair metadata is stable JSON."
+          ],
+          "verificationCommands": ["bun run typecheck"]
+        }
+      },
+      {
+        "id": "benchmark-report",
+        "title": "Benchmark report ordering",
+        "prompt": "Compare two candidate task results and report the better candidate by resolved rate, verification rate, cost, turns, and regression count.",
+        "category": "test",
+        "difficulty": "easy",
+        "tags": ["benchmark", "reporter"],
+        "targetFiles": [
+          { "path": "src/services/benchmark/Reporter.ts", "required": true }
+        ],
+        "expectedOutcome": {
+          "summary": "Reporter output is deterministic and sorted by benchmark quality.",
+          "requiredFiles": [
+            "src/services/benchmark/Reporter.ts",
+            "src/services/benchmark/__tests__/Reporter.test.ts"
+          ],
+          "assertions": [
+            "JSON output is stable.",
+            "Markdown output follows the same candidate ordering."
+          ],
+          "verificationCommands": [
+            "bun test src/services/benchmark/__tests__/Reporter.test.ts"
+          ]
+        }
+      }
+    ]
+  },
+  "candidates": [
+    {
+      "id": "deepcode-dry-run",
+      "label": "DeepCode dry run",
+      "kind": "cli",
+      "command": "deepcode"
+    },
+    {
+      "id": "baseline-dry-run",
+      "label": "Baseline dry run",
+      "kind": "cli",
+      "command": "baseline-agent"
+    }
+  ]
+}

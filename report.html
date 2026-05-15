@@ -1,0 +1,387 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DeepCode 当前进度看板</title>
+  <style>
+    :root {
+      --paper: #f7f3ec;
+      --ink: #20211f;
+      --muted: #6d685f;
+      --line: #d9d0c2;
+      --panel: #fffaf2;
+      --green: #315f4d;
+      --orange: #d77757;
+      --red: #a9473f;
+      --blue: #3f638f;
+      --code: #f0e7d8;
+    }
+
+    * { box-sizing: border-box; }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--paper);
+      font-family: ui-serif, Georgia, "Times New Roman", "Songti SC", serif;
+      line-height: 1.58;
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    .wrap {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 40px 26px 72px;
+    }
+
+    header {
+      padding: 52px 0 34px;
+      border-bottom: 2px solid var(--ink);
+    }
+
+    .eyebrow {
+      margin: 0 0 16px;
+      color: var(--green);
+      font: 700 13px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      max-width: 920px;
+      margin: 0;
+      font-size: clamp(40px, 7vw, 76px);
+      line-height: .98;
+      letter-spacing: 0;
+    }
+
+    .lead {
+      max-width: 820px;
+      margin: 24px 0 0;
+      color: #3e3b36;
+      font-size: 21px;
+    }
+
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 26px;
+    }
+
+    .pill {
+      padding: 8px 11px;
+      border: 1px solid var(--line);
+      background: rgba(255, 250, 242, .82);
+      font: 700 13px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+
+    .report-nav {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      padding: 12px 0;
+      background: rgba(247, 243, 236, .9);
+      backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .report-nav a {
+      padding: 9px 12px;
+      border: 1px solid var(--line);
+      background: rgba(255, 250, 242, .76);
+      font: 700 13px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+      transition: transform .16s ease, background .16s ease;
+    }
+
+    .report-nav a:hover {
+      transform: translateY(-2px);
+      background: #fff;
+    }
+
+    section {
+      padding: 34px 0;
+      border-bottom: 1px solid var(--line);
+    }
+
+    h2 {
+      margin: 0 0 14px;
+      font-size: 30px;
+      line-height: 1.15;
+    }
+
+    h3 {
+      margin: 0 0 10px;
+      font-size: 19px;
+    }
+
+    p {
+      margin: 0 0 14px;
+    }
+
+    ul {
+      margin: 0;
+      padding-left: 21px;
+    }
+
+    li + li {
+      margin-top: 8px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .card {
+      padding: 18px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+    }
+
+    .card.good { border-top: 4px solid var(--green); }
+    .card.warn { border-top: 4px solid var(--orange); }
+    .card.risk { border-top: 4px solid var(--red); }
+
+    .code {
+      display: inline-block;
+      padding: 2px 6px;
+      border: 1px solid #dfd3c0;
+      background: var(--code);
+      font: 13px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+
+    .table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--panel);
+      border: 1px solid var(--line);
+    }
+
+    .table th,
+    .table td {
+      vertical-align: top;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+    }
+
+    .table th {
+      width: 250px;
+      color: var(--green);
+      font: 700 13px/1.35 ui-monospace, SFMono-Regular, Menlo, monospace;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+
+    .status-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .status {
+      display: grid;
+      grid-template-columns: 150px minmax(0, 1fr);
+      gap: 16px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      background: rgba(255, 250, 242, .7);
+    }
+
+    .status strong {
+      color: var(--green);
+      font: 700 13px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+
+    .files {
+      columns: 2;
+      column-gap: 28px;
+      font: 13px/1.7 ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+
+    .files div {
+      break-inside: avoid;
+      margin-bottom: 4px;
+    }
+
+    footer {
+      padding-top: 30px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    @media (max-width: 820px) {
+      .grid { grid-template-columns: 1fr; }
+      .status { grid-template-columns: 1fr; }
+      .files { columns: 1; }
+      .table th,
+      .table td {
+        display: block;
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <header>
+      <p class="eyebrow">DeepCode Progress Report</p>
+      <h1>当前进度：任务感知模型路由已配置化</h1>
+      <p class="lead">
+        本轮完成第三步：任务感知路由继续受 <span class="code">TASK_AWARE_MODEL_ROUTING</span>
+        feature flag 控制，同时新增 <span class="code">taskAwareModelRouting</span> settings 配置入口。
+        解释/问答、bugfix、复杂改造的默认模型/effort 不再散落在 CLI 或 API 层，调用侧只读取统一配置并应用路由 patch。
+      </p>
+      <div class="meta">
+        <span class="pill">状态：已实现</span>
+        <span class="pill">风险：低-中</span>
+        <span class="pill">代码改动：已完成</span>
+        <span class="pill">验证：全量测试、类型检查、lint 通过</span>
+      </div>
+    </header>
+
+    <nav class="report-nav" aria-label="报告导航">
+      <a href="index.html">报告入口</a>
+      <a href="deepcode-deepseek-gap.html">DeepSeek 差距决策板</a>
+      <a href="#changes">已完成改动</a>
+      <a href="#validation">验证结果</a>
+      <a href="#risks">风险和下一步</a>
+    </nav>
+
+    <section>
+      <h2>本轮目标</h2>
+      <p>
+        接入现有配置体系和 feature flag，让任务类型到模型/effort 的映射可以通过 settings 覆盖或关闭；
+        默认策略集中在路由模块，processUserInput 只负责在 feature 开启时读取配置并应用。
+      </p>
+    </section>
+
+    <section id="changes">
+      <h2>已完成改动</h2>
+      <table class="table">
+        <tr>
+          <th>配置入口</th>
+          <td>
+            新增 <span class="code">src/utils/taskAwareModelRoutingConfig.ts</span>，
+            从 settings 解析 <span class="code">taskAwareModelRouting.enabled</span> 和
+            <span class="code">taskAwareModelRouting.routes</span>，并与默认路由策略合并。
+          </td>
+        </tr>
+        <tr>
+          <th>Settings Schema</th>
+          <td>
+            <span class="code">src/utils/settings/types.ts</span> 接受
+            <span class="code">taskAwareModelRouting</span> 配置块，可配置
+            <span class="code">explain</span>、<span class="code">bugfix</span>、
+            <span class="code">complex</span> 三类路由的 <span class="code">model</span>
+            和 <span class="code">effort</span>。
+          </td>
+        </tr>
+        <tr>
+          <th>路由策略</th>
+          <td>
+            <span class="code">src/utils/taskAwareModelRouter.ts</span> 现在导出默认配置和 route kinds；
+            分类器只根据配置返回 route target，默认仍是解释/问答 -> Flash + low、
+            bugfix -> Pro + high、复杂改造 -> Pro + max。
+          </td>
+        </tr>
+        <tr>
+          <th>调用侧收敛</th>
+          <td>
+            <span class="code">src/utils/processUserInput/processUserInput.ts</span> 继续只在普通 prompt
+            分支、且 feature flag 开启时应用路由；CLI/API 层不写任务类型映射。
+          </td>
+        </tr>
+        <tr>
+          <th>既有收口</th>
+          <td>
+            保留前一轮修复：headless/SDK 路径使用路由后的模型生成 system prompt，
+            路由模型别名先解析为实际模型名，避免 max effort 被裸别名判断降级。
+          </td>
+        </tr>
+      </table>
+    </section>
+
+    <section id="validation">
+      <h2>验证结果</h2>
+      <div class="status-list">
+        <div class="status">
+          <strong>Focused Tests</strong>
+          <span>
+            <span class="code">bun test src/utils/__tests__/taskAwareModelRouter.test.ts src/utils/__tests__/taskAwareModelRoutingConfig.test.ts src/utils/processUserInput/__tests__/taskAwareRouting.test.ts src/utils/settings/__tests__/config.test.ts</span>
+            通过，80 pass。
+          </span>
+        </div>
+        <div class="status">
+          <strong>Typecheck</strong>
+          <span><span class="code">bun run typecheck</span> 通过，TypeScript 零错误。</span>
+        </div>
+        <div class="status">
+          <strong>Lint</strong>
+          <span><span class="code">bun run lint</span> 通过，Biome checked 3172 files。</span>
+        </div>
+        <div class="status">
+          <strong>Unavailable Script</strong>
+          <span><span class="code">bun run test:all</span> 在当前 <span class="code">package.json</span> 中不存在，无法按文档命令执行。</span>
+        </div>
+        <div class="status">
+          <strong>Full Test</strong>
+          <span>
+            <span class="code">bun test</span> 已重新执行：5403 pass / 0 fail / 10137 expect。
+            新增路由配置测试已并入全量套件。
+          </span>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>主要影响文件</h2>
+      <div class="files">
+        <div>src/QueryEngine.ts</div>
+        <div>src/utils/processUserInput/processUserInput.ts</div>
+        <div>src/utils/taskAwareModelRouter.ts</div>
+        <div>src/utils/taskAwareModelRoutingConfig.ts</div>
+        <div>src/utils/__tests__/taskAwareModelRouter.test.ts</div>
+        <div>src/utils/__tests__/taskAwareModelRoutingConfig.test.ts</div>
+        <div>src/utils/processUserInput/__tests__/taskAwareRouting.test.ts</div>
+        <div>src/utils/settings/types.ts</div>
+        <div>src/utils/settings/__tests__/config.test.ts</div>
+      </div>
+    </section>
+
+    <section id="risks">
+      <h2>剩余风险</h2>
+      <ul>
+        <li>分类器仍是启发式关键词规则，真实提示词里可能需要继续微调“解释 vs 修复 vs 重构”的边界。</li>
+        <li>如果用户在 settings/env/CLI 中显式配置了模型，当前实现会尊重该配置，只补 effort；这是保守策略。</li>
+        <li>settings 覆盖现在支持 route target，不支持自定义关键词；后续如需调关键词，可扩展同一配置块。</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>建议下一步</h2>
+      <ul>
+        <li>Dogfood 一组真实中文任务提示，确认当前默认策略是否需要通过 settings 在项目级覆盖。</li>
+        <li>需要排查线上路由效果时，可增加低噪音 debug event，记录命中类别、配置来源和显式覆盖跳过原因。</li>
+      </ul>
+    </section>
+
+    <footer>
+      生成位置：仓库根目录 <span class="code">report.html</span>。此看板记录当前工作树状态，供实现和评审时快速对齐。
+    </footer>
+  </main>
+</body>
+</html>

@@ -4,6 +4,10 @@
  * triggering heavy module side-effects (OpenAI client, stream adapter, etc.).
  */
 import type { ChatCompletionCreateParamsStreaming } from 'openai/resources/chat/completions/completions.mjs'
+import {
+  getDeepSeekThinkingDefault,
+  resolveDeepSeekReasoningEffort,
+} from '../../deepseek/modelProfiles.js'
 import { isEnvTruthy, isEnvDefinedFalsy } from '../../../utils/envUtils.js'
 
 /**
@@ -11,7 +15,7 @@ import { isEnvTruthy, isEnvDefinedFalsy } from '../../../utils/envUtils.js'
  *
  * Enabled when:
  * 1. OPENAI_ENABLE_THINKING=1 is set (explicit enable), OR
- * 2. Model name contains "deepseek-reasoner" OR "DeepSeek-V3.2" (auto-detect, case-insensitive)
+ * 2. DeepSeek model profile declares thinking on by default
  *
  * Disabled when:
  * - OPENAI_ENABLE_THINKING=0/false/no/off is explicitly set (overrides model detection)
@@ -23,9 +27,8 @@ export function isOpenAIThinkingEnabled(model: string): boolean {
   if (isEnvDefinedFalsy(process.env.OPENAI_ENABLE_THINKING)) return false
   // Explicit enable
   if (isEnvTruthy(process.env.OPENAI_ENABLE_THINKING)) return true
-  // Auto-detect from model name (all DeepSeek models support thinking mode)
-  const modelLower = model.toLowerCase()
-  return modelLower.includes('deepseek')
+  // Auto-detect from the DeepSeek model profile.
+  return getDeepSeekThinkingDefault(model)
 }
 
 /**
@@ -73,8 +76,10 @@ export function buildOpenAIRequestBody(params: {
   enableThinking: boolean
   maxTokens: number
   temperatureOverride?: number
-}): ChatCompletionCreateParamsStreaming & {
+  effortValue?: unknown
+}): Omit<ChatCompletionCreateParamsStreaming, 'reasoning_effort'> & {
   thinking?: { type: string }
+  reasoning_effort?: 'high' | 'max'
   enable_thinking?: boolean
   chat_template_kwargs?: { thinking: boolean }
 } {
@@ -87,6 +92,9 @@ export function buildOpenAIRequestBody(params: {
     maxTokens,
     temperatureOverride,
   } = params
+  const reasoningEffort = enableThinking
+    ? resolveDeepSeekReasoningEffort(model, params.effortValue)
+    : undefined
   return {
     model,
     messages,
@@ -102,6 +110,7 @@ export function buildOpenAIRequestBody(params: {
     ...(enableThinking && {
       // Official DeepSeek API format
       thinking: { type: 'enabled' },
+      ...(reasoningEffort && { reasoning_effort: reasoningEffort }),
       // Self-hosted DeepSeek-V3.2 format
       enable_thinking: true,
       chat_template_kwargs: { thinking: true },

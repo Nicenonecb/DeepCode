@@ -1,6 +1,6 @@
 ---
 title: "协调者与蜂群模式 - 多 Agent 高级编排"
-description: "从源码角度解析 Claude Code 多 Agent 协作：Coordinator Mode 的 System Prompt 设计、Worker 生命周期、Task 通信协议和 Swarm 蜂群的任务分配机制。"
+description: "从源码角度解析 DeepCode 多 Agent 协作：Coordinator Mode 的 System Prompt 设计、Worker 生命周期、Task 通信协议和 Swarm 蜂群的任务分配机制。"
 keywords: ["协调者模式", "蜂群模式", "Agent Swarm", "多 Agent 协作", "任务编排"]
 ---
 
@@ -142,8 +142,8 @@ Teammate 启动时：
 
 | 组件 | 角色 |
 |------|------|
-| **Team Lead** | 创建团队、分配任务、综合结果的主 Claude Code 会话 |
-| **Teammate** | 独立的 Claude Code 实例，各自拥有独立的上下文窗口 |
+| **Team Lead** | 创建团队、分配任务、综合结果的主 DeepCode 会话 |
+| **Teammate** | 独立的 DeepCode 实例，各自拥有独立的上下文窗口 |
 | **Task List** | 共享的任务列表，Teammate 竞争认领和完成 |
 | **Mailbox** | 消息系统，支持 Teammate 间直接通信 |
 

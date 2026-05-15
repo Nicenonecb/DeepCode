@@ -55,6 +55,7 @@ import {
   createToolUseSummaryMessage,
   createMicrocompactBoundaryMessage,
   stripSignatureBlocks,
+  getUserMessageText,
 } from './utils/messages.js'
 import { generateToolUseSummary } from './services/toolUseSummary/toolUseSummaryGenerator.js'
 import { prependUserContext, appendSystemContext } from './utils/api.js'
@@ -99,7 +100,7 @@ import {
 } from './utils/tokens.js'
 import { ESCALATED_MAX_TOKENS } from './utils/context.js'
 import { getFeatureValue_CACHED_MAY_BE_STALE } from './services/analytics/growthbook.js'
-import { SLEEP_TOOL_NAME } from '@claude-code-best/builtin-tools/tools/SleepTool/prompt.js'
+import { SLEEP_TOOL_NAME } from '@deepcode/builtin-tools/tools/SleepTool/prompt.js'
 import { executePostSamplingHooks } from './utils/hooks/postSamplingHooks.js'
 import { executeStopFailureHooks } from './utils/hooks.js'
 import type { QuerySource } from './constants/querySource.js'
@@ -114,6 +115,30 @@ import { handleStopHooks } from './query/stopHooks.js'
 import { buildQueryConfig } from './query/config.js'
 import { productionDeps, type QueryDeps } from './query/deps.js'
 import type { Terminal, Continue } from './query/transitions.js'
+import {
+  VerificationRunner,
+  formatVerificationStatusMessage,
+  formatVerificationSummary,
+  shouldRunVerificationOnCompletion,
+  type VerificationRunnerSettings,
+} from './services/verification/index.js'
+import {
+  collectContextPackInput,
+  formatContextPackForPrompt,
+  ContextPacker,
+  type ContextPackerSettings,
+} from './services/contextPacker/index.js'
+import {
+  createWorkingMemoryPrompt,
+  persistWorkingMemory,
+  shouldUseWorkingMemory,
+  updateWorkingMemoryForVerification,
+  type WorkingMemorySettings,
+} from './services/workingMemory/index.js'
+import type { DSMLGatewaySettings } from './services/dsml/index.js'
+import type { ToolCallRepairIssue } from './services/toolRepair/types.js'
+import { runPatchSearchForHighRiskContext } from './services/patchSearch/PatchSearchIntegration.js'
+import { getCwd } from './utils/cwd.js'
 import { feature } from 'bun:bundle'
 import {
   getCurrentTurnTokenBudget,
@@ -135,6 +160,15 @@ import {
   getCacheThreshold,
   shouldShowCacheWarning,
 } from './utils/cacheWarning.js'
+
+const TOOL_CALL_REPAIR_MAX_ATTEMPTS_PER_TOOL_USE_ID = 1
+const TOOL_CALL_REPAIR_MAX_ATTEMPTS_PER_TOOL_NAME = 2
+
+type ToolCallRepairBudgetState = {
+  attemptsByToolUseId: Record<string, number>
+  attemptsByToolName: Record<string, number>
+  consecutiveUnrepairableFailures: number
+}
 
 /* eslint-disable @typescript-eslint/no-require-imports */
 const snipModule = feature('HISTORY_SNIP')
@@ -175,6 +209,158 @@ function* yieldMissingToolResultBlocks(
       })
     }
   }
+}
+
+function collectToolCallRepairOutcome(
+  message: Message,
+  issues: ToolCallRepairIssue[],
+  successfulToolUseIds: Set<string>,
+): void {
+  const repairIssue = (message as { toolCallRepairIssue?: unknown })
+    .toolCallRepairIssue
+  if (isToolCallRepairIssue(repairIssue)) {
+    issues.push(repairIssue)
+  }
+
+  if (message.type !== 'user' || !Array.isArray(message.message?.content)) {
+    return
+  }
+
+  for (const block of message.message.content) {
+    if (
+      block.type === 'tool_result' &&
+      typeof block.tool_use_id === 'string' &&
+      block.is_error !== true
+    ) {
+      successfulToolUseIds.add(block.tool_use_id)
+    }
+  }
+}
+
+function isToolCallRepairIssue(value: unknown): value is ToolCallRepairIssue {
+  if (!value || typeof value !== 'object') return false
+  const issue = value as Partial<ToolCallRepairIssue>
+  return (
+    typeof issue.kind === 'string' &&
+    typeof issue.toolUseId === 'string' &&
+    typeof issue.toolName === 'string' &&
+    typeof issue.message === 'string' &&
+    typeof issue.retryable === 'boolean' &&
+    typeof issue.repairHint === 'string'
+  )
+}
+
+function createToolCallRepairBudgetState(): ToolCallRepairBudgetState {
+  return {
+    attemptsByToolUseId: {},
+    attemptsByToolName: {},
+    consecutiveUnrepairableFailures: 0,
+  }
+}
+
+function selectToolCallRepairIssuesForRetry(
+  issues: ToolCallRepairIssue[],
+  budget: ToolCallRepairBudgetState,
+): {
+  retryableIssues: ToolCallRepairIssue[]
+  nextBudget: ToolCallRepairBudgetState
+} {
+  const nextBudget: ToolCallRepairBudgetState = {
+    attemptsByToolUseId: { ...budget.attemptsByToolUseId },
+    attemptsByToolName: { ...budget.attemptsByToolName },
+    consecutiveUnrepairableFailures: budget.consecutiveUnrepairableFailures,
+  }
+  const retryableIssues: ToolCallRepairIssue[] = []
+  let unrepairableFailures = 0
+
+  for (const issue of issues) {
+    const attemptsByToolUseId =
+      nextBudget.attemptsByToolUseId[issue.toolUseId] ?? 0
+    const attemptsByToolName =
+      nextBudget.attemptsByToolName[issue.toolName] ?? 0
+
+    if (
+      !issue.retryable ||
+      attemptsByToolUseId >= TOOL_CALL_REPAIR_MAX_ATTEMPTS_PER_TOOL_USE_ID ||
+      attemptsByToolName >= TOOL_CALL_REPAIR_MAX_ATTEMPTS_PER_TOOL_NAME
+    ) {
+      unrepairableFailures++
+      continue
+    }
+
+    retryableIssues.push(issue)
+    nextBudget.attemptsByToolUseId[issue.toolUseId] = attemptsByToolUseId + 1
+    nextBudget.attemptsByToolName[issue.toolName] = attemptsByToolName + 1
+  }
+
+  nextBudget.consecutiveUnrepairableFailures =
+    retryableIssues.length > 0
+      ? 0
+      : unrepairableFailures > 0
+        ? budget.consecutiveUnrepairableFailures + 1
+        : 0
+
+  return { retryableIssues, nextBudget }
+}
+
+function buildToolCallRepairMetaMessage(
+  toolUseBlocks: ToolUseBlock[],
+  retryableIssues: ToolCallRepairIssue[],
+  successfulToolUseIds: Set<string>,
+): UserMessage | undefined {
+  if (retryableIssues.length === 0) return undefined
+
+  const toolById = new Map(toolUseBlocks.map(block => [block.id, block]))
+  const failedIds = new Set(retryableIssues.map(issue => issue.toolUseId))
+  const successfulTools = toolUseBlocks.filter(
+    block => successfulToolUseIds.has(block.id) && !failedIds.has(block.id),
+  )
+
+  const lines = [
+    '<tool_call_repair>',
+    successfulTools.length > 0
+      ? 'A previous tool batch partially failed. Only the failed, retryable tool calls are summarized below.'
+      : 'A previous tool batch had retryable tool call failures. Only the failed tool calls are summarized below.',
+    'Do not rerun tool calls that already succeeded. Their results are already present in the conversation.',
+  ]
+
+  if (successfulTools.length > 0) {
+    lines.push('<successful_tools_do_not_rerun>')
+    for (const tool of successfulTools) {
+      lines.push(`- ${tool.id}: ${tool.name}`)
+    }
+    lines.push('</successful_tools_do_not_rerun>')
+  }
+
+  lines.push('<failed_retryable_tools>')
+  for (const issue of retryableIssues) {
+    const originalTool = toolById.get(issue.toolUseId)
+    lines.push(
+      [
+        `- toolUseId: ${issue.toolUseId}`,
+        `  toolName: ${issue.toolName}`,
+        originalTool ? `  originalToolName: ${originalTool.name}` : undefined,
+        `  kind: ${issue.kind}`,
+        `  message: ${truncateForToolRepair(issue.message)}`,
+        `  repairHint: ${truncateForToolRepair(issue.repairHint)}`,
+        `  input: ${truncateForToolRepair(JSON.stringify(issue.input))}`,
+      ]
+        .filter((line): line is string => line !== undefined)
+        .join('\n'),
+    )
+  }
+  lines.push('</failed_retryable_tools>')
+  lines.push('</tool_call_repair>')
+
+  return createUserMessage({
+    content: lines.join('\n'),
+    isMeta: true,
+  })
+}
+
+function truncateForToolRepair(value: string, maxChars = 2000): string {
+  if (value.length <= maxChars) return value
+  return `${value.slice(0, maxChars)}... [truncated ${value.length - maxChars} chars]`
 }
 
 /**
@@ -267,6 +453,7 @@ type State = {
   pendingToolUseSummary: Promise<ToolUseSummaryMessage | null> | undefined
   stopHookActive: boolean | undefined
   turnCount: number
+  toolCallRepairBudget: ToolCallRepairBudgetState
   // Why the previous iteration continued. Undefined on first iteration.
   // Lets tests assert recovery paths fired without inspecting message contents.
   transition: Continue | undefined
@@ -426,6 +613,7 @@ async function* queryLoop(
     maxOutputTokensRecoveryCount: 0,
     hasAttemptedReactiveCompact: false,
     turnCount: 1,
+    toolCallRepairBudget: createToolCallRepairBudgetState(),
     pendingToolUseSummary: undefined,
     transition: undefined,
   }
@@ -445,6 +633,7 @@ async function* queryLoop(
   // Snapshot immutable env/statsig/session state once at entry. See QueryConfig
   // for what's included and why feature() gates are intentionally excluded.
   const config = buildQueryConfig()
+  let lastVerificationMessageCount = 0
 
   // Fired once per user turn — the prompt is invariant across loop iterations,
   // so per-iteration firing would ask sideQuery the same question N times.
@@ -470,6 +659,7 @@ async function* queryLoop(
       pendingToolUseSummary,
       stopHookActive,
       turnCount,
+      toolCallRepairBudget,
     } = state
 
     // Skill discovery prefetch — per-iteration (uses findWritePivot guard
@@ -733,6 +923,8 @@ async function* queryLoop(
 
     const assistantMessages: AssistantMessage[] = []
     const toolResults: (UserMessage | AttachmentMessage)[] = []
+    const toolCallRepairIssues: ToolCallRepairIssue[] = []
+    const successfulToolUseIds = new Set<string>()
     // @see https://docs.claude.com/en/docs/build-with-claude/tool-use
     // Note: stop_reason === 'tool_use' is unreliable -- it's not always set correctly.
     // Set during streaming whenever a tool_use block arrives — the sole
@@ -872,6 +1064,19 @@ async function* queryLoop(
       }
     }
 
+    const messagesWithContextPack = await buildContextPackedMessages(
+      messagesForQuery,
+      toolUseContext,
+      toolUseContext.getAppState().settings.contextPacker as
+        | ContextPackerSettings
+        | undefined,
+    )
+    const messagesWithMetaContext = buildWorkingMemoryMessages(
+      messagesWithContextPack,
+      toolUseContext,
+      toolUseContext.getAppState().settings.workingMemory,
+    )
+
     let attemptWithFallback = true
 
     queryCheckpoint('query_api_loop_start')
@@ -882,7 +1087,7 @@ async function* queryLoop(
           let streamingFallbackOccured = false
           queryCheckpoint('query_api_streaming_start')
           for await (const message of deps.callModel({
-            messages: prependUserContext(messagesForQuery, userContext),
+            messages: prependUserContext(messagesWithMetaContext, userContext),
             systemPrompt: fullSystemPrompt,
             thinkingConfig: toolUseContext.options.thinkingConfig,
             tools: toolUseContext.options.tools,
@@ -920,6 +1125,11 @@ async function* queryLoop(
               advisorModel: appState.advisorModel,
               skipCacheWrite,
               agentId: toolUseContext.agentId,
+              dsmlGateway: resolveDSMLGatewaySettings(
+                appState.settings.dsmlGateway as
+                  | DSMLGatewaySettings
+                  | undefined,
+              ),
               addNotification: toolUseContext.addNotification,
               ...(params.taskBudget && {
                 taskBudget: {
@@ -1094,6 +1304,11 @@ async function* queryLoop(
               for (const result of streamingToolExecutor.getCompletedResults()) {
                 if (result.message) {
                   yield result.message
+                  collectToolCallRepairOutcome(
+                    result.message,
+                    toolCallRepairIssues,
+                    successfulToolUseIds,
+                  )
                   toolResults.push(
                     ...normalizeMessagesForAPI(
                       [result.message],
@@ -1378,6 +1593,7 @@ async function* queryLoop(
               pendingToolUseSummary: undefined,
               stopHookActive: undefined,
               turnCount,
+              toolCallRepairBudget,
               transition: {
                 reason: 'collapse_drain_retry',
                 committed: drained.committed,
@@ -1431,6 +1647,7 @@ async function* queryLoop(
             pendingToolUseSummary: undefined,
             stopHookActive: undefined,
             turnCount,
+            toolCallRepairBudget,
             transition: { reason: 'reactive_compact_retry' },
           }
           state = next
@@ -1486,6 +1703,7 @@ async function* queryLoop(
             pendingToolUseSummary: undefined,
             stopHookActive: undefined,
             turnCount,
+            toolCallRepairBudget,
             transition: { reason: 'max_output_tokens_escalate' },
           }
           state = next
@@ -1514,6 +1732,7 @@ async function* queryLoop(
             pendingToolUseSummary: undefined,
             stopHookActive: undefined,
             turnCount,
+            toolCallRepairBudget,
             transition: {
               reason: 'max_output_tokens_recovery',
               attempt: maxOutputTokensRecoveryCount + 1,
@@ -1574,6 +1793,7 @@ async function* queryLoop(
           pendingToolUseSummary: undefined,
           stopHookActive: true,
           turnCount,
+          toolCallRepairBudget,
           transition: { reason: 'stop_hook_blocking' },
         }
         state = next
@@ -1610,6 +1830,7 @@ async function* queryLoop(
             pendingToolUseSummary: undefined,
             stopHookActive: undefined,
             turnCount,
+            toolCallRepairBudget,
             transition: { reason: 'token_budget_continuation' },
           }
           continue
@@ -1627,6 +1848,85 @@ async function* queryLoop(
             queryDepth: queryTracking.depth,
           })
         }
+      }
+
+      const verificationRunnerSettings =
+        toolUseContext.getAppState().settings.verificationRunner
+      const verificationInputMessages =
+        messagesForQuery.concat(assistantMessages)
+      if (
+        shouldRunCompletionVerification(
+          verificationInputMessages,
+          lastVerificationMessageCount,
+          toolUseContext,
+          querySource,
+          state.transition,
+          verificationRunnerSettings,
+        )
+      ) {
+        yield createSystemMessage('Running verification commands...', 'info')
+        const verificationSummary = await new VerificationRunner({
+          cwd: getCwd(),
+          settings: verificationRunnerSettings,
+        }).run()
+        const formattedSummary = formatVerificationSummary(verificationSummary)
+        const visibleStatus =
+          formatVerificationStatusMessage(verificationSummary)
+        let updatedWorkingMemory = toolUseContext.getAppState().workingMemory
+        toolUseContext.setAppState(prev => {
+          updatedWorkingMemory = updateWorkingMemoryForVerification(
+            prev.workingMemory,
+            verificationSummary,
+            prev.settings.workingMemory,
+          )
+          return {
+            ...prev,
+            verificationStatus: {
+              status: verificationSummary.status,
+              total: verificationSummary.total,
+              passed: verificationSummary.passed,
+              failed: verificationSummary.failed,
+              timedOut: verificationSummary.timedOut,
+              updatedAt: Date.now(),
+              summary: visibleStatus,
+            },
+            workingMemory: updatedWorkingMemory,
+          }
+        })
+        persistWorkingMemory(
+          updatedWorkingMemory,
+          toolUseContext.getAppState().settings.workingMemory,
+        )
+        lastVerificationMessageCount = verificationInputMessages.length
+
+        if (verificationSummary.status !== 'passed') {
+          yield createSystemMessage(
+            `${visibleStatus} Feeding results back into the model.`,
+            'warning',
+          )
+          state = {
+            messages: [
+              ...verificationInputMessages,
+              createUserMessage({
+                content: formattedSummary,
+                isMeta: true,
+              }),
+            ],
+            toolUseContext,
+            autoCompactTracking: tracking,
+            maxOutputTokensRecoveryCount: 0,
+            hasAttemptedReactiveCompact: false,
+            maxOutputTokensOverride: undefined,
+            pendingToolUseSummary: undefined,
+            stopHookActive: undefined,
+            turnCount,
+            toolCallRepairBudget,
+            transition: { reason: 'verification_failed' },
+          }
+          continue
+        }
+
+        yield createSystemMessage(visibleStatus, 'info')
       }
 
       return { reason: 'completed' }
@@ -1658,6 +1958,11 @@ async function* queryLoop(
     for await (const update of toolUpdates) {
       if (update.message) {
         yield update.message
+        collectToolCallRepairOutcome(
+          update.message,
+          toolCallRepairIssues,
+          successfulToolUseIds,
+        )
 
         if (
           update.message.type === 'attachment' &&
@@ -2024,9 +2329,32 @@ async function* queryLoop(
       return { reason: 'max_turns', turnCount: nextTurnCount }
     }
 
+    const repairBudgetSelection = selectToolCallRepairIssuesForRetry(
+      toolCallRepairIssues,
+      toolCallRepairBudget,
+    )
+    void runPatchSearchForHighRiskContext({
+      source: 'query',
+      prompt: getLatestUserPrompt(messagesForQuery) ?? 'Repair failed tools',
+      toolUseContext,
+      repairIssues: repairBudgetSelection.retryableIssues,
+    }).catch(logError)
+    const toolCallRepairMetaMessage = buildToolCallRepairMetaMessage(
+      toolUseBlocks,
+      repairBudgetSelection.retryableIssues,
+      successfulToolUseIds,
+    )
+    const nextMessages = toolCallRepairMetaMessage
+      ? messagesForQuery.concat(
+          assistantMessages,
+          toolResults,
+          toolCallRepairMetaMessage,
+        )
+      : messagesForQuery.concat(assistantMessages, toolResults)
+
     queryCheckpoint('query_recursive_call')
     const next: State = {
-      messages: messagesForQuery.concat(assistantMessages, toolResults),
+      messages: nextMessages,
       toolUseContext: toolUseContextWithQueryTracking,
       autoCompactTracking: tracking,
       turnCount: nextTurnCount,
@@ -2035,8 +2363,142 @@ async function* queryLoop(
       pendingToolUseSummary: nextPendingToolUseSummary,
       maxOutputTokensOverride: undefined,
       stopHookActive,
+      toolCallRepairBudget: repairBudgetSelection.nextBudget,
       transition: { reason: 'next_turn' },
     }
     state = next
   } // while (true)
+}
+
+async function buildContextPackedMessages(
+  messages: Message[],
+  toolUseContext: ToolUseContext,
+  settings: ContextPackerSettings | undefined,
+): Promise<Message[]> {
+  if (!shouldInjectContextPack(toolUseContext, settings)) return messages
+
+  try {
+    const contextPackInput = await collectContextPackInput({
+      cwd: getCwd(),
+      taskPrompt: getLatestUserPrompt(messages),
+    })
+    const contextPack = new ContextPacker().pack({
+      ...contextPackInput,
+      settings,
+    })
+
+    if (contextPack.sections.length === 0) return messages
+
+    return [
+      ...messages,
+      createUserMessage({
+        content: formatContextPackForPrompt(contextPack),
+        isMeta: true,
+      }),
+    ]
+  } catch (error) {
+    logForDebugging(
+      `[ContextPacker] Failed to build context pack: ${error instanceof Error ? error.message : String(error)}`,
+    )
+    return messages
+  }
+}
+
+function resolveDSMLGatewaySettings(
+  settings: DSMLGatewaySettings | undefined,
+): DSMLGatewaySettings | undefined {
+  if (feature('DSML_GATEWAY')) {
+    return {
+      ...settings,
+      enabled: true,
+    }
+  }
+  return settings
+}
+
+function buildWorkingMemoryMessages(
+  messages: Message[],
+  toolUseContext: ToolUseContext,
+  settings: WorkingMemorySettings | undefined,
+): Message[] {
+  if (!shouldInjectWorkingMemory(toolUseContext, settings)) return messages
+
+  const prompt = createWorkingMemoryPrompt(
+    toolUseContext.getAppState().workingMemory,
+    settings,
+  )
+  if (!prompt) return messages
+
+  return [
+    ...messages,
+    createUserMessage({
+      content: prompt,
+      isMeta: true,
+    }),
+  ]
+}
+
+function shouldInjectWorkingMemory(
+  toolUseContext: ToolUseContext,
+  settings: WorkingMemorySettings | undefined,
+): boolean {
+  if (!shouldUseWorkingMemory(settings)) return false
+  if (toolUseContext.agentId) return false
+  return true
+}
+
+function shouldInjectContextPack(
+  toolUseContext: ToolUseContext,
+  settings: ContextPackerSettings | undefined,
+): boolean {
+  if (settings?.enabled !== true) return false
+  if (toolUseContext.agentId) return false
+  return true
+}
+
+function getLatestUserPrompt(messages: Message[]): string | undefined {
+  for (let index = messages.length - 1; index >= 0; index--) {
+    const message = messages[index]
+    if (!message || message.type !== 'user' || message.isMeta) continue
+
+    const text = getUserMessageText(message)
+    if (text?.trim()) return text.trim()
+  }
+
+  return undefined
+}
+
+function shouldRunCompletionVerification(
+  messages: Message[],
+  lastVerificationMessageCount: number,
+  toolUseContext: ToolUseContext,
+  querySource: QuerySource,
+  transition: Continue | undefined,
+  settings: VerificationRunnerSettings | undefined,
+): boolean {
+  if (!shouldRunVerificationOnCompletion(settings)) return false
+  if (transition?.reason === 'verification_failed') return false
+  if (toolUseContext.agentId) return false
+  if (toolUseContext.options.isNonInteractiveSession) return false
+  if (
+    typeof querySource !== 'string' ||
+    !querySource.startsWith('repl_main_thread')
+  ) {
+    return false
+  }
+  return hasFileChangeSince(messages, lastVerificationMessageCount)
+}
+
+function hasFileChangeSince(
+  messages: Message[],
+  lastVerificationMessageCount: number,
+): boolean {
+  return messages.slice(lastVerificationMessageCount).some(message => {
+    if (message.type !== 'attachment') return false
+    const attachmentType = message.attachment?.type
+    return (
+      attachmentType === 'edited_text_file' ||
+      attachmentType === 'edited_image_file'
+    )
+  })
 }

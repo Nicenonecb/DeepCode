@@ -10,7 +10,6 @@
 
 import { execFileSync } from 'node:child_process'
 import { mkdirSync } from 'node:fs'
-import { createRequire } from 'node:module'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
@@ -18,10 +17,14 @@ if (process.env.CLAUDE_CODE_SKIP_CHROME_MCP_SETUP === '1') {
   process.exit(0)
 }
 
-const require = createRequire(import.meta.url)
-const cliPath = require.resolve(
-  '@claude-code-best/mcp-chrome-bridge/dist/cli.js',
-)
+const cliPath = process.env.DEEPCODE_CHROME_MCP_BRIDGE_CLI
+
+if (!cliPath) {
+  console.log(
+    'Chrome MCP setup skipped. Set DEEPCODE_CHROME_MCP_BRIDGE_CLI to a bridge CLI path to enable it.',
+  )
+  process.exit(0)
+}
 
 const userArgs = process.argv.slice(2)
 

@@ -1,6 +1,6 @@
-# Claude Code Best (CCB) — 全功能使用指南
+# DeepCode (DeepCode) — 全功能使用指南
 
-本文档覆盖我们通过 13 个 PR 为 CCB 恢复/新增的**全部功能**，按类别组织，每个功能包含说明、使用方法和示例。
+本文档覆盖我们通过 13 个 PR 为 DeepCode 恢复/新增的**全部功能**，按类别组织，每个功能包含说明、使用方法和示例。
 
 ---
 
@@ -52,7 +52,7 @@ bun run dev
 **Feature Flag**: `BRIDGE_MODE`
 
 ### 说明
-通过 WebSocket 远程控制 Claude Code 会话。支持自托管私有部署。
+通过 WebSocket 远程控制 DeepCode 会话。支持自托管私有部署。
 
 ### 使用
 ```bash
@@ -225,7 +225,7 @@ AI 会生成：
 **Feature Flag**: `DAEMON`
 
 ### 说明
-Daemon 模式允许 Claude Code 作为后台长驻进程运行，管理多个 worker。
+Daemon 模式允许 DeepCode 作为后台长驻进程运行，管理多个 worker。
 
 ### 使用
 ```bash
@@ -250,7 +250,7 @@ bun run rcs
 **Feature Flag**: `UDS_INBOX`
 
 ### 说明
-同一台机器上的多个 Claude Code 实例通过 UDS（Unix Domain Socket / Windows Named Pipe）自动发现并协作。首个启动的实例成为 main，后续自动注册为 sub。
+同一台机器上的多个 DeepCode 实例通过 UDS（Unix Domain Socket / Windows Named Pipe）自动发现并协作。首个启动的实例成为 main，后续自动注册为 sub。
 
 ### 使用
 
@@ -320,9 +320,9 @@ bun run dev
 
 Windows（管理员 PowerShell）：
 ```powershell
-New-NetFirewallRule -DisplayName "CCB LAN Beacon (UDP)" -Direction Inbound -Protocol UDP -LocalPort 7101 -Action Allow -Profile Private
-New-NetFirewallRule -DisplayName "CCB LAN Pipes (TCP)" -Direction Inbound -Protocol TCP -LocalPort 1024-65535 -Program (Get-Command bun).Source -Action Allow -Profile Private
-New-NetFirewallRule -DisplayName "CCB LAN Beacon Out (UDP)" -Direction Outbound -Protocol UDP -RemotePort 7101 -Action Allow -Profile Private
+New-NetFirewallRule -DisplayName "DeepCode LAN Beacon (UDP)" -Direction Inbound -Protocol UDP -LocalPort 7101 -Action Allow -Profile Private
+New-NetFirewallRule -DisplayName "DeepCode LAN Pipes (TCP)" -Direction Inbound -Protocol TCP -LocalPort 1024-65535 -Program (Get-Command bun).Source -Action Allow -Profile Private
+New-NetFirewallRule -DisplayName "DeepCode LAN Beacon Out (UDP)" -Direction Outbound -Protocol UDP -RemotePort 7101 -Action Allow -Profile Private
 ```
 
 macOS：

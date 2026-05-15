@@ -6,6 +6,7 @@ mock.module('src/utils/thinking.js', () => ({
 }))
 mock.module('src/utils/settings/settings.js', () => ({
   getInitialSettings: () => ({}),
+  getSettingsForSource: () => undefined,
 }))
 mock.module('src/utils/auth.js', () => ({
   isProSubscriber: () => false,
@@ -27,6 +28,8 @@ const {
   convertEffortValueToLevel,
   getEffortLevelDescription,
   resolvePickerEffortPersistence,
+  resolveAppliedEffort,
+  getDefaultEffortForModel,
   EFFORT_LEVELS,
 } = await import('src/utils/effort.js')
 
@@ -272,5 +275,21 @@ describe('resolvePickerEffortPersistence', () => {
       false,
     )
     expect(result).toBeUndefined()
+  })
+})
+
+// ─── getDefaultEffortForModel ─────────────────────────────────────────
+
+describe('getDefaultEffortForModel', () => {
+  test("defaults max-capable Opus models to 'max'", () => {
+    expect(getDefaultEffortForModel('claude-opus-4-7')).toBe('max')
+  })
+
+  test("defaults DeepSeek V4 Pro to 'max'", () => {
+    expect(getDefaultEffortForModel('deepseek-v4-pro')).toBe('max')
+  })
+
+  test("maps DeepSeek xhigh to 'max'", () => {
+    expect(resolveAppliedEffort('deepseek-v4-pro', 'xhigh')).toBe('max')
   })
 })

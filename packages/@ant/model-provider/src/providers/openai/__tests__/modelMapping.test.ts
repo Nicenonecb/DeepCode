@@ -63,9 +63,9 @@ describe('resolveOpenAIModel', () => {
     )
   })
 
-  test('DEEPSEEK_API_KEY defaults mapped Anthropic names to deepseek-chat', () => {
+  test('DEEPSEEK_API_KEY defaults mapped Anthropic names to deepseek-v4-pro', () => {
     process.env.DEEPSEEK_API_KEY = 'sk-deepseek'
-    expect(resolveOpenAIModel('claude-sonnet-4-6')).toBe('deepseek-chat')
+    expect(resolveOpenAIModel('claude-sonnet-4-6')).toBe('deepseek-v4-pro')
   })
 
   test('ANTHROPIC_DEFAULT_SONNET_MODEL overrides default map', () => {

@@ -36,10 +36,16 @@ import { hasAutoMemPathOverride } from './memdir/paths.js'
 import { query } from './query.js'
 import { categorizeRetryableAPIError } from './services/api/errors.js'
 import type { MCPServerConnection } from './services/mcp/types.js'
+import {
+  getLatestWorkingMemoryCheckpoint,
+  loadPersistedWorkingMemory,
+  persistWorkingMemory,
+  updateWorkingMemoryForMessages,
+} from './services/workingMemory/index.js'
 import type { AppState } from './state/AppState.js'
 import { type Tools, type ToolUseContext, toolMatchesName } from './Tool.js'
-import type { AgentDefinition } from '@claude-code-best/builtin-tools/tools/AgentTool/loadAgentsDir.js'
-import { SYNTHETIC_OUTPUT_TOOL_NAME } from '@claude-code-best/builtin-tools/tools/SyntheticOutputTool/SyntheticOutputTool.js'
+import type { AgentDefinition } from '@deepcode/builtin-tools/tools/AgentTool/loadAgentsDir.js'
+import { SYNTHETIC_OUTPUT_TOOL_NAME } from '@deepcode/builtin-tools/tools/SyntheticOutputTool/SyntheticOutputTool.js'
 import type { APIError } from '@anthropic-ai/sdk'
 import type { Message, SystemCompactBoundaryMessage } from './types/message.js'
 import type { OrphanedPermission } from './types/textInputTypes.js'
@@ -197,6 +203,7 @@ export class QueryEngine {
   private totalUsage: NonNullableUsage
   private hasHandledOrphanedPermission = false
   private readFileState: FileStateCache
+  private hasLoadedPersistedWorkingMemory = false
   // Turn-scoped skill discovery tracking (feeds was_discovered on
   // tengu_skill_tool_invocation). Must persist across the two
   // processUserInputContext rebuilds inside submitMessage, but is cleared
@@ -246,6 +253,7 @@ export class QueryEngine {
     this.discoveredSkillNames.clear()
     this.permissionDenials = []
     setCwd(cwd)
+    this.hydratePersistedWorkingMemory(getAppState, setAppState)
     const persistSession = !isSessionPersistenceDisabled()
     const startTime = Date.now()
 
@@ -291,48 +299,9 @@ export class QueryEngine {
         ? { type: 'adaptive' }
         : { type: 'disabled' }
 
-    headlessProfilerCheckpoint('before_getSystemPrompt')
     // Narrow once so TS tracks the type through the conditionals below.
     const customPrompt =
       typeof customSystemPrompt === 'string' ? customSystemPrompt : undefined
-    const {
-      defaultSystemPrompt,
-      userContext: baseUserContext,
-      systemContext,
-    } = await fetchSystemPromptParts({
-      tools,
-      mainLoopModel: initialMainLoopModel,
-      additionalWorkingDirectories: Array.from(
-        initialAppState.toolPermissionContext.additionalWorkingDirectories.keys(),
-      ),
-      mcpClients,
-      customSystemPrompt: customPrompt,
-    })
-    headlessProfilerCheckpoint('after_getSystemPrompt')
-    const userContext = {
-      ...baseUserContext,
-      ...getCoordinatorUserContext(
-        mcpClients,
-        isScratchpadEnabled() ? getScratchpadDir() : undefined,
-      ),
-    }
-
-    // When an SDK caller provides a custom system prompt AND has set
-    // CLAUDE_COWORK_MEMORY_PATH_OVERRIDE, inject the memory-mechanics prompt.
-    // The env var is an explicit opt-in signal — the caller has wired up
-    // a memory directory and needs Claude to know how to use it (which
-    // Write/Edit tools to call, MEMORY.md filename, loading semantics).
-    // The caller can layer their own policy text via appendSystemPrompt.
-    const memoryMechanicsPrompt =
-      customPrompt !== undefined && hasAutoMemPathOverride()
-        ? await loadMemoryPrompt()
-        : null
-
-    const systemPrompt = asSystemPrompt([
-      ...(customPrompt !== undefined ? [customPrompt] : defaultSystemPrompt),
-      ...(memoryMechanicsPrompt ? [memoryMechanicsPrompt] : []),
-      ...(appendSystemPrompt ? [appendSystemPrompt] : []),
-    ])
 
     // Register function hook for structured output enforcement
     const hasStructuredOutputTool = tools.some(t =>
@@ -422,6 +391,7 @@ export class QueryEngine {
       shouldQuery,
       allowedTools,
       model: modelFromUserInput,
+      effort: effortFromUserInput,
       resultText,
     } = await processUserInput({
       input: prompt,
@@ -497,6 +467,13 @@ export class QueryEngine {
     }))
 
     const mainLoopModel = modelFromUserInput ?? initialMainLoopModel
+    const getAppStateForQuery =
+      effortFromUserInput !== undefined
+        ? () => ({
+            ...getAppState(),
+            effortValue: effortFromUserInput,
+          })
+        : getAppState
 
     // Recreate after processing the prompt to pick up updated messages and
     // model (from slash commands).
@@ -522,7 +499,7 @@ export class QueryEngine {
         agentDefinitions: { activeAgents: agents, allAgents: [] },
         maxBudgetUsd,
       },
-      getAppState,
+      getAppState: getAppStateForQuery,
       setAppState,
       abortController: this.abortController,
       readFileState: this.readFileState,
@@ -627,6 +604,8 @@ export class QueryEngine {
         }
       }
 
+      this.updateWorkingMemoryFromMessages(setAppState)
+
       yield {
         type: 'result',
         subtype: 'success',
@@ -666,6 +645,47 @@ export class QueryEngine {
         )
       })
     }
+
+    headlessProfilerCheckpoint('before_getSystemPrompt')
+    const queryAppState = getAppStateForQuery()
+    const {
+      defaultSystemPrompt,
+      userContext: baseUserContext,
+      systemContext,
+    } = await fetchSystemPromptParts({
+      tools,
+      mainLoopModel,
+      additionalWorkingDirectories: Array.from(
+        queryAppState.toolPermissionContext.additionalWorkingDirectories.keys(),
+      ),
+      mcpClients,
+      customSystemPrompt: customPrompt,
+    })
+    headlessProfilerCheckpoint('after_getSystemPrompt')
+    const userContext = {
+      ...baseUserContext,
+      ...getCoordinatorUserContext(
+        mcpClients,
+        isScratchpadEnabled() ? getScratchpadDir() : undefined,
+      ),
+    }
+
+    // When an SDK caller provides a custom system prompt AND has set
+    // CLAUDE_COWORK_MEMORY_PATH_OVERRIDE, inject the memory-mechanics prompt.
+    // The env var is an explicit opt-in signal — the caller has wired up
+    // a memory directory and needs Claude to know how to use it (which
+    // Write/Edit tools to call, MEMORY.md filename, loading semantics).
+    // The caller can layer their own policy text via appendSystemPrompt.
+    const memoryMechanicsPrompt =
+      customPrompt !== undefined && hasAutoMemPathOverride()
+        ? await loadMemoryPrompt()
+        : null
+
+    const systemPrompt = asSystemPrompt([
+      ...(customPrompt !== undefined ? [customPrompt] : defaultSystemPrompt),
+      ...(memoryMechanicsPrompt ? [memoryMechanicsPrompt] : []),
+      ...(appendSystemPrompt ? [appendSystemPrompt] : []),
+    ])
 
     // Track current message usage (reset on each message_start)
     let currentMessageUsage: NonNullableUsage = EMPTY_USAGE
@@ -892,6 +912,7 @@ export class QueryEngine {
                 await flushSessionStorage()
               }
             }
+            this.updateWorkingMemoryFromMessages(setAppState)
             yield {
               type: 'result',
               subtype: 'error_max_turns',
@@ -1029,6 +1050,7 @@ export class QueryEngine {
             await flushSessionStorage()
           }
         }
+        this.updateWorkingMemoryFromMessages(setAppState)
         yield {
           type: 'result',
           subtype: 'error_max_budget_usd',
@@ -1074,6 +1096,7 @@ export class QueryEngine {
               await flushSessionStorage()
             }
           }
+          this.updateWorkingMemoryFromMessages(setAppState)
           yield {
             type: 'result',
             subtype: 'error_max_structured_output_retries',
@@ -1136,6 +1159,7 @@ export class QueryEngine {
     }
 
     if (!isResultSuccessful(result, lastStopReason)) {
+      this.updateWorkingMemoryFromMessages(setAppState)
       yield {
         type: 'result',
         subtype: 'error_during_execution',
@@ -1191,6 +1215,8 @@ export class QueryEngine {
       isApiError = Boolean(result.isApiErrorMessage)
     }
 
+    this.updateWorkingMemoryFromMessages(setAppState)
+
     yield {
       type: 'result',
       subtype: 'success',
@@ -1212,6 +1238,51 @@ export class QueryEngine {
       ),
       uuid: randomUUID(),
     }
+  }
+
+  private hydratePersistedWorkingMemory(
+    getAppState: () => AppState,
+    setAppState: (f: (prev: AppState) => AppState) => void,
+  ): void {
+    if (this.hasLoadedPersistedWorkingMemory) return
+    this.hasLoadedPersistedWorkingMemory = true
+
+    const appState = getAppState()
+    if (appState.workingMemory) return
+
+    const memory =
+      getLatestWorkingMemoryCheckpoint(
+        this.mutableMessages,
+        appState.settings.workingMemory,
+      ) ?? loadPersistedWorkingMemory(appState.settings.workingMemory)
+    if (!memory) return
+
+    setAppState(prev => ({
+      ...prev,
+      workingMemory: prev.workingMemory ?? memory,
+    }))
+  }
+
+  private updateWorkingMemoryFromMessages(
+    setAppState: (f: (prev: AppState) => AppState) => void,
+  ): void {
+    let updatedWorkingMemory: AppState['workingMemory']
+    setAppState(prev => {
+      updatedWorkingMemory = updateWorkingMemoryForMessages(
+        prev.workingMemory,
+        this.mutableMessages,
+        prev.settings.workingMemory,
+      )
+      if (updatedWorkingMemory === prev.workingMemory) return prev
+      return {
+        ...prev,
+        workingMemory: updatedWorkingMemory,
+      }
+    })
+    persistWorkingMemory(
+      updatedWorkingMemory,
+      this.config.getAppState().settings.workingMemory,
+    )
   }
 
   interrupt(): void {

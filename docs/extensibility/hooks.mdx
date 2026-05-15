@@ -1,6 +1,6 @@
 ---
 title: "Hooks 生命周期钩子 - 执行引擎与拦截协议"
-description: "从源码角度解析 Claude Code Hooks 系统：27 种 Hook 事件、6 种 Hook 类型、同步/异步执行协议、JSON 输出 schema、if 条件匹配、以及 Hook 如何注入上下文和拦截工具调用。"
+description: "从源码角度解析 DeepCode Hooks 系统：27 种 Hook 事件、6 种 Hook 类型、同步/异步执行协议、JSON 输出 schema、if 条件匹配、以及 Hook 如何注入上下文和拦截工具调用。"
 keywords: ["Hooks", "生命周期钩子", "拦截器", "PreToolUse", "Hook 协议"]
 ---
 
@@ -8,7 +8,7 @@ keywords: ["Hooks", "生命周期钩子", "拦截器", "PreToolUse", "Hook 协�
 
 ## 27 种 Hook 事件
 
-Claude Code 定义了 27 种 Hook 事件（`HOOK_EVENTS` 数组，`src/entrypoints/sdk/coreTypes.ts`），覆盖完整的 Agent 生命周期：
+DeepCode 定义了 27 种 Hook 事件（`HOOK_EVENTS` 数组，`src/entrypoints/sdk/coreTypes.ts`），覆盖完整的 Agent 生命周期：
 
 | 阶段 | 事件 | 触发时机 | 匹配字段 |
 |------|------|---------|---------|

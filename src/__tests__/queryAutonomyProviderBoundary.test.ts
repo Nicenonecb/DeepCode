@@ -7,14 +7,21 @@ import {
   setProjectRoot,
 } from '../bootstrap/state'
 import { query } from '../query'
-import { getEmptyToolPermissionContext } from '../Tool'
+import { createWorkingMemory } from '../services/workingMemory/index'
+import { buildTool, getEmptyToolPermissionContext } from '../Tool'
+import type { WorkingMemory } from '../services/workingMemory/index'
 import type { AssistantMessage } from '../types/message'
+import { createAttachmentMessage } from '../utils/attachments'
 import { asSystemPrompt } from '../utils/systemPromptType'
 import {
   createAssistantAPIErrorMessage,
   createUserMessage,
 } from '../utils/messages'
-import { cleanupTempDir, createTempDir } from '../../tests/mocks/file-system'
+import {
+  cleanupTempDir,
+  createTempDir,
+  writeTempFile,
+} from '../../tests/mocks/file-system'
 import {
   enqueue,
   getCommandsByMaxPriority,
@@ -25,6 +32,7 @@ import {
   getAutonomyRunById,
   startManagedAutonomyFlowFromHeartbeatTask,
 } from '../utils/autonomyRuns'
+import { z } from 'zod/v4'
 
 let tempDir = ''
 let originalProcessCwd = ''
@@ -94,10 +102,160 @@ function createToolUseAssistantMessage(): AssistantMessage {
   } as unknown as AssistantMessage
 }
 
-function createToolUseContext(): any {
+function createMultiToolUseAssistantMessage(): AssistantMessage {
+  return {
+    type: 'assistant',
+    uuid: randomUUID(),
+    timestamp: new Date().toISOString(),
+    requestId: undefined,
+    message: {
+      id: 'msg_multi_tool_use',
+      type: 'message',
+      role: 'assistant',
+      model: 'test-model',
+      stop_reason: 'tool_use',
+      stop_sequence: null,
+      usage: {
+        input_tokens: 1,
+        output_tokens: 1,
+        cache_creation_input_tokens: 0,
+        cache_read_input_tokens: 0,
+      },
+      content: [
+        {
+          type: 'tool_use',
+          caller: { type: 'direct' },
+          id: 'toolu_success',
+          name: 'RepairSuccess',
+          input: { value: 'ok' },
+        },
+        {
+          type: 'tool_use',
+          caller: { type: 'direct' },
+          id: 'toolu_schema_retryable',
+          name: 'RepairNeedsString',
+          input: { value: 123 },
+        },
+      ],
+    },
+  } as unknown as AssistantMessage
+}
+
+function createSchemaRepairToolUseAssistantMessage(
+  toolUseId: string,
+): AssistantMessage {
+  return {
+    type: 'assistant',
+    uuid: randomUUID(),
+    timestamp: new Date().toISOString(),
+    requestId: undefined,
+    message: {
+      id: `msg_schema_repair_${toolUseId}`,
+      type: 'message',
+      role: 'assistant',
+      model: 'test-model',
+      stop_reason: 'tool_use',
+      stop_sequence: null,
+      usage: {
+        input_tokens: 1,
+        output_tokens: 1,
+        cache_creation_input_tokens: 0,
+        cache_read_input_tokens: 0,
+      },
+      content: [
+        {
+          type: 'tool_use',
+          caller: { type: 'direct' },
+          id: toolUseId,
+          name: 'RepairNeedsString',
+          input: { value: 123 },
+        },
+      ],
+    },
+  } as unknown as AssistantMessage
+}
+
+function createRepairSuccessTool() {
+  return buildTool({
+    name: 'RepairSuccess',
+    description: async () => 'repair success test',
+    prompt: async () => 'repair success test',
+    inputSchema: z.object({ value: z.string() }),
+    call: async () => ({ data: 'success-result' }),
+    mapToolResultToToolResultBlockParam: (content, toolUseID) => ({
+      type: 'tool_result',
+      content: String(content),
+      tool_use_id: toolUseID,
+    }),
+    renderToolUseMessage: () => null,
+    renderToolResultMessage: () => null,
+    renderToolUseErrorMessage: () => null,
+    maxResultSizeChars: 1000,
+  })
+}
+
+function createRepairNeedsStringTool() {
+  return buildTool({
+    name: 'RepairNeedsString',
+    description: async () => 'repair schema test',
+    prompt: async () => 'repair schema test',
+    inputSchema: z.object({ value: z.string() }),
+    call: async () => ({ data: 'should-not-run' }),
+    mapToolResultToToolResultBlockParam: (content, toolUseID) => ({
+      type: 'tool_result',
+      content: String(content),
+      tool_use_id: toolUseID,
+    }),
+    renderToolUseMessage: () => null,
+    renderToolResultMessage: () => null,
+    renderToolUseErrorMessage: () => null,
+    maxResultSizeChars: 1000,
+  })
+}
+
+function createTextAssistantMessage(text: string): AssistantMessage {
+  return {
+    type: 'assistant',
+    uuid: randomUUID(),
+    timestamp: new Date().toISOString(),
+    requestId: undefined,
+    message: {
+      id: `msg_${randomUUID()}`,
+      type: 'message',
+      role: 'assistant',
+      model: 'test-model',
+      stop_reason: 'end_turn',
+      stop_sequence: null,
+      usage: {
+        input_tokens: 1,
+        output_tokens: 1,
+        cache_creation_input_tokens: 0,
+        cache_read_input_tokens: 0,
+      },
+      content: [
+        {
+          type: 'text',
+          text,
+        },
+      ],
+    },
+  } as unknown as AssistantMessage
+}
+
+function createToolUseContext({
+  isNonInteractiveSession = true,
+  settings = {},
+  workingMemory,
+}: {
+  isNonInteractiveSession?: boolean
+  settings?: Record<string, unknown>
+  workingMemory?: WorkingMemory
+} = {}): any {
   let inProgressToolUseIds = new Set<string>()
   let responseLength = 0
   let appState = {
+    settings,
+    workingMemory,
     toolPermissionContext: getEmptyToolPermissionContext(),
     fastMode: false,
     mcp: {
@@ -119,7 +277,7 @@ function createToolUseContext(): any {
       thinkingConfig: { type: 'disabled' },
       mcpClients: [],
       mcpResources: {},
-      isNonInteractiveSession: true,
+      isNonInteractiveSession,
       agentDefinitions: {
         activeAgents: [],
         allowedAgentTypes: [],
@@ -144,6 +302,439 @@ function createToolUseContext(): any {
 }
 
 describe('query autonomy/provider boundary', () => {
+  test('feeds retryable tool repair summary into the next model pass without rerunning successful tools', async () => {
+    const toolUseContext = createToolUseContext()
+    const successTool = createRepairSuccessTool()
+    const schemaTool = createRepairNeedsStringTool()
+    toolUseContext.options.tools = [successTool, schemaTool]
+
+    const modelInputs: unknown[] = []
+    let callCount = 0
+    const deps = {
+      uuid: () => 'query-chain-id',
+      microcompact: async (messages: unknown[]) => ({ messages }),
+      autocompact: async () => ({
+        compactionResult: undefined,
+        consecutiveFailures: 0,
+      }),
+      callModel: async function* ({ messages }: { messages: unknown[] }) {
+        callCount += 1
+        modelInputs.push(messages)
+        yield callCount === 1
+          ? createMultiToolUseAssistantMessage()
+          : createTextAssistantMessage('repair summary received')
+      },
+    }
+
+    const generator = query({
+      messages: [
+        createUserMessage({
+          content: 'run two tools',
+        }),
+      ],
+      systemPrompt: asSystemPrompt([]),
+      userContext: {},
+      systemContext: {},
+      canUseTool: async (_tool, input) => ({
+        behavior: 'allow',
+        updatedInput: input,
+      }),
+      toolUseContext,
+      querySource: 'sdk',
+      maxTurns: 3,
+      deps: deps as never,
+    })
+
+    let next = await generator.next()
+    while (!next.done) {
+      next = await generator.next()
+    }
+
+    expect(next.value.reason).toBe('completed')
+    expect(callCount).toBe(2)
+
+    const serializedSecondInput = JSON.stringify(modelInputs[1])
+    expect(serializedSecondInput).toContain('<tool_call_repair>')
+    expect(serializedSecondInput).toContain('RepairNeedsString')
+    expect(serializedSecondInput).toContain('toolu_schema_retryable')
+    expect(serializedSecondInput).toContain('schema_error')
+    expect(serializedSecondInput).toContain('Do not rerun tool calls')
+    expect(serializedSecondInput).toContain('<successful_tools_do_not_rerun>')
+    expect(serializedSecondInput).toContain('toolu_success: RepairSuccess')
+
+    type CapturedModelMessage = {
+      message?: { content?: string | Array<{ text?: unknown }> }
+    }
+    const repairMessage = (modelInputs[1] as CapturedModelMessage[])
+      .flatMap(message => {
+        const content = message.message?.content
+        if (typeof content === 'string') return [content]
+        if (Array.isArray(content)) {
+          return content
+            .map(block => block.text)
+            .filter((text): text is string => typeof text === 'string')
+        }
+        return []
+      })
+      .find(text => text.includes('<tool_call_repair>'))
+
+    expect(repairMessage).toContain('RepairNeedsString')
+    expect(repairMessage).not.toContain('success-result')
+  })
+
+  test('stops feeding repair summary after the tool-name retry budget is exhausted', async () => {
+    const toolUseContext = createToolUseContext()
+    const schemaTool = createRepairNeedsStringTool()
+    toolUseContext.options.tools = [schemaTool]
+
+    const modelInputs: unknown[] = []
+    let callCount = 0
+    const deps = {
+      uuid: () => 'query-chain-id',
+      microcompact: async (messages: unknown[]) => ({ messages }),
+      autocompact: async () => ({
+        compactionResult: undefined,
+        consecutiveFailures: 0,
+      }),
+      callModel: async function* ({ messages }: { messages: unknown[] }) {
+        callCount += 1
+        modelInputs.push(messages)
+        yield callCount <= 3
+          ? createSchemaRepairToolUseAssistantMessage(
+              `toolu_schema_retry_${callCount}`,
+            )
+          : createTextAssistantMessage('repair budget exhausted')
+      },
+    }
+
+    const generator = query({
+      messages: [
+        createUserMessage({
+          content: 'keep retrying the same invalid tool',
+        }),
+      ],
+      systemPrompt: asSystemPrompt([]),
+      userContext: {},
+      systemContext: {},
+      canUseTool: async (_tool, input) => ({
+        behavior: 'allow',
+        updatedInput: input,
+      }),
+      toolUseContext,
+      querySource: 'sdk',
+      maxTurns: 5,
+      deps: deps as never,
+    })
+
+    let next = await generator.next()
+    while (!next.done) {
+      next = await generator.next()
+    }
+
+    expect(next.value.reason).toBe('completed')
+    expect(callCount).toBe(4)
+
+    const secondInput = JSON.stringify(modelInputs[1])
+    const thirdInput = JSON.stringify(modelInputs[2])
+    const fourthInput = JSON.stringify(modelInputs[3])
+    expect(secondInput).toContain('<tool_call_repair>')
+    expect(secondInput).toContain('toolu_schema_retry_1')
+    expect(thirdInput).toContain('<tool_call_repair>')
+    expect(thirdInput).toContain('toolu_schema_retry_2')
+    expect(fourthInput.match(/<tool_call_repair>/g)?.length ?? 0).toBe(2)
+    expect(fourthInput).not.toContain('toolUseId: toolu_schema_retry_3')
+    expect(fourthInput).toContain('toolu_schema_retry_3')
+  })
+
+  test('completion verification failure is fed back into a second model pass', async () => {
+    await writeTempFile(
+      tempDir,
+      'package.json',
+      JSON.stringify({
+        type: 'module',
+        scripts: {
+          verify:
+            'echo "src/failing.test.ts(7,3): error TS2304: Cannot find name nope." >&2; exit 1',
+        },
+      }),
+    )
+
+    const toolUseContext = createToolUseContext({
+      isNonInteractiveSession: false,
+      settings: {
+        verificationRunner: {
+          commands: ['bun run verify'],
+          timeoutMs: 5_000,
+          runOnCompletion: true,
+        },
+      },
+    })
+
+    const modelInputs: unknown[] = []
+    let callCount = 0
+    const deps = {
+      uuid: () => 'query-chain-id',
+      microcompact: async (messages: unknown[]) => ({ messages }),
+      autocompact: async () => ({
+        compactionResult: undefined,
+        consecutiveFailures: 0,
+      }),
+      callModel: async function* ({ messages }: { messages: unknown[] }) {
+        callCount += 1
+        modelInputs.push(messages)
+        yield createTextAssistantMessage(
+          callCount === 1
+            ? 'I changed the file.'
+            : 'I fixed it after verification.',
+        )
+      },
+    }
+
+    const generator = query({
+      messages: [
+        createUserMessage({
+          content: 'make a change',
+        }),
+        createAttachmentMessage({
+          type: 'edited_text_file',
+          filename: `${tempDir}/src/failing.test.ts`,
+          snippet: '1  const nope = missing',
+        }),
+      ],
+      systemPrompt: asSystemPrompt([]),
+      userContext: {},
+      systemContext: {},
+      canUseTool: async (_tool, input) => ({
+        behavior: 'allow',
+        updatedInput: input,
+      }),
+      toolUseContext,
+      querySource: 'repl_main_thread',
+      maxTurns: 3,
+      deps: deps as never,
+    })
+
+    const emitted: any[] = []
+    let next = await generator.next()
+    while (!next.done) {
+      emitted.push(next.value)
+      next = await generator.next()
+    }
+
+    expect(next.value.reason).toBe('completed')
+    expect(callCount).toBe(2)
+    expect(JSON.stringify(modelInputs[1])).toContain('<verification_result>')
+    expect(JSON.stringify(modelInputs[1])).toContain('verification failed')
+    expect(toolUseContext.getAppState().verificationStatus).toMatchObject({
+      status: 'failed',
+      total: 1,
+      passed: 0,
+      failed: 1,
+    })
+    expect(
+      emitted.some(
+        message =>
+          message.type === 'system' &&
+          message.content.includes('Verification failed: 0/1 commands passed'),
+      ),
+    ).toBe(true)
+  })
+
+  test('context packer injects an explicit settings-enabled pack before the model call', async () => {
+    await writeTempFile(
+      tempDir,
+      'package.json',
+      JSON.stringify({
+        type: 'module',
+        scripts: {
+          typecheck: 'bunx tsc --noEmit',
+          test: 'bun test',
+        },
+      }),
+    )
+
+    const toolUseContext = createToolUseContext({
+      settings: {
+        contextPacker: {
+          enabled: true,
+          maxChars: 4_000,
+        },
+      },
+    })
+    const modelInputs: unknown[] = []
+    const deps = {
+      uuid: () => 'query-chain-id',
+      microcompact: async (messages: unknown[]) => ({ messages }),
+      autocompact: async () => ({
+        compactionResult: undefined,
+        consecutiveFailures: 0,
+      }),
+      callModel: async function* ({ messages }: { messages: unknown[] }) {
+        modelInputs.push(messages)
+        yield createTextAssistantMessage('packed context received.')
+      },
+    }
+
+    const generator = query({
+      messages: [
+        createUserMessage({
+          content: 'wire ContextPacker into query',
+        }),
+      ],
+      systemPrompt: asSystemPrompt([]),
+      userContext: {},
+      systemContext: {},
+      canUseTool: async (_tool, input) => ({
+        behavior: 'allow',
+        updatedInput: input,
+      }),
+      toolUseContext,
+      querySource: 'sdk',
+      maxTurns: 1,
+      deps: deps as never,
+    })
+
+    let next = await generator.next()
+    while (!next.done) {
+      next = await generator.next()
+    }
+
+    const serializedInput = JSON.stringify(modelInputs[0])
+    expect(next.value.reason).toBe('completed')
+    expect(serializedInput).toContain('<context_pack>')
+    expect(serializedInput).toContain('wire ContextPacker into query')
+    expect(serializedInput).toContain('package_scripts')
+    expect(serializedInput).toContain('typecheck: bunx tsc --noEmit')
+  })
+
+  test('context packer does not inject when explicitly disabled', async () => {
+    await writeTempFile(
+      tempDir,
+      'package.json',
+      JSON.stringify({
+        type: 'module',
+        scripts: {
+          typecheck: 'bunx tsc --noEmit',
+        },
+      }),
+    )
+
+    const toolUseContext = createToolUseContext({
+      settings: {
+        contextPacker: {
+          enabled: false,
+          maxChars: 4_000,
+        },
+      },
+    })
+    const modelInputs: unknown[] = []
+    const deps = {
+      uuid: () => 'query-chain-id',
+      microcompact: async (messages: unknown[]) => ({ messages }),
+      autocompact: async () => ({
+        compactionResult: undefined,
+        consecutiveFailures: 0,
+      }),
+      callModel: async function* ({ messages }: { messages: unknown[] }) {
+        modelInputs.push(messages)
+        yield createTextAssistantMessage('plain context received.')
+      },
+    }
+
+    const generator = query({
+      messages: [
+        createUserMessage({
+          content: 'do not pack this request',
+        }),
+      ],
+      systemPrompt: asSystemPrompt([]),
+      userContext: {},
+      systemContext: {},
+      canUseTool: async (_tool, input) => ({
+        behavior: 'allow',
+        updatedInput: input,
+      }),
+      toolUseContext,
+      querySource: 'sdk',
+      maxTurns: 1,
+      deps: deps as never,
+    })
+
+    let next = await generator.next()
+    while (!next.done) {
+      next = await generator.next()
+    }
+
+    expect(next.value.reason).toBe('completed')
+    expect(JSON.stringify(modelInputs[0])).not.toContain('<context_pack>')
+  })
+
+  test('working memory injects checkpoint context before the model call', async () => {
+    const toolUseContext = createToolUseContext({
+      settings: {
+        workingMemory: {
+          enabled: true,
+          maxChars: 4_000,
+          includeInPrompt: true,
+        },
+      },
+      workingMemory: createWorkingMemory(
+        {
+          goal: 'Preserve compact checkpoint in query',
+          verificationStatus: {
+            status: 'failed',
+            summary: 'typecheck failed',
+          },
+          nextSteps: ['Fix the failing typecheck before final response'],
+        },
+        123,
+      ),
+    })
+    const modelInputs: unknown[] = []
+    const deps = {
+      uuid: () => 'query-chain-id',
+      microcompact: async (messages: unknown[]) => ({ messages }),
+      autocompact: async () => ({
+        compactionResult: undefined,
+        consecutiveFailures: 0,
+      }),
+      callModel: async function* ({ messages }: { messages: unknown[] }) {
+        modelInputs.push(messages)
+        yield createTextAssistantMessage('working memory received.')
+      },
+    }
+
+    const generator = query({
+      messages: [
+        createUserMessage({
+          content: 'continue after compact',
+        }),
+      ],
+      systemPrompt: asSystemPrompt([]),
+      userContext: {},
+      systemContext: {},
+      canUseTool: async (_tool, input) => ({
+        behavior: 'allow',
+        updatedInput: input,
+      }),
+      toolUseContext,
+      querySource: 'sdk',
+      maxTurns: 1,
+      deps: deps as never,
+    })
+
+    let next = await generator.next()
+    while (!next.done) {
+      next = await generator.next()
+    }
+
+    const serializedInput = JSON.stringify(modelInputs[0])
+    expect(next.value.reason).toBe('completed')
+    expect(serializedInput).toContain('<working_memory>')
+    expect(serializedInput).toContain('Preserve compact checkpoint in query')
+    expect(serializedInput).toContain('typecheck failed')
+  })
+
   test('provider api-error messages fail a consumed autonomy run instead of advancing the flow', async () => {
     const previousDisableAttachments =
       process.env.CLAUDE_CODE_DISABLE_ATTACHMENTS

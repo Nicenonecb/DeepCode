@@ -30,6 +30,11 @@ const SESSION_TRACKING_TRIM_TO = 750
 const discoveredThisSession = new Set<string>()
 const recordedGapSignals = new Set<string>()
 
+export function clearSkillDiscoveryStateForTesting(): void {
+  discoveredThisSession.clear()
+  recordedGapSignals.clear()
+}
+
 function addBoundedSessionEntry(set: Set<string>, value: string): void {
   set.add(value)
   if (set.size > SESSION_TRACKING_MAX) {

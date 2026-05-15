@@ -60,7 +60,7 @@ import type { ToolInputJSONSchema } from './Tool.js';
 import {
   createSyntheticOutputTool,
   isSyntheticOutputToolEnabled,
-} from '@claude-code-best/builtin-tools/tools/SyntheticOutputTool/SyntheticOutputTool.js';
+} from '@deepcode/builtin-tools/tools/SyntheticOutputTool/SyntheticOutputTool.js';
 import { getTools } from './tools.js';
 import {
   canUserConfigureAdvisor,
@@ -168,14 +168,14 @@ import { checkQuotaStatus } from './services/claudeAiLimits.js';
 import { getMcpToolsCommandsAndResources, prefetchAllMcpResources } from './services/mcp/client.js';
 import { VALID_INSTALLABLE_SCOPES, VALID_UPDATE_SCOPES } from './services/plugins/pluginCliCommands.js';
 import { initBundledSkills } from './skills/bundled/index.js';
-import type { AgentColorName } from '@claude-code-best/builtin-tools/tools/AgentTool/agentColorManager.js';
+import type { AgentColorName } from '@deepcode/builtin-tools/tools/AgentTool/agentColorManager.js';
 import {
   getActiveAgentsFromList,
   getAgentDefinitionsWithOverrides,
   isBuiltInAgent,
   isCustomAgent,
   parseAgentsFromJson,
-} from '@claude-code-best/builtin-tools/tools/AgentTool/loadAgentsDir.js';
+} from '@deepcode/builtin-tools/tools/AgentTool/loadAgentsDir.js';
 import type { LogOption } from './types/logs.js';
 import type { Message as MessageType } from './types/message.js';
 import {
@@ -1139,8 +1139,8 @@ async function run(): Promise<CommanderCommand> {
   });
 
   program
-    .name('claude')
-    .description(`Claude Code - starts an interactive session by default, use -p/--print for non-interactive output`)
+    .name('deepcode')
+    .description(`DeepCode - starts an interactive session by default, use -p/--print for non-interactive output`)
     .argument('[prompt]', 'Your prompt', String)
     // Subcommands inherit helpOption via commander's copyInheritedSettings —
     // setting it once here covers mcp, plugin, auth, and all other subcommands.
@@ -2188,9 +2188,9 @@ async function run(): Promise<CommanderCommand> {
       if ((feature('KAIROS') || feature('KAIROS_BRIEF')) && baseTools.length > 0) {
         /* eslint-disable @typescript-eslint/no-require-imports */
         const { BRIEF_TOOL_NAME, LEGACY_BRIEF_TOOL_NAME } =
-          require('@claude-code-best/builtin-tools/tools/BriefTool/prompt.js') as typeof import('@claude-code-best/builtin-tools/tools/BriefTool/prompt.js');
+          require('@deepcode/builtin-tools/tools/BriefTool/prompt.js') as typeof import('@deepcode/builtin-tools/tools/BriefTool/prompt.js');
         const { isBriefEntitled } =
-          require('@claude-code-best/builtin-tools/tools/BriefTool/BriefTool.js') as typeof import('@claude-code-best/builtin-tools/tools/BriefTool/BriefTool.js');
+          require('@deepcode/builtin-tools/tools/BriefTool/BriefTool.js') as typeof import('@deepcode/builtin-tools/tools/BriefTool/BriefTool.js');
         /* eslint-enable @typescript-eslint/no-require-imports */
         const parsed = parseToolListFromCLI(baseTools);
         if ((parsed.includes(BRIEF_TOOL_NAME) || parsed.includes(LEGACY_BRIEF_TOOL_NAME)) && isBriefEntitled()) {
@@ -2697,7 +2697,7 @@ async function run(): Promise<CommanderCommand> {
       ) {
         /* eslint-disable @typescript-eslint/no-require-imports */
         const { isBriefEntitled } =
-          require('@claude-code-best/builtin-tools/tools/BriefTool/BriefTool.js') as typeof import('@claude-code-best/builtin-tools/tools/BriefTool/BriefTool.js');
+          require('@deepcode/builtin-tools/tools/BriefTool/BriefTool.js') as typeof import('@deepcode/builtin-tools/tools/BriefTool/BriefTool.js');
         /* eslint-enable @typescript-eslint/no-require-imports */
         if (isBriefEntitled()) {
           setUserMsgOptIn(true);
@@ -2715,7 +2715,7 @@ async function run(): Promise<CommanderCommand> {
         const briefVisibility =
           feature('KAIROS') || feature('KAIROS_BRIEF')
             ? (
-                require('@claude-code-best/builtin-tools/tools/BriefTool/BriefTool.js') as typeof import('@claude-code-best/builtin-tools/tools/BriefTool/BriefTool.js')
+                require('@deepcode/builtin-tools/tools/BriefTool/BriefTool.js') as typeof import('@deepcode/builtin-tools/tools/BriefTool/BriefTool.js')
               ).isBriefEnabled()
               ? 'Call SendUserMessage at checkpoints to mark where things stand.'
               : 'The user will see any text you output.'
@@ -2772,12 +2772,16 @@ async function run(): Promise<CommanderCommand> {
 
         // Now that trust is established and GrowthBook has auth headers,
         // resolve the --remote-control / --rc entitlement gate.
-        if (feature('BRIDGE_MODE') && remoteControlOption !== undefined) {
-          const { getBridgeDisabledReason } = await import('./bridge/bridgeEnabled.js');
-          const disabledReason = await getBridgeDisabledReason();
-          remoteControl = disabledReason === null;
-          if (disabledReason) {
-            process.stderr.write(chalk.yellow(`${disabledReason}\n--rc flag ignored.\n`));
+        if (feature('CLAUDE_OAUTH_FEATURES')) {
+          if (feature('BRIDGE_MODE')) {
+            if (remoteControlOption !== undefined) {
+              const { getBridgeDisabledReason } = await import('./bridge/bridgeEnabled.js');
+              const disabledReason = await getBridgeDisabledReason();
+              remoteControl = disabledReason === null;
+              if (disabledReason) {
+                process.stderr.write(chalk.yellow(`${disabledReason}\n--rc flag ignored.\n`));
+              }
+            }
           }
         }
 
@@ -2803,29 +2807,8 @@ async function run(): Promise<CommanderCommand> {
           agentDef.pendingSnapshotUpdate = undefined;
         }
 
-        // Skip executing /login if we just completed onboarding for it
-        if (onboardingShown && prompt?.trim().toLowerCase() === '/login') {
-          prompt = '';
-        }
-
         if (onboardingShown) {
-          // Refresh auth-dependent services now that the user has logged in during onboarding.
-          // Keep in sync with the post-login logic in src/commands/login.tsx
-          void refreshRemoteManagedSettings();
-          void refreshPolicyLimits();
-          // Clear user data cache BEFORE GrowthBook refresh so it picks up fresh credentials
           resetUserCache();
-          // Refresh GrowthBook after login to get updated feature flags (e.g., for claude.ai MCPs)
-          refreshGrowthBookAfterAuthChange();
-          // Clear any stale trusted device token then enroll for Remote Control.
-          // Both self-gate on tengu_sessions_elevated_auth_enforcement internally
-          // — enrollTrustedDevice() via checkGate_CACHED_OR_BLOCKING (awaits
-          // the GrowthBook reinit above), clearTrustedDeviceToken() via the
-          // sync cached check (acceptable since clear is idempotent).
-          void import('./bridge/trustedDevice.js').then(m => {
-            m.clearTrustedDeviceToken();
-            return m.enrollTrustedDevice();
-          });
         }
 
         // Validate that the active token's org matches forceLoginOrgUUID (if set
@@ -3179,6 +3162,8 @@ async function run(): Promise<CommanderCommand> {
             tools: mcpTools,
           },
           toolPermissionContext,
+          mainLoopModel: initialMainLoopModel,
+          mainLoopModelForSession: null,
           effortValue: parseEffortValue(options.effort) ?? getInitialEffortSetting(),
           ...(isFastModeEnabled() && {
             fastMode: getInitialFastModeSetting(effectiveModel ?? null),
@@ -3460,7 +3445,9 @@ async function run(): Promise<CommanderCommand> {
       // All startup opt-in paths (--tools, --brief, defaultView) have fired
       // above; initialIsBriefOnly just reads the resulting state.
       const initialIsBriefOnly = feature('KAIROS') || feature('KAIROS_BRIEF') ? getUserMsgOptIn() : false;
-      const fullRemoteControl = remoteControl || getRemoteControlAtStartup() || kairosEnabled;
+      const fullRemoteControl = feature('CLAUDE_OAUTH_FEATURES')
+        ? remoteControl || getRemoteControlAtStartup() || kairosEnabled
+        : false;
       let ccrMirrorEnabled = false;
       if (feature('CCR_MIRROR') && !fullRemoteControl) {
         /* eslint-disable @typescript-eslint/no-require-imports */
@@ -3489,6 +3476,9 @@ async function run(): Promise<CommanderCommand> {
         coordinatorTaskIndex: -1,
         viewSelectionMode: 'none',
         footerSelection: null,
+        verificationStatus: undefined,
+        patchSearchStatus: undefined,
+        workingMemory: undefined,
         toolPermissionContext: effectiveToolPermissionContext,
         agent: mainThreadAgentDefinition?.agentType,
         agentDefinitions,
@@ -4599,25 +4589,26 @@ async function run(): Promise<CommanderCommand> {
     ).hideHelp(),
   );
 
-  // Enable teleport/remote flags for all builds but keep them undocumented until GA
-  program.addOption(
-    new Option('--teleport [session]', 'Resume a teleport session, optionally specify session ID').hideHelp(),
-  );
-  program.addOption(
-    new Option('--remote [description]', 'Create a remote session with the given description').hideHelp(),
-  );
-  if (feature('BRIDGE_MODE')) {
+  if (feature('CLAUDE_OAUTH_FEATURES')) {
     program.addOption(
-      new Option(
-        '--remote-control [name]',
-        'Start an interactive session with Remote Control enabled (optionally named)',
-      )
-        .argParser(value => value || true)
-        .hideHelp(),
+      new Option('--teleport [session]', 'Resume a teleport session, optionally specify session ID').hideHelp(),
     );
     program.addOption(
-      new Option('--rc [name]', 'Alias for --remote-control').argParser(value => value || true).hideHelp(),
+      new Option('--remote [description]', 'Create a remote session with the given description').hideHelp(),
     );
+    if (feature('BRIDGE_MODE')) {
+      program.addOption(
+        new Option(
+          '--remote-control [name]',
+          'Start an interactive session with Remote Control enabled (optionally named)',
+        )
+          .argParser(value => value || true)
+          .hideHelp(),
+      );
+      program.addOption(
+        new Option('--rc [name]', 'Alias for --remote-control').argParser(value => value || true).hideHelp(),
+      );
+    }
   }
 
   if (feature('HARD_FAIL')) {
@@ -4895,52 +4886,6 @@ async function run(): Promise<CommanderCommand> {
         },
       );
   }
-
-  // claude auth
-
-  const auth = program.command('auth').description('Manage authentication').configureHelp(createSortedHelpConfig());
-
-  auth
-    .command('login')
-    .description('Sign in to your Anthropic account')
-    .option('--email <email>', 'Pre-populate email address on the login page')
-    .option('--sso', 'Force SSO login flow')
-    .option('--console', 'Use Anthropic Console (API usage billing) instead of Claude subscription')
-    .option('--claudeai', 'Use Claude subscription (default)')
-    .action(
-      async ({
-        email,
-        sso,
-        console: useConsole,
-        claudeai,
-      }: {
-        email?: string;
-        sso?: boolean;
-        console?: boolean;
-        claudeai?: boolean;
-      }) => {
-        const { authLogin } = await import('./cli/handlers/auth.js');
-        await authLogin({ email, sso, console: useConsole, claudeai });
-      },
-    );
-
-  auth
-    .command('status')
-    .description('Show authentication status')
-    .option('--json', 'Output as JSON (default)')
-    .option('--text', 'Output as human-readable text')
-    .action(async (opts: { json?: boolean; text?: boolean }) => {
-      const { authStatus } = await import('./cli/handlers/auth.js');
-      await authStatus(opts);
-    });
-
-  auth
-    .command('logout')
-    .description('Log out from your Anthropic account')
-    .action(async () => {
-      const { authLogout } = await import('./cli/handlers/auth.js');
-      await authLogout();
-    });
 
   /**
    * Helper function to handle marketplace command errors consistently.
@@ -5235,17 +5180,19 @@ async function run(): Promise<CommanderCommand> {
   // false via the try/catch — but not before paying ~65ms of side effects
   // (25ms settings Zod parse + 40ms sync `security` keychain subprocess).
   // The dynamic visibility never worked; the command was always hidden.
-  if (feature('BRIDGE_MODE')) {
-    program
-      .command('remote-control', { hidden: true })
-      .alias('rc')
-      .description('Connect your local environment for remote-control sessions via claude.ai/code')
-      .action(async () => {
-        // Unreachable — cli.tsx fast-path handles this command before main.tsx loads.
-        // If somehow reached, delegate to bridgeMain.
-        const { bridgeMain } = await import('./bridge/bridgeMain.js');
-        await bridgeMain(process.argv.slice(3));
-      });
+  if (feature('CLAUDE_OAUTH_FEATURES')) {
+    if (feature('BRIDGE_MODE')) {
+      program
+        .command('remote-control', { hidden: true })
+        .alias('rc')
+        .description('Connect your local environment for remote-control sessions via claude.ai/code')
+        .action(async () => {
+          // Unreachable — cli.tsx fast-path handles this command before main.tsx loads.
+          // If somehow reached, delegate to bridgeMain.
+          const { bridgeMain } = await import('./bridge/bridgeMain.js');
+          await bridgeMain(process.argv.slice(3));
+        });
+    }
   }
 
   if (feature('KAIROS')) {
@@ -5334,13 +5281,13 @@ async function run(): Promise<CommanderCommand> {
       await installHandler(target, options);
     });
 
-  // claude update — update ccb to the latest version via npm or bun
+  // deepcode update — update DeepCode to the latest version via npm or bun
   program
     .command('update')
-    .description('Update claude-code-best (ccb) to the latest version')
+    .description('Update DeepCode to the latest version')
     .action(async () => {
-      const { updateCCB } = await import('./cli/updateCCB.js');
-      await updateCCB();
+      const { updateDeepCode } = await import('./cli/updateDeepCode.js');
+      await updateDeepCode();
     });
 
   // ant-only commands
@@ -5623,7 +5570,7 @@ function maybeActivateBrief(options: unknown): void {
   // into external builds via BriefTool.ts → prompt.ts.
   /* eslint-disable @typescript-eslint/no-require-imports */
   const { isBriefEntitled } =
-    require('@claude-code-best/builtin-tools/tools/BriefTool/BriefTool.js') as typeof import('@claude-code-best/builtin-tools/tools/BriefTool/BriefTool.js');
+    require('@deepcode/builtin-tools/tools/BriefTool/BriefTool.js') as typeof import('@deepcode/builtin-tools/tools/BriefTool/BriefTool.js');
   /* eslint-enable @typescript-eslint/no-require-imports */
   const entitled = isBriefEntitled();
   if (entitled) {

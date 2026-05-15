@@ -1,6 +1,6 @@
 ---
 title: "88 个 Feature Flags - 构建时特性门控全解"
-description: "深入剖析 Claude Code 的 88+ 个构建时 feature flags：bun:bundle 编译时门控机制，揭示被编译器删除的隐藏功能模块。"
+description: "深入剖析 DeepCode 的 88+ 个构建时 feature flags：bun:bundle 编译时门控机制，揭示被编译器删除的隐藏功能模块。"
 keywords: ["feature flags", "特性标志", "构建时门控", "bun:bundle", "条件编译"]
 ---
 
@@ -8,14 +8,14 @@ keywords: ["feature flags", "特性标志", "构建时门控", "bun:bundle", "�
 
 ## feature() 是什么
 
-Claude Code 使用 Bun 打包器的 `bun:bundle` 模块提供编译时特性门控：
+DeepCode 使用 Bun 打包器的 `bun:bundle` 模块提供编译时特性门控：
 
 ```typescript
 // 源码中的用法（src/tools.ts 等）
 import { feature } from 'bun:bundle'
 
 const SleepTool = feature('PROACTIVE') || feature('KAIROS')
-  ? require('@claude-code-best/builtin-tools/tools/SleepTool/SleepTool.js').SleepTool
+  ? require('@deepcode/builtin-tools/tools/SleepTool/SleepTool.js').SleepTool
   : null
 ```
 
@@ -81,7 +81,7 @@ Feature flags 在代码中主要有三种使用模式：
 ```typescript
 // src/tools.ts — 最常见的模式
 const MonitorTool = feature('MONITOR_TOOL')
-  ? require('@claude-code-best/builtin-tools/tools/MonitorTool/MonitorTool.js').MonitorTool
+  ? require('@deepcode/builtin-tools/tools/MonitorTool/MonitorTool.js').MonitorTool
   : null
 ```
 

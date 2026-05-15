@@ -1,12 +1,12 @@
 ---
 title: "System Prompt 动态组装 - AI 工作记忆构建"
-description: "深入解析 Claude Code 的 System Prompt 动态组装过程：缓存策略、分界标记、Section 注册表、CLAUDE.md 多级合并，以及如何将零散上下文拼装为 API 可消费的缓存友好结构。"
+description: "深入解析 DeepCode 的 System Prompt 动态组装过程：缓存策略、分界标记、Section 注册表、CLAUDE.md 多级合并，以及如何将零散上下文拼装为 API 可消费的缓存友好结构。"
 keywords: ["System Prompt", "系统提示词", "动态组装", "CLAUDE.md", "Prompt Cache", "缓存策略"]
 ---
 
 ## 从数组到 API 调用：System Prompt 的完整链路
 
-System Prompt 在 Claude Code 中不是一段写死的文本，而是一个 **`string[]` 数组**（品牌类型 `SystemPrompt`，定义于 `src/utils/systemPromptType.ts:8`），经过组装、分块、缓存标记后发送给 API。
+System Prompt 在 DeepCode 中不是一段写死的文本，而是一个 **`string[]` 数组**（品牌类型 `SystemPrompt`，定义于 `src/utils/systemPromptType.ts:8`），经过组装、分块、缓存标记后发送给 API。
 
 ### 三阶段管道
 
@@ -71,7 +71,7 @@ DANGEROUS_uncachedSystemPromptSection(
 当环境变量 `CLAUDE_CODE_SIMPLE` 为真时，整个 System Prompt 缩减为一行：
 
 ```typescript
-`You are Claude Code, Anthropic's official CLI for Claude.\n\nCWD: ${getCwd()}\nDate: ${getSessionStartDate()}`
+`You are DeepCode, Anthropic's official CLI for Claude.\n\nCWD: ${getCwd()}\nDate: ${getSessionStartDate()}`
 ```
 
 跳过所有 Section 注册、缓存分块、动态组装——用于最小化 token 消耗的测试场景。
@@ -92,7 +92,7 @@ DANGEROUS_uncachedSystemPromptSection(
 
 ## Provider 系统概述
 
-Claude Code 支持多种 API 提供商，分为两大类：
+DeepCode 支持多种 API 提供商，分为两大类：
 
 | 类别 | Provider | 环境变量 | 说明 |
 |------|----------|---------|------|
@@ -216,7 +216,7 @@ export function shouldUseGlobalCacheScope(): boolean {
 当设置了 `CLAUDE_CODE_SIMPLE` 环境变量时，整个系统提示词会大幅缩减：
 
 ```typescript
-return [`You are Claude Code, Anthropic's official CLI for Claude.\n\nCWD: ${getCwd()}\nDate: ${getSessionStartDate()}`]
+return [`You are DeepCode, Anthropic's official CLI for Claude.\n\nCWD: ${getCwd()}\nDate: ${getSessionStartDate()}`]
 ```
 
 ## 上下文注入：System Context 与 User Context
@@ -269,15 +269,15 @@ User Context 通过 `prependUserContext()`（`src/utils/api.ts:449`）注入为 
 ## Attribution Header：计费与安全
 
 每个 API 请求的 System Prompt 首块是 Attribution Header（`src/constants/system.ts:30`），包含：
-- **`cc_version`**：Claude Code 版本 + 指纹
+- **`cc_version`**：DeepCode 版本 + 指纹
 - **`cc_entrypoint`**：入口点标识（REPL / SDK / pipe 等）
-- **`cch=00000`**（NATIVE_CLIENT_ATTESTATION 启用时）：Bun 原生 HTTP 层在发送前将零替换为计算出的哈希值，服务器验证此 token 确认请求来自真实 Claude Code 客户端
+- **`cch=00000`**（NATIVE_CLIENT_ATTESTATION 启用时）：Bun 原生 HTTP 层在发送前将零替换为计算出的哈希值，服务器验证此 token 确认请求来自真实 DeepCode 客户端
 
 Header 始终 `cacheScope: null`——它因版本和指纹不同而变化，不适合缓存。
 
 ## CLAUDE.md：项目级知识注入
 
-这是 Claude Code 最巧妙的设计之一。在项目根目录放一个 `CLAUDE.md` 文件，就能让 AI "理解" 你的项目：
+这是 DeepCode 最巧妙的设计之一。在项目根目录放一个 `CLAUDE.md` 文件，就能让 AI "理解" 你的项目：
 
 - **项目概述**：这个项目做什么、用了什么技术栈
 - **开发约定**：代码风格、命名规范、分支策略
@@ -303,11 +303,11 @@ Header 始终 `cacheScope: null`——它因版本和指纹不同而变化，不
 3. 如果是单个 `string`，任何一个字符变化（如日期更新）都会导致整个 System Prompt 的缓存失效
 4. `SYSTEM_PROMPT_DYNAMIC_BOUNDARY` 标记允许 `splitSysPromptPrefix()` 精确地将静态区标记为 `scope: 'global'`，动态区不标记或标记为 `scope: 'org'`
 
-这是 Claude Code 在 token 成本优化上的核心设计——一次典型的 System Prompt 约 20K+ tokens，通过缓存分块可以节省 30-50% 的输入 token 费用。
+这是 DeepCode 在 token 成本优化上的核心设计——一次典型的 System Prompt 约 20K+ tokens，通过缓存分块可以节省 30-50% 的输入 token 费用。
 
 ## 兼容层：OpenAI 与 Gemini
 
-Claude Code 提供了 OpenAI 和 Gemini 协议的兼容层，允许使用非 Anthropic 端点。
+DeepCode 提供了 OpenAI 和 Gemini 协议的兼容层，允许使用非 Anthropic 端点。
 
 ### OpenAI 兼容层
 

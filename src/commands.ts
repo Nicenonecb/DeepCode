@@ -25,8 +25,6 @@ import init from './commands/init.js'
 import initVerifiers from './commands/init-verifiers.js'
 import keybindings from './commands/keybindings/index.js'
 import lang from './commands/lang/index.js'
-import login from './commands/login/index.js'
-import logout from './commands/logout/index.js'
 import installGitHubApp from './commands/install-github-app/index.js'
 import installSlackApp from './commands/install-slack-app/index.js'
 import breakCache, {
@@ -45,11 +43,9 @@ import share from './commands/share/index.js'
 import skills from './commands/skills/index.js'
 import status from './commands/status/index.js'
 import tasks from './commands/tasks/index.js'
-import teleport from './commands/teleport/index.js'
 import agentsPlatform from './commands/agents-platform/index.js'
 import scheduleCommand from './commands/schedule/index.js'
 import memoryStoresCommand from './commands/memory-stores/index.js'
-import skillStoreCommand from './commands/skill-store/index.js'
 import vaultCommand from './commands/vault/index.js'
 import localVaultCommand from './commands/local-vault/index.js'
 import localMemoryCommand from './commands/local-memory/index.js'
@@ -73,14 +69,24 @@ const briefCommand =
 const assistantCommand = feature('KAIROS')
   ? require('./commands/assistant/index.js').default
   : null
-const bridge = feature('BRIDGE_MODE')
-  ? require('./commands/bridge/index.js').default
+const bridge = feature('CLAUDE_OAUTH_FEATURES')
+  ? feature('BRIDGE_MODE')
+    ? require('./commands/bridge/index.js').default
+    : null
   : null
-const remoteControlServerCommand = feature('BRIDGE_MODE')
-  ? require('./commands/remoteControlServer/index.js').default
+const remoteControlServerCommand = feature('CLAUDE_OAUTH_FEATURES')
+  ? feature('BRIDGE_MODE')
+    ? require('./commands/remoteControlServer/index.js').default
+    : null
   : null
 const voiceCommand = feature('VOICE_MODE')
   ? require('./commands/voice/index.js').default
+  : null
+const teleportCommand = feature('CLAUDE_OAUTH_FEATURES')
+  ? require('./commands/teleport/index.js').default
+  : null
+const skillStoreCommand = feature('CLAUDE_OAUTH_FEATURES')
+  ? require('./commands/skill-store/index.js').default
   : null
 const monitorCmd = feature('MONITOR_TOOL')
   ? require('./commands/monitor.js').default
@@ -214,7 +220,7 @@ import {
   clearPluginSkillsCache,
 } from './utils/plugins/loadPluginCommands.js'
 import memoize from 'lodash-es/memoize.js'
-import { isUsing3PServices, isClaudeAISubscriber } from './utils/auth.js'
+import { isClaudeAISubscriber, isUsing3PServices } from './utils/auth.js'
 import { isFirstPartyAnthropicBaseUrl } from './utils/model/providers.js'
 import env from './commands/env/index.js'
 import exit from './commands/exit/index.js'
@@ -292,7 +298,7 @@ const COMMANDS = memoize((): Command[] => [
   agentsPlatform,
   scheduleCommand,
   memoryStoresCommand,
-  skillStoreCommand,
+  ...(skillStoreCommand ? [skillStoreCommand] : []),
   vaultCommand,
   localVaultCommand,
   localMemoryCommand,
@@ -376,7 +382,6 @@ const COMMANDS = memoize((): Command[] => [
   hooks,
   exportCommand,
   sandboxToggle,
-  ...(!isUsing3PServices() ? [logout, login()] : []),
   passes,
   ...(peersCmd ? [peersCmd] : []),
   ...(attachCmd ? [attachCmd] : []),
@@ -411,7 +416,7 @@ const COMMANDS = memoize((): Command[] => [
   breakCacheNonInteractive,
   issue,
   share,
-  teleport,
+  ...(teleportCommand ? [teleportCommand] : []),
   tui,
   tuiNonInteractive,
   onboarding,
@@ -475,7 +480,7 @@ async function getSkills(cwd: string): Promise<{
 /* eslint-disable @typescript-eslint/no-require-imports */
 const getWorkflowCommands = feature('WORKFLOW_SCRIPTS')
   ? (
-      require('@claude-code-best/builtin-tools/tools/WorkflowTool/createWorkflowCommand.js') as typeof import('@claude-code-best/builtin-tools/tools/WorkflowTool/createWorkflowCommand.js')
+      require('@deepcode/builtin-tools/tools/WorkflowTool/createWorkflowCommand.js') as typeof import('@deepcode/builtin-tools/tools/WorkflowTool/createWorkflowCommand.js')
     ).getWorkflowCommands
   : null
 /* eslint-enable @typescript-eslint/no-require-imports */

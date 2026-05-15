@@ -2,7 +2,7 @@
 
 ## 概述
 
-Pipes 系统提供 Claude Code CLI 实例之间的通讯能力，分两层：
+Pipes 系统提供 DeepCode CLI 实例之间的通讯能力，分两层：
 
 1. **Pipes（本机）**：同一台机器上的多个 CLI 实例通过 UDS（Unix Domain Socket / Windows Named Pipe）协作
 2. **LAN Pipes（局域网）**：不同机器上的 CLI 实例通过 TCP + UDP Multicast 协作
@@ -50,9 +50,9 @@ bun run dev
 
 **Windows**（管理员 PowerShell）：
 ```powershell
-New-NetFirewallRule -DisplayName "Claude Code LAN Beacon (UDP)" -Direction Inbound -Protocol UDP -LocalPort 7101 -Action Allow -Profile Private
-New-NetFirewallRule -DisplayName "Claude Code LAN Pipes (TCP)" -Direction Inbound -Protocol TCP -LocalPort 1024-65535 -Program (Get-Command bun).Source -Action Allow -Profile Private
-New-NetFirewallRule -DisplayName "Claude Code LAN Beacon Out (UDP)" -Direction Outbound -Protocol UDP -RemotePort 7101 -Action Allow -Profile Private
+New-NetFirewallRule -DisplayName "DeepCode LAN Beacon (UDP)" -Direction Inbound -Protocol UDP -LocalPort 7101 -Action Allow -Profile Private
+New-NetFirewallRule -DisplayName "DeepCode LAN Pipes (TCP)" -Direction Inbound -Protocol TCP -LocalPort 1024-65535 -Program (Get-Command bun).Source -Action Allow -Profile Private
+New-NetFirewallRule -DisplayName "DeepCode LAN Beacon Out (UDP)" -Direction Outbound -Protocol UDP -RemotePort 7101 -Action Allow -Profile Private
 # 确认网络为"专用"：Get-NetConnectionProfile
 ```
 

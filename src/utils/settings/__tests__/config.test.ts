@@ -39,6 +39,56 @@ describe('SettingsSchema', () => {
     expect(result.success).toBe(true)
   })
 
+  test('accepts task-aware model routing settings', () => {
+    const result = SettingsSchema().safeParse({
+      taskAwareModelRouting: {
+        enabled: true,
+        routes: {
+          explain: { model: 'haiku', effort: 'low' },
+          bugfix: { model: 'opus', effort: 'high' },
+        },
+      },
+    })
+
+    expect(result.success).toBe(true)
+  })
+
+  test('accepts verification runner settings', () => {
+    const result = SettingsSchema().safeParse({
+      verificationRunner: {
+        enabled: true,
+        runOnCompletion: false,
+        timeoutMs: 120_000,
+        commands: [
+          'bun run typecheck',
+          {
+            kind: 'test',
+            name: 'Focused tests',
+            command: 'bun',
+            args: ['test', 'src/services/verification/__tests__'],
+            timeoutMs: 60_000,
+          },
+        ],
+      },
+    })
+
+    expect(result.success).toBe(true)
+  })
+
+  test('accepts context packer settings', () => {
+    const result = SettingsSchema().safeParse({
+      contextPacker: {
+        enabled: true,
+        maxChars: 12_000,
+        includeDiff: true,
+        includeVerification: false,
+        includeLsp: true,
+      },
+    })
+
+    expect(result.success).toBe(true)
+  })
+
   test('accepts permissions block with allow rules', () => {
     const result = SettingsSchema().safeParse({
       permissions: { allow: ['Bash(npm install)'] },

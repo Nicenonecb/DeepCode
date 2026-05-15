@@ -1,7 +1,7 @@
 {
   "$schema": "https://mintlify.com/docs.json",
   "theme": "mint",
-  "name": "Claude Code Architecture",
+  "name": "DeepCode Architecture",
   "colors": {
     "primary": "#D97706",
     "light": "#F59E0B",
@@ -160,23 +160,23 @@
   "navbar": {
     "primary": {
       "type": "github",
-      "href": "https://github.com/claude-code-best/claude-code"
+      "href": "https://github.com/Nicenonecb/DeepCode"
     }
   },
   "search": {
-    "prompt": "搜索 Claude Code 架构文档..."
+    "prompt": "搜索 DeepCode 架构文档..."
   },
   "seo": {
     "metatags": {
-      "og:image": "https://ccb.agent-aura.top/docs/images/og-cover.png",
-      "twitter:image": "https://ccb.agent-aura.top/docs/images/og-cover.png",
+      "og:image": "https://github.com/Nicenonecb/DeepCode/raw/main/docs/images/og-cover.png",
+      "twitter:image": "https://github.com/Nicenonecb/DeepCode/raw/main/docs/images/og-cover.png",
       "twitter:card": "summary_large_image"
     },
     "indexing": "navigable"
   },
   "footer": {
     "socials": {
-      "github": "https://github.com/anthropics/claude-code"
+      "github": "https://github.com/Nicenonecb/DeepCode"
     }
   },
   "redirects": [

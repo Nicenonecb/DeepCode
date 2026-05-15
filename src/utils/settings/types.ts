@@ -77,6 +77,170 @@ export const PermissionsSchema = lazySchema(() =>
     .passthrough(),
 )
 
+export const TaskAwareModelRouteSettingsSchema = lazySchema(() =>
+  z
+    .object({
+      model: z
+        .string()
+        .optional()
+        .describe(
+          'Model alias or model ID to use when this task route matches.',
+        ),
+      effort: z
+        .enum(
+          process.env.USER_TYPE === 'ant'
+            ? ['low', 'medium', 'high', 'xhigh', 'max']
+            : ['low', 'medium', 'high', 'xhigh'],
+        )
+        .optional()
+        .describe('Reasoning effort to use when this task route matches.'),
+    })
+    .passthrough(),
+)
+
+export const VerificationRunnerCommandSchema = lazySchema(() =>
+  z.union([
+    z.string().min(1),
+    z
+      .object({
+        kind: z.enum(['typecheck', 'lint', 'test']).optional(),
+        name: z.string().optional(),
+        command: z.string().min(1),
+        args: z.array(z.string()).optional(),
+        timeoutMs: z.number().int().positive().optional(),
+      })
+      .passthrough(),
+  ]),
+)
+
+export const VerificationRunnerSettingsSchema = lazySchema(() =>
+  z
+    .object({
+      enabled: z
+        .boolean()
+        .optional()
+        .describe('Whether VerificationRunner is enabled. Defaults to true.'),
+      commands: z
+        .array(VerificationRunnerCommandSchema())
+        .optional()
+        .describe(
+          'Commands to run for verification. When omitted, package scripts are auto-detected. String commands are shell-tokenized; object commands may provide command and args separately.',
+        ),
+      timeoutMs: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe(
+          'Default timeout in milliseconds for each verification command.',
+        ),
+      runOnCompletion: z
+        .boolean()
+        .optional()
+        .describe(
+          'Whether to run VerificationRunner automatically when the agent is about to finish after file changes. Defaults to true.',
+        ),
+    })
+    .passthrough(),
+)
+
+export const ContextPackerSettingsSchema = lazySchema(() =>
+  z
+    .object({
+      enabled: z
+        .boolean()
+        .optional()
+        .describe(
+          'Whether ContextPacker injects task evidence into model input. Defaults to false at the query integration layer.',
+        ),
+      maxChars: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('Maximum character budget for the generated ContextPack.'),
+      includeDiff: z
+        .boolean()
+        .optional()
+        .describe('Whether to include git diff evidence in the ContextPack.'),
+      includeVerification: z
+        .boolean()
+        .optional()
+        .describe(
+          'Whether to include verification summary evidence when available.',
+        ),
+      includeLsp: z
+        .boolean()
+        .optional()
+        .describe(
+          'Whether to include LSP diagnostics and symbols when available.',
+        ),
+    })
+    .passthrough(),
+)
+
+export const WorkingMemorySettingsSchema = lazySchema(() =>
+  z
+    .object({
+      enabled: z
+        .boolean()
+        .optional()
+        .describe(
+          'Whether WorkingMemory updates and prompt injection are enabled. Defaults to false.',
+        ),
+      maxChars: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('Maximum character budget for serialized WorkingMemory.'),
+      includeInPrompt: z
+        .boolean()
+        .optional()
+        .describe(
+          'Whether WorkingMemory is injected as meta context before model calls. Defaults to true when enabled.',
+        ),
+      persistToDisk: z
+        .boolean()
+        .optional()
+        .describe(
+          'Whether WorkingMemory is persisted to the session working-memory file. Defaults to false.',
+        ),
+    })
+    .passthrough(),
+)
+
+export const DSMLGatewaySettingsSchema = lazySchema(() =>
+  z
+    .object({
+      enabled: z
+        .boolean()
+        .optional()
+        .describe(
+          'Whether to serialize OpenAI-compatible tool schemas into a DSML prompt instead of native OpenAI function calling. Defaults to false.',
+        ),
+      tagStyle: z
+        .enum(['fullwidth', 'ascii'])
+        .optional()
+        .describe(
+          'Which DSML tag spelling to show in the request prompt. Defaults to fullwidth.',
+        ),
+      maxPromptChars: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('Maximum character budget for the DSML tool schema prompt.'),
+      malformedResponseStrategy: z
+        .enum(['text', 'tool_use'])
+        .optional()
+        .describe(
+          'How to handle malformed DSML responses. text keeps the original assistant text; tool_use emits any parseable tool calls.',
+        ),
+    })
+    .passthrough(),
+)
+
 /**
  * Schema for extra marketplaces defined in repository settings
  * Same as KnownMarketplace but without lastUpdated (which is managed automatically)
@@ -395,6 +559,49 @@ export const SettingsSchema = lazySchema(() =>
           'Override mapping from Anthropic model ID (e.g. "claude-opus-4-6") to provider-specific ' +
             'model ID (e.g. a Bedrock inference profile ARN). Typically set in managed settings by ' +
             'enterprise administrators.',
+        ),
+      taskAwareModelRouting: z
+        .object({
+          enabled: z
+            .boolean()
+            .optional()
+            .describe(
+              'Whether task-aware model routing is enabled when the TASK_AWARE_MODEL_ROUTING feature is available.',
+            ),
+          routes: z
+            .object({
+              explain: TaskAwareModelRouteSettingsSchema().optional(),
+              bugfix: TaskAwareModelRouteSettingsSchema().optional(),
+              complex: TaskAwareModelRouteSettingsSchema().optional(),
+            })
+            .optional()
+            .describe(
+              'Per-task routing overrides. explain is used for explanation/Q&A prompts, bugfix for clear fixes, and complex for refactors or large changes.',
+            ),
+        })
+        .optional()
+        .describe(
+          'Configure task-aware model routing without changing CLI or API call sites.',
+        ),
+      verificationRunner: VerificationRunnerSettingsSchema()
+        .optional()
+        .describe(
+          'Configure automatic verification commands and completion-time verification behavior.',
+        ),
+      contextPacker: ContextPackerSettingsSchema()
+        .optional()
+        .describe(
+          'Configure task-scoped ContextPacker evidence injection into model input.',
+        ),
+      workingMemory: WorkingMemorySettingsSchema()
+        .optional()
+        .describe(
+          'Configure structured WorkingMemory updates, prompt injection, and optional session persistence.',
+        ),
+      dsmlGateway: DSMLGatewaySettingsSchema()
+        .optional()
+        .describe(
+          'Configure DSML tool protocol serialization for OpenAI-compatible providers.',
         ),
       // Whether to automatically approve all MCP servers in the project
       enableAllProjectMcpServers: z

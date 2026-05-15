@@ -45,6 +45,7 @@ import { isXtermJs, useHasSelection, useSelection } from '@anthropic/ink';
 import { getGlobalConfig, saveGlobalConfig } from '../../utils/config.js';
 import { getPlatform } from '../../utils/platform.js';
 import { PrBadge } from '../PrBadge.js';
+import { patchSearchStatusLabel } from '../../services/patchSearch/PatchSearchStatus.js';
 
 // Dead code elimination: conditional import for proactive mode
 /* eslint-disable @typescript-eslint/no-require-imports */
@@ -224,6 +225,8 @@ function ModeIndicator({
   const showSpinnerTree = expandedView === 'teammates';
   const prStatus = usePrStatus(isLoading, isPrStatusEnabled());
   const hasTmuxSession = useAppState(s => process.env.USER_TYPE === 'ant' && s.tungstenActiveSession !== undefined);
+  const verificationStatus = useAppState(s => s.verificationStatus);
+  const patchSearchStatus = useAppState(s => s.patchSearchStatus);
 
   const nextTickAt = useSyncExternalStore(
     proactiveModule?.subscribeToProactiveChanges ?? NO_OP_SUBSCRIBE,
@@ -373,6 +376,46 @@ function ModeIndicator({
             color={rssState.level === 'error' ? 'error' : rssState.level === 'warning' ? 'warning' : undefined}
           >
             {rssState.text} · pid:{process.pid}
+          </Text>,
+        ]
+      : []),
+    ...(verificationStatus
+      ? [
+          <Text
+            key="verification"
+            color={
+              verificationStatus.status === 'passed'
+                ? 'success'
+                : verificationStatus.status === 'timed_out'
+                  ? 'warning'
+                  : 'error'
+            }
+          >
+            verify {verificationStatus.status === 'passed' ? 'ok' : verificationStatus.status.replace('_', ' ')}{' '}
+            <Text dimColor>
+              {verificationStatus.passed}/{verificationStatus.total}
+            </Text>
+          </Text>,
+        ]
+      : []),
+    ...(patchSearchStatus
+      ? [
+          <Text
+            key="patch-search"
+            color={
+              patchSearchStatus.phase === 'failed'
+                ? 'error'
+                : patchSearchStatus.phase === 'running' ||
+                    patchSearchStatus.phase === 'verifying' ||
+                    patchSearchStatus.phase === 'selecting' ||
+                    patchSearchStatus.phase === 'applying'
+                  ? 'warning'
+                  : patchSearchStatus.failedCount > 0
+                    ? 'warning'
+                    : 'success'
+            }
+          >
+            {patchSearchStatusLabel(patchSearchStatus)}
           </Text>,
         ]
       : []),

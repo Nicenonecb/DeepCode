@@ -1,6 +1,6 @@
 ---
 title: "StatusLine 底部状态栏 - 自定义 shell 渲染管线"
-description: "从源码角度解析 Claude Code 底部状态栏：自定义 shell 脚本 + JSON stdin 协议、三种触发源（event / settings / time）、debounce + abort、信任与 hook 开关、以及本仓库 refreshInterval 缺失修复。"
+description: "从源码角度解析 DeepCode 底部状态栏：自定义 shell 脚本 + JSON stdin 协议、三种触发源（event / settings / time）、debounce + abort、信任与 hook 开关、以及本仓库 refreshInterval 缺失修复。"
 keywords: ["statusLine", "状态栏", "自定义提示符", "refreshInterval", "Hooks"]
 ---
 
@@ -8,7 +8,7 @@ keywords: ["statusLine", "状态栏", "自定义提示符", "refreshInterval", "
 
 ## 概述
 
-StatusLine 是 Claude Code REPL 底部显示的一行自定义文本，由**用户提供的 shell 命令**渲染。主进程把运行时状态（模型、工作目录、token、限流、会话元数据等）打包成 JSON 通过 stdin 喂给脚本，脚本在 stdout 输出一行字符串，Ink 侧以 ANSI 转义渲染到 footer。
+StatusLine 是 DeepCode REPL 底部显示的一行自定义文本，由**用户提供的 shell 命令**渲染。主进程把运行时状态（模型、工作目录、token、限流、会话元数据等）打包成 JSON 通过 stdin 喂给脚本，脚本在 stdout 输出一行字符串，Ink 侧以 ANSI 转义渲染到 footer。
 
 核心设计哲学：**语言无关 + 进程隔离 + Unix 管道**。用户可用 bash / python / node / 任意语言写脚本；脚本崩溃不影响主进程；输入输出都是纯文本，可以离线测试（`echo '{...}' | ./script.sh`）。
 
@@ -231,7 +231,7 @@ Create an AgentTool with subagent_type "statusline-setup" and the prompt "<user-
 
 反编译版的 `StatusLine.tsx` 存在一处功能缺口：
 
-| 项 | 官方 Claude Code | 本仓库原始 | 本仓库现状 |
+| 项 | 官方 DeepCode | 本仓库原始 | 本仓库现状 |
 |----|-----------------|-----------|-----------|
 | `refreshInterval` Zod 字段 | ✅ 有 | ❌ 无 | ✅ 已补 |
 | Time-driven `setInterval` 触发 | ✅ 有 | ❌ 无 | ✅ 已补 |

@@ -1,6 +1,6 @@
 # Chrome Use — 浏览器自动化快速指南
 
-让 Claude Code 直接控制你的 Chrome 浏览器，用自然语言完成网页操作。
+让 DeepCode 直接控制你的 Chrome 浏览器，用自然语言完成网页操作。
 
 ## 快速开始（3 分钟）
 
@@ -12,11 +12,11 @@
 4. 开启右上角「开发者模式」
 5. 点击「加载已解压的扩展程序」，选择解压后的文件夹
 
-### 第二步：启动 Claude Code
+### 第二步：启动 DeepCode
 
 ```bash
 bun run dev
-ccb # 或者 ccb 安装版也行
+deepcode # 或者 deepcode 安装版也行
 ```
 
 ### 第三步：启用 Chrome MCP

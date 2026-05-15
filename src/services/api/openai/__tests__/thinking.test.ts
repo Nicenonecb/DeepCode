@@ -123,28 +123,28 @@ describe('isOpenAIThinkingEnabled', () => {
       expect(isOpenAIThinkingEnabled('TokenService/deepseek-v3.2')).toBe(true)
     })
 
-    test('returns true when model name is "deepseek-chat"', () => {
-      expect(isOpenAIThinkingEnabled('deepseek-chat')).toBe(true)
+    test('returns false when model name is "deepseek-chat"', () => {
+      expect(isOpenAIThinkingEnabled('deepseek-chat')).toBe(false)
     })
 
-    test('returns true when model name is "deepseek-v3"', () => {
-      expect(isOpenAIThinkingEnabled('deepseek-v3')).toBe(true)
+    test('returns false when model name is unknown legacy "deepseek-v3"', () => {
+      expect(isOpenAIThinkingEnabled('deepseek-v3')).toBe(false)
     })
 
-    test('returns true when model name is "deepseek-v4"', () => {
-      expect(isOpenAIThinkingEnabled('deepseek-v4')).toBe(true)
+    test('returns false when model name is unknown shorthand "deepseek-v4"', () => {
+      expect(isOpenAIThinkingEnabled('deepseek-v4')).toBe(false)
     })
 
     test('returns true when model name is "deepseek-v4-pro"', () => {
       expect(isOpenAIThinkingEnabled('deepseek-v4-pro')).toBe(true)
     })
 
-    test('returns true when model name is "deepseek-r1"', () => {
-      expect(isOpenAIThinkingEnabled('deepseek-r1')).toBe(true)
+    test('returns false when model name is unknown legacy "deepseek-r1"', () => {
+      expect(isOpenAIThinkingEnabled('deepseek-r1')).toBe(false)
     })
 
-    test('returns true when model name contains "deepseek"', () => {
-      expect(isOpenAIThinkingEnabled('deepseek-coder')).toBe(true)
+    test('returns false when model name only contains "deepseek"', () => {
+      expect(isOpenAIThinkingEnabled('deepseek-coder')).toBe(false)
     })
 
     test('returns false when model name is "gpt-4o"', () => {
@@ -192,6 +192,16 @@ describe('buildOpenAIRequestBody — thinking params', () => {
   test('includes official DeepSeek API thinking format when enabled', () => {
     const body = buildOpenAIRequestBody({ ...baseParams, enableThinking: true })
     expect(body.thinking).toEqual({ type: 'enabled' })
+  })
+
+  test('includes DeepSeek reasoning effort when enabled', () => {
+    const body = buildOpenAIRequestBody({
+      ...baseParams,
+      model: 'deepseek-v4-pro',
+      enableThinking: true,
+      effortValue: 'xhigh',
+    })
+    expect(body.reasoning_effort).toBe('max')
   })
 
   test('includes vLLM/self-hosted thinking format when enabled', () => {

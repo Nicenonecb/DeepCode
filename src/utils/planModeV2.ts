@@ -1,45 +1,48 @@
 import { getFeatureValue_CACHED_MAY_BE_STALE } from '../services/analytics/growthbook.js'
-import { getRateLimitTier, getSubscriptionType } from './auth.js'
 import { isEnvDefinedFalsy, isEnvTruthy } from './envUtils.js'
 
+const PLAN_AGENT_COUNT_PRESETS = {
+  low: 2,
+  default: 4,
+  high: 12,
+} as const
+
+type PlanAgentCountPreset = keyof typeof PLAN_AGENT_COUNT_PRESETS
+
+function isPlanAgentCountPreset(value: string): value is PlanAgentCountPreset {
+  return value in PLAN_AGENT_COUNT_PRESETS
+}
+
+function parsePlanAgentCount(value: string | undefined): number | undefined {
+  if (!value) {
+    return undefined
+  }
+
+  const normalized = value.toLowerCase()
+  if (isPlanAgentCountPreset(normalized)) {
+    return PLAN_AGENT_COUNT_PRESETS[normalized]
+  }
+
+  const count = parseInt(value, 10)
+  if (!isNaN(count) && count > 0 && count <= PLAN_AGENT_COUNT_PRESETS.high) {
+    return count
+  }
+
+  return undefined
+}
+
 export function getPlanModeV2AgentCount(): number {
-  // Environment variable override takes precedence
-  if (process.env.CLAUDE_CODE_PLAN_V2_AGENT_COUNT) {
-    const count = parseInt(process.env.CLAUDE_CODE_PLAN_V2_AGENT_COUNT, 10)
-    if (!isNaN(count) && count > 0 && count <= 10) {
-      return count
-    }
-  }
-
-  const subscriptionType = getSubscriptionType()
-  const rateLimitTier = getRateLimitTier()
-
-  if (
-    subscriptionType === 'max' &&
-    rateLimitTier === 'default_claude_max_20x'
-  ) {
-    return 3
-  }
-
-  if (subscriptionType === 'enterprise' || subscriptionType === 'team') {
-    return 3
-  }
-
-  return 1
+  return (
+    parsePlanAgentCount(process.env.CLAUDE_CODE_PLAN_V2_AGENT_COUNT) ??
+    PLAN_AGENT_COUNT_PRESETS.default
+  )
 }
 
 export function getPlanModeV2ExploreAgentCount(): number {
-  if (process.env.CLAUDE_CODE_PLAN_V2_EXPLORE_AGENT_COUNT) {
-    const count = parseInt(
-      process.env.CLAUDE_CODE_PLAN_V2_EXPLORE_AGENT_COUNT,
-      10,
-    )
-    if (!isNaN(count) && count > 0 && count <= 10) {
-      return count
-    }
-  }
-
-  return 3
+  return (
+    parsePlanAgentCount(process.env.CLAUDE_CODE_PLAN_V2_EXPLORE_AGENT_COUNT) ??
+    PLAN_AGENT_COUNT_PRESETS.default
+  )
 }
 
 /**

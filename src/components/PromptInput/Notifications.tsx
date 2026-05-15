@@ -254,7 +254,7 @@ function NotificationContent({
           <Text color="error" wrap="truncate">
             {isEnvTruthy(process.env.CLAUDE_CODE_REMOTE)
               ? 'Authentication error · Try again'
-              : 'Not logged in · Run /login'}
+              : 'Not authenticated · Configure provider credentials'}
           </Text>
         </Box>
       )}

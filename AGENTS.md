@@ -6,6 +6,13 @@ This file provides guidance to Claude Code (claude.ai/code) and other AI coding 
 
 This is a **reverse-engineered / decompiled** version of Anthropic's official Claude Code CLI tool. The goal is to restore core functionality while trimming secondary capabilities. Many modules are stubbed or feature-flagged off. TypeScript strict mode is enforced — **`bunx tsc --noEmit` must pass with zero errors**.
 
+## Progress Report Requirement
+
+- 根目录 `deepcode-deepseek-gap.html` 是当前实现差距和进度状态的固定看板。任何 agent 完成代码、配置、测试、功能边界或风险状态变更后，必须同步更新 `deepcode-deepseek-gap.html`。
+- `deepcode-deepseek-gap.html` 至少保持这些信息最新：本轮目标、已完成改动、验证命令和结果、主要影响文件、剩余风险、建议下一步。
+- 如果新增专题报告或长期决策页，同时更新根目录 `index.html` 的跳转；但 `deepcode-deepseek-gap.html` 仍然是默认查看进度的入口。
+- 不要只在聊天里说明进度，也不要只更新 markdown；用户需要通过浏览器打开 `deepcode-deepseek-gap.html` 直接看到当前状态。
+
 ## Git Commit Message Convention
 
 使用 **Conventional Commits** 规范：
@@ -117,8 +124,8 @@ bun run docs:dev
 ### Tool System
 
 - **`src/Tool.ts`** — Tool interface definition (`Tool` type) and utilities (`findToolByName`, `toolMatchesName`).
-- **`src/tools.ts`** — Tool registry. Assembles the tool list; tools are imported from `@claude-code-best/builtin-tools` package. Some tools are conditionally loaded via `feature()` flags or `process.env.USER_TYPE`.
-- **`packages/builtin-tools/src/tools/`** — 59 个子目录（含 shared/testing 等工具目录），通过 `@claude-code-best/builtin-tools` 包导出。主要分类：
+- **`src/tools.ts`** — Tool registry. Assembles the tool list; tools are imported from `@deepcode/builtin-tools` package. Some tools are conditionally loaded via `feature()` flags or `process.env.USER_TYPE`.
+- **`packages/builtin-tools/src/tools/`** — 59 个子目录（含 shared/testing 等工具目录），通过 `@deepcode/builtin-tools` 包导出。主要分类：
   - **文件操作**: FileEditTool, FileReadTool, FileWriteTool, GlobTool, GrepTool
   - **Shell/执行**: BashTool, PowerShellTool, REPLTool
   - **Agent 系统**: AgentTool, TaskCreateTool, TaskUpdateTool, TaskListTool, TaskGetTool
@@ -158,7 +165,7 @@ bun run docs:dev
 | `packages/@ant/computer-use-swift/` | 截图 + 应用管理（dispatcher + per-platform backend） |
 | `packages/@ant/claude-for-chrome-mcp/` | Chrome 浏览器控制（通过 `--chrome` 启用） |
 | `packages/@ant/model-provider/` | Model provider 抽象层 |
-| `packages/builtin-tools/` | 内置工具集（60 个 tool 实现，通过 `@claude-code-best/builtin-tools` 导出） |
+| `packages/builtin-tools/` | 内置工具集（60 个 tool 实现，通过 `@deepcode/builtin-tools` 导出） |
 | `packages/agent-tools/` | Agent 工具集 |
 | `packages/acp-link/` | ACP 代理服务器（WebSocket → ACP agent 桥接） |
 | `packages/cc-knowledge/` | Claude Code 知识库（非 workspace 包） |
