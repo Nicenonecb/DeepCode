@@ -19,6 +19,7 @@ import type {
   AssistantMessage,
   StreamEvent,
 } from '../../../../types/message.js'
+import { join } from 'path'
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -130,6 +131,11 @@ async function* eventStream(events: BetaRawMessageStreamEvent[]) {
 async function runQueryModel(
   events: BetaRawMessageStreamEvent[],
   envOverrides: Record<string, string | undefined> = {},
+  optionOverrides: Record<string, any> = {},
+  thinkingConfig?: {
+    type: 'adaptive' | 'disabled' | 'enabled'
+    budgetTokens?: number
+  },
 ) {
   // Wire events into the mocked stream adapter
   _nextEvents = events
@@ -163,6 +169,7 @@ async function runQueryModel(
         mode: 'default',
         isBypassingPermissions: false,
       }),
+      ...optionOverrides,
     }
 
     for await (const item of queryModelOpenAI(
@@ -171,6 +178,7 @@ async function runQueryModel(
       [],
       new AbortController().signal,
       minimalOptions,
+      thinkingConfig as any,
     )) {
       if (item.type === 'assistant') {
         assistantMessages.push(item as AssistantMessage)
@@ -223,19 +231,41 @@ mock.module('@ant/model-provider', () => ({
 }))
 
 mock.module('../../../../utils/envUtils.js', () => ({
+  getClaudeConfigHomeDir: () => join(process.cwd(), '.test-claude'),
+  getTeamsDir: () => join(process.cwd(), '.test-claude', 'teams'),
+  hasNodeOption: () => false,
   isEnvTruthy: (value: string | undefined) =>
     value === '1' || value === 'true' || value === 'yes' || value === 'on',
   isEnvDefinedFalsy: (value: string | undefined) =>
     value === '0' || value === 'false' || value === 'no' || value === 'off',
+  isBareMode: () => false,
+  isRunningOnHomespace: () => false,
+  isInProtectedNamespace: () => false,
+  getAWSRegion: () => 'us-east-1',
+  getDefaultVertexRegion: () => 'us-east5',
+  getVertexRegionForModel: () => 'us-east5',
+  shouldMaintainProjectWorkingDir: () => false,
+  parseEnvVars: () => ({}),
 }))
 
 mock.module('../../../../services/analytics/growthbook.js', () => ({
   getFeatureValue_CACHED_MAY_BE_STALE: (_key: string, fallback: unknown) =>
     fallback,
+  getFeatureValue_CACHED_WITH_REFRESH: async (
+    _key: string,
+    fallback: unknown,
+  ) => fallback,
+  checkStatsigFeatureGate_CACHED_MAY_BE_STALE: () => false,
+  getDynamicConfig_CACHED_MAY_BE_STALE: <T>(_key: string, fallback: T) =>
+    fallback,
 }))
 
-mock.module('src/bootstrap/state.js', () => ({
-  isReplBridgeActive: () => false,
+mock.module('../../../deepseek/config.js', () => ({
+  DEEPSEEK_DEFAULT_BASE_URL: 'https://api.deepseek.com/v1',
+  DEEPSEEK_DEFAULT_MODEL: 'deepseek-v4-pro',
+  getStoredDeepSeekConfig: () => ({}),
+  hasStoredDeepSeekApiKey: () => false,
+  hasStoredDeepSeekConfig: () => false,
 }))
 
 mock.module('bun:bundle', () => ({
@@ -349,6 +379,11 @@ mock.module('../../../../utils/modelCost.js', () => ({
 
 mock.module('../../../../services/langfuse/tracing.js', () => ({
   recordLLMObservation: () => {},
+}))
+
+mock.module('../../../../services/analytics/index.js', () => ({
+  logEvent: () => {},
+  logEventAsync: async () => {},
 }))
 
 mock.module('../../../../services/langfuse/convert.js', () => ({
@@ -601,6 +636,36 @@ describe('queryModelOpenAI — max_tokens forwarded to request', () => {
 
     expect(_lastCreateArgs).not.toBeNull()
     expect(_lastCreateArgs!.max_tokens).toBe(8192)
+  })
+})
+
+describe('queryModelOpenAI — DeepSeek non-think path', () => {
+  test('turn-level disabled thinking forces V4 Pro onto non-think request body', async () => {
+    _nextEvents = [
+      makeMessageStart(),
+      makeContentBlockStart(0, 'text'),
+      makeTextDelta(0, 'hi'),
+      makeContentBlockStop(0),
+      makeMessageDelta('end_turn', 5),
+      makeMessageStop(),
+    ]
+
+    await runQueryModel(
+      _nextEvents,
+      {
+        OPENAI_MODEL: 'deepseek-v4-pro',
+        OPENAI_BASE_URL: 'https://api.deepseek.com/v1',
+      },
+      { model: 'deepseek-v4-pro', effortValue: 'max' },
+      { type: 'disabled' },
+    )
+
+    expect(_lastCreateArgs).not.toBeNull()
+    expect(_lastCreateArgs!.max_tokens).toBe(8192)
+    expect(_lastCreateArgs!.thinking).toBeUndefined()
+    expect(_lastCreateArgs!.reasoning_effort).toBeUndefined()
+    expect(_lastCreateArgs!.enable_thinking).toBeUndefined()
+    expect(_lastCreateArgs!.chat_template_kwargs).toBeUndefined()
   })
 })
 

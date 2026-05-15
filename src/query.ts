@@ -136,6 +136,7 @@ import {
   type WorkingMemorySettings,
 } from './services/workingMemory/index.js'
 import type { DSMLGatewaySettings } from './services/dsml/index.js'
+import type { DeepSeekEffortBudgetSettings } from './services/deepseek/modelProfiles.js'
 import type { ToolCallRepairIssue } from './services/toolRepair/types.js'
 import { runPatchSearchForHighRiskContext } from './services/patchSearch/PatchSearchIntegration.js'
 import { getCwd } from './utils/cwd.js'
@@ -1130,6 +1131,9 @@ async function* queryLoop(
                   | DSMLGatewaySettings
                   | undefined,
               ),
+              deepSeekEffortBudgets: appState.settings.deepSeekEffortBudgets as
+                | DeepSeekEffortBudgetSettings
+                | undefined,
               addNotification: toolUseContext.addNotification,
               ...(params.taskBudget && {
                 taskBudget: {
@@ -1987,6 +1991,20 @@ async function* queryLoop(
     }
     queryCheckpoint('query_tool_execution_end')
 
+    const dsmlToolUseIds = toolUseBlocks
+      .map(block => block.id)
+      .filter(id => id.startsWith('toolu_dsml_'))
+    if (dsmlToolUseIds.length > 0) {
+      const dsmlSucceeded = dsmlToolUseIds.filter(id =>
+        successfulToolUseIds.has(id),
+      ).length
+      logEvent('tengu_dsml_gateway_tool_results', {
+        tool_count: dsmlToolUseIds.length,
+        success_count: dsmlSucceeded,
+        error_count: dsmlToolUseIds.length - dsmlSucceeded,
+      })
+    }
+
     // Generate tool use summary after tool batch completes — passed to next recursive call
     let nextPendingToolUseSummary:
       | Promise<ToolUseSummaryMessage | null>
@@ -2407,6 +2425,7 @@ async function buildContextPackedMessages(
 function resolveDSMLGatewaySettings(
   settings: DSMLGatewaySettings | undefined,
 ): DSMLGatewaySettings | undefined {
+  if (settings?.enabled === false) return settings
   if (feature('DSML_GATEWAY')) {
     return {
       ...settings,

@@ -1,4 +1,5 @@
 import type { CompatRule } from './types.js'
+import type { DeepSeekToolProtocol } from '../deepseek/modelProfiles.js'
 
 /**
  * Per-provider OpenAI-compat field whitelist.
@@ -38,6 +39,11 @@ export interface CompatProfile {
    * 'openai-v2' = standard OpenAI function-calling schema
    */
   toolCallFormat: 'openai-v2'
+
+  /**
+   * Tool protocols known to be accepted by this provider profile.
+   */
+  toolProtocols: readonly DeepSeekToolProtocol[]
 }
 
 export const COMPAT_PROFILES: Record<CompatRule, CompatProfile> = {
@@ -46,12 +52,14 @@ export const COMPAT_PROFILES: Record<CompatRule, CompatProfile> = {
     supportsThinkingField: false,
     reasoningContentEcho: 'strip',
     toolCallFormat: 'openai-v2',
+    toolProtocols: ['openai-tools'],
   },
   groq: {
     supportsStreamUsageOption: false,
     supportsThinkingField: false,
     reasoningContentEcho: 'strip',
     toolCallFormat: 'openai-v2',
+    toolProtocols: ['openai-tools'],
   },
   deepseek: {
     // DeepSeek-reasoner supports reasoning_content and the thinking field.
@@ -60,18 +68,21 @@ export const COMPAT_PROFILES: Record<CompatRule, CompatProfile> = {
     supportsThinkingField: true,
     reasoningContentEcho: 'always-preserve',
     toolCallFormat: 'openai-v2',
+    toolProtocols: ['dsml', 'openai-tools'],
   },
   'strict-openai': {
     supportsStreamUsageOption: false,
     supportsThinkingField: false,
     reasoningContentEcho: 'strip',
     toolCallFormat: 'openai-v2',
+    toolProtocols: ['openai-tools'],
   },
   permissive: {
     supportsStreamUsageOption: true,
     supportsThinkingField: true,
     reasoningContentEcho: 'drop-on-non-thinking',
     toolCallFormat: 'openai-v2',
+    toolProtocols: ['openai-tools'],
   },
 }
 

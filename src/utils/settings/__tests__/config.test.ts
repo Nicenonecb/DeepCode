@@ -46,6 +46,34 @@ describe('SettingsSchema', () => {
         routes: {
           explain: { model: 'haiku', effort: 'low' },
           bugfix: { model: 'opus', effort: 'high' },
+          complex: { thinking: 'enabled' },
+        },
+      },
+    })
+
+    expect(result.success).toBe(true)
+  })
+
+  test('accepts DeepSeek effort budget settings', () => {
+    const result = SettingsSchema().safeParse({
+      deepSeekEffortBudgets: {
+        nonThink: {
+          maxOutputTokens: 16_000,
+          maxReasoningTokens: 0,
+          maxContextTokens: 64_000,
+          contextWatermark: 0.2,
+        },
+        high: {
+          maxOutputTokens: 64_000,
+          maxReasoningTokens: 64_000,
+          maxContextTokens: 512_000,
+          contextWatermark: 0.6,
+        },
+        max: {
+          maxOutputTokens: 384_000,
+          maxReasoningTokens: 256_000,
+          maxContextTokens: 800_000,
+          contextWatermark: 0.8,
         },
       },
     })

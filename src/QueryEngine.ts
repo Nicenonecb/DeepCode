@@ -392,6 +392,7 @@ export class QueryEngine {
       allowedTools,
       model: modelFromUserInput,
       effort: effortFromUserInput,
+      thinkingConfig: thinkingConfigFromUserInput,
       resultText,
     } = await processUserInput({
       input: prompt,
@@ -474,6 +475,8 @@ export class QueryEngine {
             effortValue: effortFromUserInput,
           })
         : getAppState
+    const queryThinkingConfig =
+      thinkingConfigFromUserInput ?? initialThinkingConfig
 
     // Recreate after processing the prompt to pick up updated messages and
     // model (from slash commands).
@@ -488,7 +491,7 @@ export class QueryEngine {
         tools,
         verbose,
         mainLoopModel,
-        thinkingConfig: initialThinkingConfig,
+        thinkingConfig: queryThinkingConfig,
         mcpClients,
         mcpResources: {},
         ideInstallationStatus: null,

@@ -68,6 +68,7 @@ describe('processUserInput task-aware routing', () => {
 
     expect(result.model).toBe(parseUserSpecifiedModel('haiku'))
     expect(result.effort).toBe('low')
+    expect(result.thinkingConfig).toEqual({ type: 'disabled' })
   })
 
   test('preserves explicit model and only patches effort', async () => {
@@ -97,7 +98,7 @@ describe('processUserInput task-aware routing', () => {
   test('does not patch unrelated prompts', async () => {
     const result = applyTaskAwareModelRoute(
       { messages: [], shouldQuery: true },
-      '继续',
+      '随便弄一下',
       makeContext(),
       DEFAULT_TASK_AWARE_MODEL_ROUTING_CONFIG,
     )

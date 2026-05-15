@@ -5,13 +5,45 @@ export type DeepSeekModelId =
   | 'deepseek-v4-flash'
   | 'deepseek-v3.2'
 
-export type DeepSeekToolProtocol = 'openai-tools'
+export type DeepSeekToolProtocol = 'dsml' | 'openai-tools'
+
+export type DeepSeekToolProtocolProfile = {
+  preferred: DeepSeekToolProtocol
+  fallbacks: readonly DeepSeekToolProtocol[]
+}
+
+export type DeepSeekReasoningEffort = 'high' | 'max'
+
+export type DeepSeekEffortTier = 'non-think' | 'high' | 'max'
+
+export type DeepSeekEffortProfile = {
+  tier: DeepSeekEffortTier
+  thinkingEnabled: boolean
+  reasoningEffort?: DeepSeekReasoningEffort
+  maxOutputTokens: number
+  maxReasoningTokens: number
+  maxContextTokens: number
+  contextWatermark: number
+  defaultUseCase: string
+}
+
+export type DeepSeekEffortBudgetOverride = {
+  maxOutputTokens?: number
+  maxReasoningTokens?: number
+  maxContextTokens?: number
+  contextWatermark?: number
+}
+
+export type DeepSeekEffortBudgetSettings = Partial<
+  Record<DeepSeekEffortTier | 'nonThink', DeepSeekEffortBudgetOverride>
+>
 
 export type DeepSeekThinkingMode = {
   supported: boolean
   defaultEnabled: boolean
-  defaultEffort?: Extract<EffortLevel, 'high' | 'max'>
-  supportedEfforts: readonly Extract<EffortLevel, 'high' | 'max'>[]
+  defaultEffort?: EffortLevel
+  supportedEfforts: readonly EffortLevel[]
+  effortProfiles?: Partial<Record<DeepSeekEffortTier, DeepSeekEffortProfile>>
 }
 
 export type DeepSeekPricing = {
@@ -44,7 +76,7 @@ export type DeepSeekModelProfile = {
   maxOutputTokens: number
   maxCoTTokens?: number
   thinking: DeepSeekThinkingMode
-  toolProtocol: DeepSeekToolProtocol
+  toolProtocol: DeepSeekToolProtocolProfile
   pricing: DeepSeekPricing
   defaultStrategy: DeepSeekDefaultStrategy
 }
@@ -74,9 +106,46 @@ export const DEEPSEEK_MODEL_PROFILES: Record<
       supported: true,
       defaultEnabled: true,
       defaultEffort: 'max',
-      supportedEfforts: ['high', 'max'],
+      supportedEfforts: ['low', 'medium', 'high', 'xhigh', 'max'],
+      effortProfiles: {
+        'non-think': {
+          tier: 'non-think',
+          thinkingEnabled: false,
+          maxOutputTokens: 16_000,
+          maxReasoningTokens: 0,
+          maxContextTokens: 64_000,
+          contextWatermark: 0.2,
+          defaultUseCase:
+            'Small edits, direct command answers, concise chat, and tasks where the user explicitly asks for low or medium effort.',
+        },
+        high: {
+          tier: 'high',
+          thinkingEnabled: true,
+          reasoningEffort: 'high',
+          maxOutputTokens: 64_000,
+          maxReasoningTokens: 64_000,
+          maxContextTokens: 512_000,
+          contextWatermark: 0.6,
+          defaultUseCase:
+            'Normal coding turns, tool planning, debugging, and multi-file work that needs reasoning without the full Max budget.',
+        },
+        max: {
+          tier: 'max',
+          thinkingEnabled: true,
+          reasoningEffort: 'max',
+          maxOutputTokens: 384_000,
+          maxReasoningTokens: 256_000,
+          maxContextTokens: 800_000,
+          contextWatermark: 0.8,
+          defaultUseCase:
+            'Large refactors, ambiguous investigations, deep design work, long-context synthesis, and explicit Max requests.',
+        },
+      },
     },
-    toolProtocol: 'openai-tools',
+    toolProtocol: {
+      preferred: 'dsml',
+      fallbacks: ['openai-tools'],
+    },
     pricing: {
       currency: 'USD',
       unit: 'MTok',
@@ -108,7 +177,10 @@ export const DEEPSEEK_MODEL_PROFILES: Record<
       defaultEffort: 'high',
       supportedEfforts: ['high', 'max'],
     },
-    toolProtocol: 'openai-tools',
+    toolProtocol: {
+      preferred: 'openai-tools',
+      fallbacks: [],
+    },
     pricing: {
       currency: 'USD',
       unit: 'MTok',
@@ -140,7 +212,10 @@ export const DEEPSEEK_MODEL_PROFILES: Record<
       defaultEffort: 'high',
       supportedEfforts: ['high', 'max'],
     },
-    toolProtocol: 'openai-tools',
+    toolProtocol: {
+      preferred: 'openai-tools',
+      fallbacks: [],
+    },
     pricing: {
       currency: 'USD',
       unit: 'MTok',
@@ -225,22 +300,180 @@ export function getDeepSeekThinkingDefault(model: string): boolean {
   return match.profile.thinking.defaultEnabled
 }
 
-export function resolveDeepSeekReasoningEffort(
+export function getDeepSeekToolProtocolProfile(
+  model: string,
+): DeepSeekToolProtocolProfile | undefined {
+  return getDeepSeekModelProfile(model)?.toolProtocol
+}
+
+function resolveDeepSeekEffortTier(
+  profile: DeepSeekModelProfile,
+  effortValue?: unknown,
+): DeepSeekEffortTier | undefined {
+  if (effortValue === 'low' || effortValue === 'medium') return 'non-think'
+  if (effortValue === 'high' || typeof effortValue === 'number') return 'high'
+  if (effortValue === 'max' || effortValue === 'xhigh') return 'max'
+
+  const defaultEffort = profile.thinking.defaultEffort
+  if (defaultEffort === 'low' || defaultEffort === 'medium') {
+    return 'non-think'
+  }
+  if (defaultEffort === 'high') return 'high'
+  if (defaultEffort === 'max' || defaultEffort === 'xhigh') return 'max'
+
+  return profile.thinking.defaultEnabled ? 'high' : 'non-think'
+}
+
+export function resolveDeepSeekEffortProfile(
   model: string,
   effortValue?: unknown,
-): 'high' | 'max' | undefined {
+): DeepSeekEffortProfile | undefined {
   const profile = getDeepSeekModelProfile(model)
   if (!profile?.thinking.supported) return undefined
 
-  if (effortValue === 'max' || effortValue === 'xhigh') return 'max'
-  if (
-    effortValue === 'low' ||
-    effortValue === 'medium' ||
-    effortValue === 'high' ||
-    typeof effortValue === 'number'
-  ) {
-    return 'high'
+  const effortProfiles = profile.thinking.effortProfiles
+  if (!effortProfiles) return undefined
+
+  const tier = resolveDeepSeekEffortTier(profile, effortValue)
+  return tier ? effortProfiles[tier] : undefined
+}
+
+export function resolveDeepSeekRequestEffortProfile(
+  model: string,
+  effortValue?: unknown,
+  budgetSettings?: DeepSeekEffortBudgetSettings,
+): DeepSeekEffortProfile | undefined {
+  const profile = resolveDeepSeekEffortProfile(model, effortValue)
+  if (!profile) return undefined
+
+  const override = {
+    ...getSettingsBudgetOverride(profile.tier, budgetSettings),
+    ...getEnvBudgetOverride(profile.tier),
   }
 
-  return profile.thinking.defaultEffort
+  return applyBudgetOverride(profile, override)
+}
+
+function getSettingsBudgetOverride(
+  tier: DeepSeekEffortTier,
+  budgetSettings?: DeepSeekEffortBudgetSettings,
+): DeepSeekEffortBudgetOverride {
+  if (!budgetSettings) return {}
+  return {
+    ...(tier === 'non-think' ? budgetSettings.nonThink : undefined),
+    ...budgetSettings[tier],
+  }
+}
+
+function getEnvBudgetOverride(
+  tier: DeepSeekEffortTier,
+): DeepSeekEffortBudgetOverride {
+  const prefixByTier: Record<DeepSeekEffortTier, string> = {
+    'non-think': 'DEEPSEEK_V4_PRO_NON_THINK',
+    high: 'DEEPSEEK_V4_PRO_HIGH',
+    max: 'DEEPSEEK_V4_PRO_MAX',
+  }
+  const prefix = prefixByTier[tier]
+  return compactBudgetOverride({
+    maxOutputTokens: parsePositiveIntegerEnv(`${prefix}_MAX_OUTPUT_TOKENS`),
+    maxReasoningTokens: parseNonNegativeIntegerEnv(
+      `${prefix}_MAX_REASONING_TOKENS`,
+    ),
+    maxContextTokens: parsePositiveIntegerEnv(`${prefix}_MAX_CONTEXT_TOKENS`),
+    contextWatermark: parseWatermarkEnv(`${prefix}_CONTEXT_WATERMARK`),
+  })
+}
+
+function compactBudgetOverride(
+  override: DeepSeekEffortBudgetOverride,
+): DeepSeekEffortBudgetOverride {
+  return Object.fromEntries(
+    Object.entries(override).filter(([, value]) => value !== undefined),
+  ) as DeepSeekEffortBudgetOverride
+}
+
+function applyBudgetOverride(
+  profile: DeepSeekEffortProfile,
+  override: DeepSeekEffortBudgetOverride,
+): DeepSeekEffortProfile {
+  const maxOutputTokens =
+    positiveIntegerOrUndefined(override.maxOutputTokens) ??
+    profile.maxOutputTokens
+  const maxReasoningTokens =
+    nonNegativeIntegerOrUndefined(override.maxReasoningTokens) ??
+    profile.maxReasoningTokens
+  const maxContextTokens =
+    positiveIntegerOrUndefined(override.maxContextTokens) ??
+    profile.maxContextTokens
+  const contextWatermark =
+    watermarkOrUndefined(override.contextWatermark) ?? profile.contextWatermark
+
+  return {
+    ...profile,
+    maxOutputTokens,
+    maxReasoningTokens,
+    maxContextTokens,
+    contextWatermark,
+  }
+}
+
+function parsePositiveIntegerEnv(key: string): number | undefined {
+  return positiveIntegerOrUndefined(parseEnvNumber(key))
+}
+
+function parseNonNegativeIntegerEnv(key: string): number | undefined {
+  return nonNegativeIntegerOrUndefined(parseEnvNumber(key))
+}
+
+function parseWatermarkEnv(key: string): number | undefined {
+  return watermarkOrUndefined(parseEnvNumber(key))
+}
+
+function parseEnvNumber(key: string): number | undefined {
+  const rawValue = process.env[key]
+  if (!rawValue) return undefined
+  const value = Number(rawValue)
+  return Number.isFinite(value) ? value : undefined
+}
+
+function positiveIntegerOrUndefined(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isInteger(value) && value > 0
+    ? value
+    : undefined
+}
+
+function nonNegativeIntegerOrUndefined(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0
+    ? value
+    : undefined
+}
+
+function watermarkOrUndefined(value: unknown): number | undefined {
+  return typeof value === 'number' && value > 0 && value <= 1
+    ? value
+    : undefined
+}
+
+function toDeepSeekReasoningEffort(
+  effort?: unknown,
+): DeepSeekReasoningEffort | undefined {
+  if (effort === 'max' || effort === 'xhigh') return 'max'
+  if (effort === 'high' || typeof effort === 'number') return 'high'
+  return undefined
+}
+
+export function resolveDeepSeekReasoningEffort(
+  model: string,
+  effortValue?: unknown,
+): DeepSeekReasoningEffort | undefined {
+  const effortProfile = resolveDeepSeekEffortProfile(model, effortValue)
+  if (effortProfile) return effortProfile.reasoningEffort
+
+  const profile = getDeepSeekModelProfile(model)
+  if (!profile?.thinking.supported) return undefined
+
+  return (
+    toDeepSeekReasoningEffort(effortValue) ??
+    toDeepSeekReasoningEffort(profile.thinking.defaultEffort)
+  )
 }

@@ -1,0 +1,126 @@
+{
+  "id": "deepseek-effort-smoke",
+  "dataset": {
+    "id": "deepseek-v4-pro-effort-routing",
+    "name": "DeepSeek V4 Pro effort routing smoke",
+    "description": "Dry-run benchmark fixture that exercises Non-think, High, and Max request profiles for provider-facing evidence.",
+    "version": "1",
+    "tasks": [
+      {
+        "id": "non-think-direct-answer",
+        "title": "Non-think direct answer",
+        "prompt": "Answer in one sentence: what file owns DeepSeek V4 Pro request profiles?",
+        "category": "routing",
+        "difficulty": "easy",
+        "tags": ["deepseek", "non-think", "effort"],
+        "targetFiles": [
+          {
+            "path": "src/services/deepseek/modelProfiles.ts",
+            "required": true
+          }
+        ],
+        "metadata": {
+          "expectedEffortTier": "non-think",
+          "expectedThinking": "disabled"
+        },
+        "expectedOutcome": {
+          "summary": "Small direct-answer prompts are eligible for the non-think path without sending thinking fields.",
+          "requiredFiles": ["src/services/deepseek/modelProfiles.ts"],
+          "assertions": [
+            "No thinking, reasoning_effort, enable_thinking, or chat_template_kwargs fields are required for the request.",
+            "Temperature and short-output strategy remain available."
+          ],
+          "verificationCommands": [
+            "bun test src/services/api/openai/__tests__/thinking.test.ts"
+          ]
+        }
+      },
+      {
+        "id": "high-normal-coding",
+        "title": "High normal coding turn",
+        "prompt": "Patch the DeepSeek profile tests so high effort proves its output, reasoning, context, and watermark budgets.",
+        "category": "test",
+        "difficulty": "medium",
+        "tags": ["deepseek", "high", "effort"],
+        "targetFiles": [
+          {
+            "path": "src/services/deepseek/__tests__/modelProfiles.test.ts",
+            "required": true
+          }
+        ],
+        "metadata": {
+          "expectedEffortTier": "high",
+          "expectedThinking": "enabled",
+          "expectedReasoningEffort": "high"
+        },
+        "expectedOutcome": {
+          "summary": "High effort uses bounded thinking for normal coding turns.",
+          "requiredFiles": [
+            "src/services/deepseek/modelProfiles.ts",
+            "src/services/deepseek/__tests__/modelProfiles.test.ts"
+          ],
+          "assertions": [
+            "High effort maps to reasoning_effort=high.",
+            "High effort clamps final output below Max."
+          ],
+          "verificationCommands": [
+            "bun test src/services/deepseek/__tests__/modelProfiles.test.ts"
+          ]
+        }
+      },
+      {
+        "id": "max-prompt-pressure-test",
+        "title": "Max prompt pressure test",
+        "prompt": "Implement a DeepSeek V4 Pro Max-only prompt injector that decomposes the task, pressure-tests assumptions, and handles concise user requests.",
+        "category": "feature",
+        "difficulty": "hard",
+        "tags": ["deepseek", "max", "prompt-injector"],
+        "targetFiles": [
+          {
+            "path": "src/services/deepseek/maxPrompt.ts",
+            "required": true
+          }
+        ],
+        "metadata": {
+          "expectedEffortTier": "max",
+          "expectedThinking": "enabled",
+          "expectedReasoningEffort": "max"
+        },
+        "expectedOutcome": {
+          "summary": "Max effort injects a DeepSeek-specific system patch and records conflict policy evidence.",
+          "requiredFiles": [
+            "src/services/deepseek/maxPrompt.ts",
+            "src/services/deepseek/__tests__/maxPrompt.test.ts"
+          ],
+          "assertions": [
+            "Prompt patch is gated to DeepSeek V4 Pro Max.",
+            "Concise requests keep final output concise while preserving internal pressure testing."
+          ],
+          "verificationCommands": [
+            "bun test src/services/deepseek/__tests__/maxPrompt.test.ts"
+          ]
+        }
+      }
+    ]
+  },
+  "candidates": [
+    {
+      "id": "deepseek-v4-pro-non-think",
+      "label": "DeepSeek V4 Pro Non-think",
+      "kind": "cli",
+      "command": "deepcode --model deepseek-v4-pro --thinking disabled"
+    },
+    {
+      "id": "deepseek-v4-pro-high",
+      "label": "DeepSeek V4 Pro High",
+      "kind": "cli",
+      "command": "deepcode --model deepseek-v4-pro --effort high"
+    },
+    {
+      "id": "deepseek-v4-pro-max",
+      "label": "DeepSeek V4 Pro Max",
+      "kind": "cli",
+      "command": "deepcode --model deepseek-v4-pro --effort max"
+    }
+  ]
+}

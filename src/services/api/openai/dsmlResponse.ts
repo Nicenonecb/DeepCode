@@ -17,18 +17,27 @@ export type DSMLResponseGatewayResult = {
   contentBlocks: BetaMessage['content']
   hasToolUse: boolean
   fellBackToText: boolean
+  toolUseCount: number
+  parseAttemptCount: number
+  parseErrorCount: number
+  unknownToolCount: number
 }
 
 export function applyDSMLResponseGateway(params: {
   contentBlocks: BetaMessage['content']
   settings: DSMLGatewaySettings | undefined
   createToolUseId: (toolName: string, index: number) => string
+  knownToolNames?: ReadonlySet<string>
 }): DSMLResponseGatewayResult {
   if (params.settings?.enabled !== true) {
     return {
       contentBlocks: params.contentBlocks,
       hasToolUse: false,
       fellBackToText: false,
+      toolUseCount: 0,
+      parseAttemptCount: 0,
+      parseErrorCount: 0,
+      unknownToolCount: 0,
     }
   }
 
@@ -36,6 +45,9 @@ export function applyDSMLResponseGateway(params: {
   let toolUseCount = 0
   let hasToolUse = false
   let fellBackToText = false
+  let parseAttemptCount = 0
+  let parseErrorCount = 0
+  let unknownToolCount = 0
 
   for (const block of params.contentBlocks) {
     if (!isTextBlock(block)) {
@@ -44,8 +56,15 @@ export function applyDSMLResponseGateway(params: {
     }
 
     const parsed = parseDSMLToolCalls(block.text)
-    if (!parsed || parsed.toolCalls.length === 0) {
+    if (!parsed) {
       transformedBlocks.push(block)
+      continue
+    }
+    parseAttemptCount++
+    parseErrorCount += parsed.errors.length
+    if (parsed.toolCalls.length === 0) {
+      transformedBlocks.push(block)
+      fellBackToText = parsed.errors.length > 0
       continue
     }
     if (
@@ -62,6 +81,15 @@ export function applyDSMLResponseGateway(params: {
     }
 
     for (const toolCall of parsed.toolCalls) {
+      if (params.knownToolNames && !params.knownToolNames.has(toolCall.name)) {
+        transformedBlocks.push({
+          ...block,
+          text: toolCall.raw ?? parsed.raw,
+        })
+        unknownToolCount++
+        fellBackToText = true
+        continue
+      }
       transformedBlocks.push({
         type: 'tool_use',
         id: params.createToolUseId(toolCall.name, toolUseCount),
@@ -69,19 +97,22 @@ export function applyDSMLResponseGateway(params: {
         input: toolCall.input,
       } satisfies ToolUseBlock)
       toolUseCount++
+      hasToolUse = true
     }
 
     if (parsed.suffix.trim().length > 0) {
       transformedBlocks.push({ ...block, text: parsed.suffix })
     }
-
-    hasToolUse = true
   }
 
   return {
     contentBlocks: transformedBlocks,
     hasToolUse,
     fellBackToText,
+    toolUseCount,
+    parseAttemptCount,
+    parseErrorCount,
+    unknownToolCount,
   }
 }
 

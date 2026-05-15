@@ -295,6 +295,12 @@ function getNextImagePasteId(messages: Message[]): number {
   return maxId + 1
 }
 
+function observeToolStat(name: string, value: number): void {
+  const store = getStatsStore()
+  if (typeof store?.observe !== 'function') return
+  store.observe(name, value)
+}
+
 export type MessageUpdateLazy<M extends Message = Message> = {
   message: M
   contextModifier?: {
@@ -964,7 +970,7 @@ async function checkPermissionsAndCallTool(
         resultingMessages.push(result.message)
         break
       case 'stop':
-        getStatsStore()?.observe(
+        observeToolStat(
           'pre_tool_hook_duration_ms',
           Date.now() - preToolHookStart,
         )
@@ -979,7 +985,7 @@ async function checkPermissionsAndCallTool(
     }
   }
   const preToolHookDurationMs = Date.now() - preToolHookStart
-  getStatsStore()?.observe('pre_tool_hook_duration_ms', preToolHookDurationMs)
+  observeToolStat('pre_tool_hook_duration_ms', preToolHookDurationMs)
   if (preToolHookDurationMs >= SLOW_PHASE_LOG_THRESHOLD_MS) {
     logForDebugging(
       `Slow PreToolUse hooks: ${preToolHookDurationMs}ms for ${tool.name} (${preToolHookInfos.length} hooks)`,

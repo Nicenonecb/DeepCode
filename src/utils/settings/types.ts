@@ -94,6 +94,12 @@ export const TaskAwareModelRouteSettingsSchema = lazySchema(() =>
         )
         .optional()
         .describe('Reasoning effort to use when this task route matches.'),
+      thinking: z
+        .enum(['enabled', 'disabled'])
+        .optional()
+        .describe(
+          'Thinking mode to use when this task route matches. Use disabled for first-class non-think routes.',
+        ),
     })
     .passthrough(),
 )
@@ -217,7 +223,7 @@ export const DSMLGatewaySettingsSchema = lazySchema(() =>
         .boolean()
         .optional()
         .describe(
-          'Whether to serialize OpenAI-compatible tool schemas into a DSML prompt instead of native OpenAI function calling. Defaults to false.',
+          'Whether to serialize OpenAI-compatible tool schemas into a DSML prompt instead of native OpenAI function calling. For DeepSeek V4 Pro on the official DeepSeek endpoint, undefined defaults to DSML; false explicitly falls back to native OpenAI tools.',
         ),
       tagStyle: z
         .enum(['fullwidth', 'ascii'])
@@ -237,6 +243,47 @@ export const DSMLGatewaySettingsSchema = lazySchema(() =>
         .describe(
           'How to handle malformed DSML responses. text keeps the original assistant text; tool_use emits any parseable tool calls.',
         ),
+    })
+    .passthrough(),
+)
+
+const DeepSeekEffortBudgetSchema = lazySchema(() =>
+  z
+    .object({
+      maxOutputTokens: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('Maximum final-output token budget for this effort tier.'),
+      maxReasoningTokens: z
+        .number()
+        .int()
+        .nonnegative()
+        .optional()
+        .describe('Maximum reasoning token budget for this effort tier.'),
+      maxContextTokens: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('Context token cap to target before routing or packing.'),
+      contextWatermark: z
+        .number()
+        .positive()
+        .max(1)
+        .optional()
+        .describe('Context usage watermark ratio from 0 to 1.'),
+    })
+    .passthrough(),
+)
+
+export const DeepSeekEffortBudgetSettingsSchema = lazySchema(() =>
+  z
+    .object({
+      nonThink: DeepSeekEffortBudgetSchema().optional(),
+      high: DeepSeekEffortBudgetSchema().optional(),
+      max: DeepSeekEffortBudgetSchema().optional(),
     })
     .passthrough(),
 )
@@ -602,6 +649,11 @@ export const SettingsSchema = lazySchema(() =>
         .optional()
         .describe(
           'Configure DSML tool protocol serialization for OpenAI-compatible providers.',
+        ),
+      deepSeekEffortBudgets: DeepSeekEffortBudgetSettingsSchema()
+        .optional()
+        .describe(
+          'Override DeepSeek V4 Pro non-think, high, and max context/output/reasoning budgets.',
         ),
       // Whether to automatically approve all MCP servers in the project
       enableAllProjectMcpServers: z

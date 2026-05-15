@@ -6,7 +6,10 @@
 import type { ChatCompletionCreateParamsStreaming } from 'openai/resources/chat/completions/completions.mjs'
 import {
   getDeepSeekThinkingDefault,
+  resolveDeepSeekEffortProfile,
+  resolveDeepSeekRequestEffortProfile,
   resolveDeepSeekReasoningEffort,
+  type DeepSeekEffortBudgetSettings,
 } from '../../deepseek/modelProfiles.js'
 import { isEnvTruthy, isEnvDefinedFalsy } from '../../../utils/envUtils.js'
 
@@ -15,18 +18,28 @@ import { isEnvTruthy, isEnvDefinedFalsy } from '../../../utils/envUtils.js'
  *
  * Enabled when:
  * 1. OPENAI_ENABLE_THINKING=1 is set (explicit enable), OR
- * 2. DeepSeek model profile declares thinking on by default
+ * 2. DeepSeek per-effort profile enables thinking, OR
+ * 3. DeepSeek model profile declares thinking on by default
  *
  * Disabled when:
  * - OPENAI_ENABLE_THINKING=0/false/no/off is explicitly set (overrides model detection)
  *
  * @param model - The resolved OpenAI model name
  */
-export function isOpenAIThinkingEnabled(model: string): boolean {
+export function isOpenAIThinkingEnabled(
+  model: string,
+  effortValue?: unknown,
+): boolean {
   // Explicit disable takes priority (overrides model auto-detect)
   if (isEnvDefinedFalsy(process.env.OPENAI_ENABLE_THINKING)) return false
   // Explicit enable
   if (isEnvTruthy(process.env.OPENAI_ENABLE_THINKING)) return true
+  // Explicit effort should decide the DeepSeek V4 Pro tier. Low/medium are
+  // true non-think tiers, not aliases for high reasoning.
+  if (effortValue !== undefined) {
+    const effortProfile = resolveDeepSeekEffortProfile(model, effortValue)
+    if (effortProfile) return effortProfile.thinkingEnabled
+  }
   // Auto-detect from the DeepSeek model profile.
   return getDeepSeekThinkingDefault(model)
 }
@@ -77,6 +90,7 @@ export function buildOpenAIRequestBody(params: {
   maxTokens: number
   temperatureOverride?: number
   effortValue?: unknown
+  effortBudgetSettings?: DeepSeekEffortBudgetSettings
 }): Omit<ChatCompletionCreateParamsStreaming, 'reasoning_effort'> & {
   thinking?: { type: string }
   reasoning_effort?: 'high' | 'max'
@@ -92,13 +106,23 @@ export function buildOpenAIRequestBody(params: {
     maxTokens,
     temperatureOverride,
   } = params
-  const reasoningEffort = enableThinking
+  const effortProfile = resolveDeepSeekRequestEffortProfile(
+    model,
+    params.effortValue,
+    params.effortBudgetSettings,
+  )
+  const effectiveThinking =
+    enableThinking && (effortProfile?.thinkingEnabled ?? true)
+  const effectiveMaxTokens = effortProfile
+    ? Math.min(maxTokens, effortProfile.maxOutputTokens)
+    : maxTokens
+  const reasoningEffort = effectiveThinking
     ? resolveDeepSeekReasoningEffort(model, params.effortValue)
     : undefined
   return {
     model,
     messages,
-    max_tokens: maxTokens,
+    max_tokens: effectiveMaxTokens,
     ...(tools.length > 0 && {
       tools,
       ...(toolChoice && { tool_choice: toolChoice }),
@@ -107,7 +131,7 @@ export function buildOpenAIRequestBody(params: {
     stream_options: { include_usage: true },
     // DeepSeek thinking mode: enable chain-of-thought output.
     // When active, temperature/top_p/presence_penalty/frequency_penalty are ignored by DeepSeek.
-    ...(enableThinking && {
+    ...(effectiveThinking && {
       // Official DeepSeek API format
       thinking: { type: 'enabled' },
       ...(reasoningEffort && { reasoning_effort: reasoningEffort }),
@@ -117,7 +141,7 @@ export function buildOpenAIRequestBody(params: {
     }),
     // Only send temperature when thinking mode is off (DeepSeek ignores it anyway,
     // but other providers may respect it)
-    ...(!enableThinking &&
+    ...(!effectiveThinking &&
       temperatureOverride !== undefined && {
         temperature: temperatureOverride,
       }),

@@ -24,7 +24,9 @@ after`)
     expect(parsed?.prefix.trim()).toBe('before')
     expect(parsed?.suffix.trim()).toBe('after')
     expect(parsed?.errors).toEqual([])
-    expect(parsed?.toolCalls).toEqual([
+    expect(
+      parsed?.toolCalls.map(({ name, input }) => ({ name, input })),
+    ).toEqual([
       {
         name: 'Edit',
         input: {
@@ -80,7 +82,10 @@ after`)
     expect(serialized).toContain('<｜DSML｜tool_calls>')
     expect(serialized).toContain('string="true"')
     expect(serialized).toContain('string="false"')
-    expect(parsed?.toolCalls).toEqual(calls)
+    expect(
+      parsed?.toolCalls.map(({ name, input }) => ({ name, input })),
+    ).toEqual(calls)
+    expect(parsed?.toolCalls[0]?.raw).toContain('<｜DSML｜invoke name="Write">')
   })
 
   test('converts DSML tool calls to and from OpenAI tool_calls shape', () => {

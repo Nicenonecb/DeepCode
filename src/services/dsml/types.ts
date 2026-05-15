@@ -12,6 +12,7 @@ export type DSMLToolCall = {
   id?: string
   name: string
   input: DSMLToolInput
+  raw?: string
 }
 
 export type DSMLParseError = {

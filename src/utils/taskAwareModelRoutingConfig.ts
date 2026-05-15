@@ -18,6 +18,7 @@ type TaskAwareRoutingSettings = {
         Partial<{
           model: string
           effort: EffortLevel
+          thinking: 'enabled' | 'disabled'
         }>
       >
     >
@@ -50,6 +51,7 @@ function resolveRoute(
   return {
     model: sanitizeModel(override?.model) ?? fallback.model,
     effort: sanitizeEffort(override?.effort) ?? fallback.effort,
+    thinking: sanitizeThinking(override?.thinking) ?? fallback.thinking,
   }
 }
 
@@ -60,5 +62,13 @@ function sanitizeModel(model: unknown): string | undefined {
 function sanitizeEffort(effort: unknown): EffortLevel | undefined {
   return typeof effort === 'string' && isEffortLevel(effort)
     ? effort
+    : undefined
+}
+
+function sanitizeThinking(
+  thinking: unknown,
+): 'enabled' | 'disabled' | undefined {
+  return thinking === 'enabled' || thinking === 'disabled'
+    ? thinking
     : undefined
 }

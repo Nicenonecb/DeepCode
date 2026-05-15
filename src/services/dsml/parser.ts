@@ -49,7 +49,7 @@ export function parseDSMLToolCalls(text: string): DSMLParseResult | undefined {
       blockMatch.index,
       errors,
     )
-    toolCalls.push({ name: unescapeDSMLText(name), input })
+    toolCalls.push({ name: unescapeDSMLText(name), input, raw: rawInvoke })
   }
 
   return {
