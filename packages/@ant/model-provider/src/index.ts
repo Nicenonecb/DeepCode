@@ -62,6 +62,10 @@ export {
 // Shared OpenAI conversion utilities
 export { anthropicMessagesToOpenAI } from './shared/openaiConvertMessages.js'
 export type { ConvertMessagesOptions } from './shared/openaiConvertMessages.js'
+export type {
+  InterleavedThinkingRetentionMode,
+  InterleavedThinkingRetentionOptions,
+} from './shared/interleavedThinkingRetention.js'
 export {
   anthropicToolsToOpenAI,
   anthropicToolChoiceToOpenAI,

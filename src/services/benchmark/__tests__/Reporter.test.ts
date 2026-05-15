@@ -35,6 +35,12 @@ describe('Benchmark Reporter', () => {
               resolved: true,
               exitStatus: 'completed',
               verificationPassRate: 1,
+              promptTokens: 320000,
+              packChars: 900000,
+              packBudgetChars: 2560000,
+              sectionHits: ['hot:task', 'warm:related_files'],
+              truncatedSections: 1,
+              evidenceTiers: ['hot', 'warm'],
               costUsd: 0.01,
               turns: 2,
               regressionCount: 0,
@@ -56,6 +62,12 @@ describe('Benchmark Reporter', () => {
               resolved: false,
               exitStatus: 'completed',
               verificationPassRate: 0.5,
+              promptTokens: 240000,
+              packChars: 420000,
+              packBudgetChars: 512000,
+              sectionHits: ['hot:task'],
+              truncatedSections: 3,
+              evidenceTiers: ['hot'],
               costUsd: 0.02,
               turns: 4,
               regressionCount: 1,
@@ -77,7 +89,7 @@ describe('Benchmark Reporter', () => {
       markdown.indexOf('| cli-slow |'),
     )
     expect(markdown).toContain(
-      '| task-a | completed | yes | 100% | $0.010000 | 2 | 0 | 1497.95 |',
+      '| task-a | completed | yes | 100% | 320000 prompt tok, 900000/2560000 chars, 2 sections, 1 trunc, hot/warm | $0.010000 | 2 | 0 | 1497.95 |',
     )
   })
 })
@@ -104,6 +116,24 @@ async function benchmarkResult() {
           }),
     cost: { usd: input.candidate.id === 'agent-good' ? 0.01 : 0.02 },
     turns: input.candidate.id === 'agent-good' ? 2 : 4,
+    context:
+      input.candidate.id === 'agent-good'
+        ? {
+            promptTokens: 320000,
+            packChars: 900000,
+            packBudgetChars: 2560000,
+            sectionHits: ['hot:task', 'warm:related_files'],
+            truncatedSections: 1,
+            evidenceTiers: ['hot', 'warm'],
+          }
+        : {
+            promptTokens: 240000,
+            packChars: 420000,
+            packBudgetChars: 512000,
+            sectionHits: ['hot:task'],
+            truncatedSections: 3,
+            evidenceTiers: ['hot'],
+          },
     regressions:
       input.candidate.id === 'agent-good'
         ? []

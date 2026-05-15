@@ -30,6 +30,13 @@ describe('createBenchmarkTaskDataset', () => {
             forbiddenFiles: ['dist/cli.js'],
             assertions: ['successful tools are not rerun'],
           },
+          contextExpectations: {
+            minPromptTokens: 180000.9,
+            expectedSectionHits: ['warm:related_files', 'hot:task'],
+            expectedEvidenceTiers: ['cold', 'hot', 'warm', 'hot'],
+            maxTruncatedSections: 2.9,
+            minPackChars: 720000.7,
+          },
         },
       ],
     })
@@ -49,6 +56,13 @@ describe('createBenchmarkTaskDataset', () => {
         requiredFiles: ['src/query.ts', 'src/services/toolRepair/types.ts'],
         forbiddenFiles: ['dist/cli.js'],
         assertions: ['successful tools are not rerun'],
+      },
+      contextExpectations: {
+        minPromptTokens: 180000,
+        expectedSectionHits: ['hot:task', 'warm:related_files'],
+        expectedEvidenceTiers: ['hot', 'warm', 'cold'],
+        maxTruncatedSections: 2,
+        minPackChars: 720000,
       },
       metadata: { owner: 'runtime', priority: 1, stable: true },
     })
@@ -127,6 +141,14 @@ describe('summarizeBenchmarkTaskRun', () => {
       }),
       cost: { usd: 0.02 },
       turns: 3,
+      context: {
+        promptTokens: 320000.9,
+        packChars: 900000.4,
+        packBudgetChars: 2560000.1,
+        sectionHits: ['warm:related_files', 'hot:task', 'hot:task'],
+        truncatedSections: 1.7,
+        evidenceTiers: ['cold', 'hot', 'warm', 'hot'],
+      },
       regressions: [
         {
           kind: 'output_regression',
@@ -158,6 +180,14 @@ describe('summarizeBenchmarkTaskRun', () => {
       score: 1296.9,
       transcript: [],
       logs: [],
+      context: {
+        promptTokens: 320000,
+        packChars: 900000,
+        packBudgetChars: 2560000,
+        sectionHits: ['hot:task', 'warm:related_files'],
+        truncatedSections: 1,
+        evidenceTiers: ['hot', 'warm', 'cold'],
+      },
       regressions: [
         {
           kind: 'unexpected_file_change',

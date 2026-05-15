@@ -110,6 +110,7 @@ import { bedrockAdapter } from '../providerUsage/adapters/bedrock.js'
 import { updateProviderBuckets } from '../providerUsage/store.js'
 import type { DSMLGatewaySettings } from '../dsml/index.js'
 import type { DeepSeekEffortBudgetSettings } from '../deepseek/modelProfiles.js'
+import type { InterleavedThinkingRetentionOptions } from '@ant/model-provider'
 
 /* eslint-disable @typescript-eslint/no-require-imports */
 const autoModeStateModule = feature('TRANSCRIPT_CLASSIFIER')
@@ -234,6 +235,7 @@ import { getInitializationStatus } from '../lsp/manager.js'
 import { isToolFromMcpServer } from '../mcp/utils.js'
 import { recordLLMObservation } from '../langfuse/index.js'
 import type { LangfuseSpan } from '../langfuse/index.js'
+import type { ContextWatermarkSnapshot } from '../contextPacker/index.js'
 import {
   convertMessagesToLangfuse,
   convertOutputToLangfuse,
@@ -724,6 +726,7 @@ export type Options = {
   addNotification?: (notif: Notification) => void
   dsmlGateway?: DSMLGatewaySettings
   deepSeekEffortBudgets?: DeepSeekEffortBudgetSettings
+  deepSeekInterleavedThinking?: InterleavedThinkingRetentionOptions
   // API-side task budget (output_config.task_budget). Distinct from the
   // tokenBudget.ts +500k auto-continue feature — this one is sent to the API
   // so the model can pace itself. `remaining` is computed by the caller
@@ -731,6 +734,8 @@ export type Options = {
   taskBudget?: { total: number; remaining?: number }
   /** Langfuse root trace span for observability. No-op if null/undefined. */
   langfuseTrace?: LangfuseSpan | null
+  /** Context pack / agent cap observability snapshot for this request. */
+  contextWatermark?: ContextWatermarkSnapshot
 }
 
 export async function queryModelWithoutStreaming({
@@ -2993,6 +2998,9 @@ async function* queryModel(
     completionStartTime: ttftMs > 0 ? new Date(start + ttftMs) : undefined,
     tools: convertToolsToLangfuse(toolSchemas as unknown[]),
     thinking: langfuseThinking,
+    ...(options.contextWatermark && {
+      metadata: { contextWatermark: options.contextWatermark },
+    }),
   })
 
   void options.getToolPermissionContext().then(permissionContext => {

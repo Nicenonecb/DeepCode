@@ -81,6 +81,18 @@ describe('SettingsSchema', () => {
     expect(result.success).toBe(true)
   })
 
+  test('accepts DeepSeek interleaved thinking retention settings', () => {
+    const result = SettingsSchema().safeParse({
+      deepSeekInterleavedThinking: {
+        mode: 'tool-chain',
+        keepRecentAssistantTurns: 1,
+        maxReasoningChars: 12_000,
+      },
+    })
+
+    expect(result.success).toBe(true)
+  })
+
   test('accepts verification runner settings', () => {
     const result = SettingsSchema().safeParse({
       verificationRunner: {
@@ -108,6 +120,9 @@ describe('SettingsSchema', () => {
       contextPacker: {
         enabled: true,
         maxChars: 12_000,
+        budgetSource: 'model-profile',
+        charsPerToken: 4,
+        contextWatermark: 0.8,
         includeDiff: true,
         includeVerification: false,
         includeLsp: true,

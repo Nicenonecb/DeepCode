@@ -12,11 +12,18 @@ import type {
 } from 'openai/resources/chat/completions/completions.mjs'
 import type { AssistantMessage, UserMessage } from '../types/message.js'
 import type { SystemPrompt } from '../types/systemPrompt.js'
+import {
+  createInterleavedThinkingRetentionState,
+  shouldPreserveThinkingForMessage,
+  trimReasoningContent,
+  type InterleavedThinkingRetentionOptions,
+} from './interleavedThinkingRetention.js'
 
 export interface ConvertMessagesOptions {
   /** When true, preserve thinking blocks as reasoning_content on assistant messages
    *  (required for DeepSeek thinking mode with tool calls). */
   enableThinking?: boolean
+  interleavedThinkingRetention?: InterleavedThinkingRetentionOptions
 }
 
 /**
@@ -36,6 +43,10 @@ export function anthropicMessagesToOpenAI(
   _options?: ConvertMessagesOptions,
 ): ChatCompletionMessageParam[] {
   const result: ChatCompletionMessageParam[] = []
+  const retentionState = createInterleavedThinkingRetentionState(
+    messages,
+    _options?.interleavedThinkingRetention,
+  )
 
   // Prepend system prompt as system message
   const systemText = systemPromptToText(systemPrompt)
@@ -52,7 +63,13 @@ export function anthropicMessagesToOpenAI(
         result.push(...convertInternalUserMessage(msg))
         break
       case 'assistant':
-        result.push(...convertInternalAssistantMessage(msg))
+        result.push(
+          ...convertInternalAssistantMessage(
+            msg,
+            shouldPreserveThinkingForMessage(retentionState, msg),
+            _options?.interleavedThinkingRetention,
+          ),
+        )
         break
       default:
         break
@@ -162,6 +179,8 @@ function convertToolResult(
 
 function convertInternalAssistantMessage(
   msg: AssistantMessage,
+  retentionDecision: { preserveThinking: boolean },
+  retentionOptions?: InterleavedThinkingRetentionOptions,
 ): ChatCompletionMessageParam[] {
   const content = msg.message.content
 
@@ -206,14 +225,17 @@ function convertInternalAssistantMessage(
         },
       })
     } else if (block.type === 'thinking') {
-      // DeepSeek thinking mode: always preserve reasoning_content,
-      // including the empty-string case. DeepSeek v4 may return
-      // reasoning_content: "" when the model answers directly, and the
-      // empty value must be echoed back in the next request — otherwise
-      // DeepSeek returns 400 ("reasoning_content ... must be passed back").
+      // DeepSeek V4 interleaved thinking retention: preserve reasoning_content
+      // only for assistant turns that remain part of an active tool chain or
+      // the configured recent conversation window. This prevents normal chat
+      // history from replaying unbounded reasoning while preserving the exact
+      // tool-call round trip DeepSeek requires.
       const thinkingText = (block as unknown as Record<string, unknown>)
         .thinking
-      if (typeof thinkingText === 'string') {
+      if (
+        retentionDecision.preserveThinking &&
+        typeof thinkingText === 'string'
+      ) {
         reasoningParts.push(thinkingText)
       }
     }
@@ -224,9 +246,13 @@ function convertInternalAssistantMessage(
     role: 'assistant',
     content: textParts.length > 0 ? textParts.join('\n') : null,
     ...(toolCalls.length > 0 && { tool_calls: toolCalls }),
-    ...(reasoningParts.length > 0 && {
-      reasoning_content: reasoningParts.join('\n'),
-    }),
+    ...(retentionDecision.preserveThinking &&
+      reasoningParts.length > 0 && {
+        reasoning_content: trimReasoningContent(
+          reasoningParts.join('\n'),
+          retentionOptions,
+        ),
+      }),
   }
 
   return [result]

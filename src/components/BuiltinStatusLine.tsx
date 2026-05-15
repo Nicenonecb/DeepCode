@@ -3,6 +3,7 @@ import { formatCost } from '../cost-tracker.js';
 import { Box, Text } from '@anthropic/ink';
 import { formatTokens } from '../utils/format.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
+import type { ContextWatermarkSnapshot } from '../services/contextPacker/index.js';
 
 type RateLimitBucket = {
   utilization: number;
@@ -15,6 +16,7 @@ type BuiltinStatusLineProps = {
   usedTokens: number;
   contextWindowSize: number;
   totalCostUsd: number;
+  contextWatermark?: ContextWatermarkSnapshot | null;
   rateLimits: {
     five_hour?: RateLimitBucket;
     seven_day?: RateLimitBucket;
@@ -38,6 +40,24 @@ export function formatCountdown(epochSeconds: number): string {
   return `${minutes}m`;
 }
 
+export function formatContextWatermark(snapshot: ContextWatermarkSnapshot | null | undefined): string | null {
+  if (!snapshot) return null;
+
+  const parts = [
+    `Pack ${snapshot.packUsagePercent}%`,
+    `${formatTokens(Math.ceil(snapshot.packChars / 4))}/${formatTokens(Math.ceil(snapshot.packBudgetChars / 4))}`,
+  ];
+
+  if (snapshot.truncatedSectionCount > 0) {
+    parts.push(`${snapshot.truncatedSectionCount} trunc`);
+  }
+  if (snapshot.agentContextCapTokens) {
+    parts.push(`cap ${formatTokens(snapshot.agentContextCapTokens)}`);
+  }
+
+  return parts.join(' ');
+}
+
 function Separator() {
   return <Text dimColor>{' \u2502 '}</Text>;
 }
@@ -48,6 +68,7 @@ function BuiltinStatusLineInner({
   usedTokens,
   contextWindowSize,
   totalCostUsd,
+  contextWatermark,
   rateLimits,
 }: BuiltinStatusLineProps) {
   const { columns } = useTerminalSize();
@@ -78,6 +99,7 @@ function BuiltinStatusLineInner({
 
   // Token display: "50k/1M"
   const tokenDisplay = `${formatTokens(usedTokens)}/${formatTokens(contextWindowSize)}`;
+  const contextWatermarkDisplay = formatContextWatermark(contextWatermark);
 
   return (
     <Box>
@@ -89,6 +111,14 @@ function BuiltinStatusLineInner({
       <Text dimColor>Context </Text>
       <Text>{contextUsedPct}%</Text>
       {!narrow && <Text dimColor> ({tokenDisplay})</Text>}
+
+      {contextWatermarkDisplay && (
+        <>
+          <Separator />
+          <Text dimColor>CtxPack </Text>
+          <Text>{contextWatermarkDisplay}</Text>
+        </>
+      )}
 
       {/* 5-hour session rate limit */}
       {hasFiveHour && (

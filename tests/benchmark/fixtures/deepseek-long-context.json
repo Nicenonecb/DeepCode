@@ -1,0 +1,234 @@
+{
+  "id": "deepseek-long-context",
+  "dataset": {
+    "id": "deepseek-v4-pro-long-context",
+    "name": "DeepSeek V4 Pro long-context engineering",
+    "description": "Dry-run benchmark fixture for 1M/512K context behavior across large repositories and multi-document tasks. Each task declares the context evidence that a real executor must report.",
+    "version": "1",
+    "tasks": [
+      {
+        "id": "large-repo-multifile-localization",
+        "title": "Large repo multi-file localization",
+        "prompt": "Given a repository with hundreds of source files, locate the request-construction path that owns DeepSeek V4 Pro context packing, agent caps, OpenAI-compatible conversion, and auto-compaction. Patch the smallest coherent set of files and explain which evidence tier justified each edit.",
+        "category": "bugfix",
+        "difficulty": "hard",
+        "tags": ["deepseek", "long-context", "large-repo", "context-packer"],
+        "targetFiles": [
+          {
+            "path": "src/query.ts",
+            "required": true
+          },
+          {
+            "path": "src/services/contextPacker/ContextPacker.ts",
+            "required": true
+          },
+          {
+            "path": "src/services/compact/autoCompact.ts"
+          },
+          {
+            "path": "src/utils/agentContextBudget.ts"
+          }
+        ],
+        "contextExpectations": {
+          "minPromptTokens": 300000,
+          "minPackChars": 900000,
+          "expectedSectionHits": [
+            "cold:repo_map",
+            "hot:lsp",
+            "hot:task",
+            "warm:related_files"
+          ],
+          "expectedEvidenceTiers": ["hot", "warm", "cold"],
+          "maxTruncatedSections": 2
+        },
+        "expectedOutcome": {
+          "summary": "The agent localizes the long-context code path without scanning or rewriting unrelated subsystems.",
+          "requiredFiles": [
+            "src/query.ts",
+            "src/services/contextPacker/ContextPacker.ts"
+          ],
+          "assertions": [
+            "Prompt token evidence is recorded.",
+            "Hot task/LSP evidence survives any pack trimming.",
+            "Cold repo map is present only as orientation, not as the edit driver."
+          ],
+          "verificationCommands": [
+            "bun test src/services/contextPacker/__tests__/ContextPacker.test.ts src/services/benchmark/__tests__/BenchmarkHarness.test.ts"
+          ]
+        }
+      },
+      {
+        "id": "multi-document-fact-synthesis",
+        "title": "Multi-document fact synthesis",
+        "prompt": "Synthesize implementation requirements from AGENTS.md, deepcode-deepseek-gap.html, benchmark fixtures, and settings schema. Produce one coherent patch plan that preserves every explicit acceptance criterion and calls out contradictions.",
+        "category": "docs",
+        "difficulty": "hard",
+        "tags": ["deepseek", "long-context", "multi-doc", "requirements"],
+        "targetFiles": [
+          {
+            "path": "AGENTS.md",
+            "required": true
+          },
+          {
+            "path": "deepcode-deepseek-gap.html",
+            "required": true
+          },
+          {
+            "path": "src/utils/settings/types.ts"
+          },
+          {
+            "path": "tests/benchmark/fixtures/deepseek-long-context.json"
+          }
+        ],
+        "contextExpectations": {
+          "minPromptTokens": 220000,
+          "minPackChars": 700000,
+          "expectedSectionHits": [
+            "cold:repo_map",
+            "hot:task",
+            "warm:related_files"
+          ],
+          "expectedEvidenceTiers": ["hot", "warm", "cold"],
+          "maxTruncatedSections": 1
+        },
+        "expectedOutcome": {
+          "summary": "The agent reconciles project rules, progress board state, and schema requirements before editing code.",
+          "requiredFiles": [
+            "deepcode-deepseek-gap.html",
+            "tests/benchmark/fixtures/deepseek-long-context.json"
+          ],
+          "assertions": [
+            "AGENTS.md progress-board rule is honored.",
+            "Benchmark acceptance criteria are not replaced by chat-only notes.",
+            "Any conflict is surfaced before implementation."
+          ],
+          "verificationCommands": [
+            "bun run benchmark:deepseek-long-context:json -- --max-tasks 4"
+          ]
+        }
+      },
+      {
+        "id": "cross-directory-refactor-recovery",
+        "title": "Cross-directory refactor recovery",
+        "prompt": "A refactor touches benchmark types, harness normalization, reporter output, fixtures, and package scripts. Recover from one failing test by using verification output plus related files, then patch only the affected benchmark surface.",
+        "category": "refactor",
+        "difficulty": "hard",
+        "tags": ["deepseek", "long-context", "cross-directory", "verification"],
+        "targetFiles": [
+          {
+            "path": "src/services/benchmark/types.ts",
+            "required": true
+          },
+          {
+            "path": "src/services/benchmark/TaskDataset.ts",
+            "required": true
+          },
+          {
+            "path": "src/services/benchmark/Reporter.ts",
+            "required": true
+          },
+          {
+            "path": "src/services/benchmark/__tests__/Reporter.test.ts"
+          },
+          {
+            "path": "package.json"
+          }
+        ],
+        "contextExpectations": {
+          "minPromptTokens": 360000,
+          "minPackChars": 1100000,
+          "expectedSectionHits": [
+            "cold:repo_map",
+            "hot:diff",
+            "hot:task",
+            "hot:verification",
+            "warm:test_hints"
+          ],
+          "expectedEvidenceTiers": ["hot", "warm", "cold"],
+          "maxTruncatedSections": 2
+        },
+        "expectedOutcome": {
+          "summary": "Verification errors guide the refactor recovery while warm/cold evidence keeps cross-directory context available.",
+          "requiredFiles": [
+            "src/services/benchmark/types.ts",
+            "src/services/benchmark/TaskDataset.ts",
+            "src/services/benchmark/Reporter.ts"
+          ],
+          "assertions": [
+            "Verification evidence is recorded as hot.",
+            "Test hints are recorded as warm.",
+            "Reporter output exposes long-context fields."
+          ],
+          "verificationCommands": [
+            "bun test src/services/benchmark/__tests__/TaskDataset.test.ts src/services/benchmark/__tests__/Reporter.test.ts"
+          ]
+        }
+      },
+      {
+        "id": "long-toolchain-state-recovery",
+        "title": "Long toolchain state recovery",
+        "prompt": "Resume a long agent task after many tool calls, failed verification, and compaction. Preserve task intent, changed files, failed command output, and agent cap evidence while discarding stale cold context.",
+        "category": "feature",
+        "difficulty": "hard",
+        "tags": ["deepseek", "long-context", "toolchain", "recovery"],
+        "targetFiles": [
+          {
+            "path": "src/tasks/LocalAgentTask/LocalAgentTask.tsx",
+            "required": true
+          },
+          {
+            "path": "src/utils/sessionStorage.ts",
+            "required": true
+          },
+          {
+            "path": "src/services/compact/autoCompact.ts"
+          },
+          {
+            "path": "src/query.ts"
+          }
+        ],
+        "contextExpectations": {
+          "minPromptTokens": 420000,
+          "minPackChars": 1200000,
+          "expectedSectionHits": [
+            "cold:repo_map",
+            "hot:task",
+            "hot:verification",
+            "warm:related_files"
+          ],
+          "expectedEvidenceTiers": ["hot", "warm", "cold"],
+          "maxTruncatedSections": 3
+        },
+        "expectedOutcome": {
+          "summary": "The resumed task keeps cap/debug evidence and uses hot verification context to continue without redoing unrelated work.",
+          "requiredFiles": [
+            "src/tasks/LocalAgentTask/LocalAgentTask.tsx",
+            "src/utils/sessionStorage.ts"
+          ],
+          "assertions": [
+            "Agent context cap evidence remains visible.",
+            "Failed verification output survives compaction.",
+            "Stale cold context may be trimmed before warm/hot evidence."
+          ],
+          "verificationCommands": [
+            "bun test src/tasks/LocalAgentTask/__tests__/LocalAgentTask.test.ts src/utils/__tests__/agentContextBudget.test.ts"
+          ]
+        }
+      }
+    ]
+  },
+  "candidates": [
+    {
+      "id": "deepseek-v4-pro-max-long-context",
+      "label": "DeepSeek V4 Pro Max long-context",
+      "kind": "cli",
+      "command": "deepcode --model deepseek-v4-pro --effort max"
+    },
+    {
+      "id": "deepseek-v4-pro-high-long-context",
+      "label": "DeepSeek V4 Pro High long-context",
+      "kind": "cli",
+      "command": "deepcode --model deepseek-v4-pro --effort high"
+    }
+  ]
+}

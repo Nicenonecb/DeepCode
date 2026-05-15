@@ -41,6 +41,7 @@ import { assembleToolPool } from 'src/tools.js';
 import { filterParentToolsForFork } from 'src/utils/agentToolFilter.js';
 import { asAgentId } from 'src/types/ids.js';
 import { runWithAgentContext, type SubagentContext } from 'src/utils/agentContext.js';
+import { resolveAgentContextBudget } from 'src/utils/agentContextBudget.js';
 import { isAgentSwarmsEnabled } from 'src/utils/agentSwarmsEnabled.js';
 import { getCwd, runWithCwdOverride } from 'src/utils/cwd.js';
 import { logForDebugging } from 'src/utils/debug.js';
@@ -688,6 +689,12 @@ export const AgentTool = buildTool({
       agentType: selectedAgent.agentType,
       isAsync: (run_in_background === true || selectedAgent.background === true) && !isBackgroundTasksDisabled,
     };
+    const contextBudget = resolveAgentContextBudget({
+      parentModel: toolUseContext.options.mainLoopModel,
+      agentType: selectedAgent.agentType,
+      description,
+      prompt,
+    });
 
     // Use inline env check instead of coordinatorModule to avoid circular
     // dependency issues during test module loading.
@@ -786,6 +793,7 @@ export const AgentTool = buildTool({
       ...(isForkPath && { useExactTools: true }),
       worktreePath: worktreeInfo?.worktreePath,
       description,
+      contextBudget,
     };
 
     // Helper to wrap execution with a cwd override: explicit cwd arg (KAIROS)
@@ -818,6 +826,11 @@ export const AgentTool = buildTool({
           void writeAgentMetadata(asAgentId(earlyAgentId), {
             agentType: selectedAgent.agentType,
             description,
+            ...(contextBudget && {
+              contextWindowOverrideTokens: contextBudget.capTokens,
+              parentContextWindowTokens: contextBudget.parentContextTokens,
+              contextCapTier: contextBudget.tier,
+            }),
           }).catch(_err => logForDebugging(`Failed to clear worktree metadata: ${_err}`));
           return {};
         }
@@ -838,6 +851,11 @@ export const AgentTool = buildTool({
         // survive when the user presses ESC to cancel the main thread.
         // They are killed explicitly via chat:killAgents.
         toolUseId: toolUseContext.toolUseId,
+        ...(contextBudget && {
+          contextWindowOverrideTokens: contextBudget.capTokens,
+          parentContextWindowTokens: contextBudget.parentContextTokens,
+          contextCapTier: contextBudget.tier,
+        }),
       });
 
       // Register name → agentId for SendMessage routing. Post-registerAsyncAgent
@@ -973,6 +991,11 @@ export const AgentTool = buildTool({
               setAppState: rootSetAppState,
               toolUseId: toolUseContext.toolUseId,
               autoBackgroundMs: getAutoBackgroundMs() || undefined,
+              ...(contextBudget && {
+                contextWindowOverrideTokens: contextBudget.capTokens,
+                parentContextWindowTokens: contextBudget.parentContextTokens,
+                contextCapTier: contextBudget.tier,
+              }),
             });
             foregroundTaskId = registration.taskId;
             backgroundPromise = registration.backgroundSignal.then(() => ({

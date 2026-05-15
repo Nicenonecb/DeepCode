@@ -165,6 +165,27 @@ export const ContextPackerSettingsSchema = lazySchema(() =>
         .positive()
         .optional()
         .describe('Maximum character budget for the generated ContextPack.'),
+      budgetSource: z
+        .enum(['settings', 'model-profile'])
+        .optional()
+        .describe(
+          'Whether ContextPacker uses explicit settings.maxChars or the active model effort profile context budget. Defaults to model-profile when available.',
+        ),
+      charsPerToken: z
+        .number()
+        .positive()
+        .optional()
+        .describe(
+          'Approximate character budget per model context token when deriving ContextPack size from a model profile.',
+        ),
+      contextWatermark: z
+        .number()
+        .positive()
+        .max(1)
+        .optional()
+        .describe(
+          'Optional watermark override for model-profile ContextPacker budgeting.',
+        ),
       includeDiff: z
         .boolean()
         .optional()
@@ -284,6 +305,35 @@ export const DeepSeekEffortBudgetSettingsSchema = lazySchema(() =>
       nonThink: DeepSeekEffortBudgetSchema().optional(),
       high: DeepSeekEffortBudgetSchema().optional(),
       max: DeepSeekEffortBudgetSchema().optional(),
+    })
+    .passthrough(),
+)
+
+export const DeepSeekInterleavedThinkingSettingsSchema = lazySchema(() =>
+  z
+    .object({
+      mode: z
+        .enum(['tool-chain', 'conversation'])
+        .optional()
+        .describe(
+          'How DeepSeek reasoning_content is retained across turns. tool-chain preserves tool-call reasoning only; conversation also keeps recent assistant turns.',
+        ),
+      keepRecentAssistantTurns: z
+        .number()
+        .int()
+        .nonnegative()
+        .optional()
+        .describe(
+          'Number of recent assistant turns whose reasoning_content may be retained in conversation mode.',
+        ),
+      maxReasoningChars: z
+        .number()
+        .int()
+        .nonnegative()
+        .optional()
+        .describe(
+          'Maximum reasoning_content characters retained per assistant message.',
+        ),
     })
     .passthrough(),
 )
@@ -654,6 +704,11 @@ export const SettingsSchema = lazySchema(() =>
         .optional()
         .describe(
           'Override DeepSeek V4 Pro non-think, high, and max context/output/reasoning budgets.',
+        ),
+      deepSeekInterleavedThinking: DeepSeekInterleavedThinkingSettingsSchema()
+        .optional()
+        .describe(
+          'Configure DeepSeek V4 reasoning_content retention across tool and conversation turns.',
         ),
       // Whether to automatically approve all MCP servers in the project
       enableAllProjectMcpServers: z

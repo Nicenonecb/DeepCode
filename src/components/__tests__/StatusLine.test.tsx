@@ -8,6 +8,7 @@
  */
 
 import { describe, test, expect } from 'bun:test';
+import { formatContextWatermark } from '../BuiltinStatusLine.js';
 import { computeHitRate } from '../../utils/cacheStats.js';
 
 // ---------------------------------------------------------------------------
@@ -172,6 +173,51 @@ describe('computeHitRate used in CachePill', () => {
 
   test('zero-token response returns null rate', () => {
     expect(computeHitRate({ input_tokens: 0, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 })).toBeNull();
+  });
+});
+
+describe('formatContextWatermark', () => {
+  test('formats pack usage and tokenized char budget', () => {
+    expect(
+      formatContextWatermark({
+        generatedAt: 123,
+        source: 'deepseek-v4-pro:max',
+        contextWatermark: 0.8,
+        maxContextTokens: 800000,
+        packBudgetChars: 2560000,
+        packChars: 1280000,
+        packUsagePercent: 50,
+        sectionCount: 6,
+        truncatedSectionCount: 0,
+        hotSectionCount: 3,
+        warmSectionCount: 2,
+        coldSectionCount: 1,
+        agentContextCapHit: false,
+      }),
+    ).toBe('Pack 50% 320k/640k');
+  });
+
+  test('includes truncation and agent cap when present', () => {
+    expect(
+      formatContextWatermark({
+        generatedAt: 123,
+        source: 'deepseek-v4-pro:max',
+        packBudgetChars: 2560000,
+        packChars: 2000000,
+        packUsagePercent: 78,
+        sectionCount: 6,
+        truncatedSectionCount: 2,
+        hotSectionCount: 3,
+        warmSectionCount: 2,
+        coldSectionCount: 1,
+        agentContextCapTokens: 512000,
+        agentContextCapHit: true,
+      }),
+    ).toBe('Pack 78% 500k/640k 2 trunc cap 512k');
+  });
+
+  test('returns null without a snapshot', () => {
+    expect(formatContextWatermark(null)).toBeNull();
   });
 });
 

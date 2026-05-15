@@ -57,6 +57,7 @@ import { clearSessionHooks } from 'src/utils/hooks/sessionHooks.js'
 import { executeSubagentStartHooks } from 'src/utils/hooks.js'
 import { createUserMessage } from 'src/utils/messages.js'
 import { getAgentModel } from 'src/utils/model/agent.js'
+import type { AgentContextBudget } from 'src/utils/agentContextBudget.js'
 import { getAPIProvider } from 'src/utils/model/providers.js'
 import {
   createSubagentTrace,
@@ -276,6 +277,7 @@ export async function* runAgent({
   description,
   transcriptSubdir,
   onQueryProgress,
+  contextBudget,
 }: {
   agentDefinition: AgentDefinition
   promptMessages: Message[]
@@ -335,6 +337,7 @@ export async function* runAgent({
    * during long single-block streams (e.g. thinking) where no assistant
    * message is yielded for >60s. */
   onQueryProgress?: () => void
+  contextBudget?: AgentContextBudget
 }): AsyncGenerator<Message, void> {
   // Track subagent usage for feature discovery
 
@@ -701,6 +704,9 @@ export async function* runAgent({
     // reads undefined and only the message-scan fallback fires — which
     // autocompact defeats by replacing the fork-boilerplate message.
     ...(useExactTools && { querySource }),
+    ...(contextBudget && {
+      contextWindowOverrideTokens: contextBudget.capTokens,
+    }),
   }
 
   // Create subagent context using shared helper
@@ -748,7 +754,18 @@ export async function* runAgent({
     agentType: agentDefinition.agentType,
     ...(worktreePath && { worktreePath }),
     ...(description && { description }),
+    ...(contextBudget && {
+      contextWindowOverrideTokens: contextBudget.capTokens,
+      parentContextWindowTokens: contextBudget.parentContextTokens,
+      contextCapTier: contextBudget.tier,
+    }),
   }).catch(_err => logForDebugging(`Failed to write agent metadata: ${_err}`))
+
+  if (contextBudget) {
+    logForDebugging(
+      `[Agent: ${agentDefinition.agentType}] context cap ${contextBudget.capTokens}/${contextBudget.parentContextTokens} tokens (${contextBudget.tier}, ${contextBudget.source})`,
+    )
+  }
 
   // Track the last recorded message UUID for parent chain continuity
   let lastRecordedUuid: UUID | null = initialMessages.at(-1)?.uuid ?? null

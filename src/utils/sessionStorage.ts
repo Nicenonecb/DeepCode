@@ -265,6 +265,12 @@ export type AgentMetadata = {
   agentType: string
   /** Worktree path if the agent was spawned with isolation: "worktree" */
   worktreePath?: string
+  /** Effective subagent context cap used by query/autocompact. */
+  contextWindowOverrideTokens?: number
+  /** Parent context window before applying the subagent cap. */
+  parentContextWindowTokens?: number
+  /** Cap tier selected when spawning the subagent. */
+  contextCapTier?: string
   /** Original task description from the AgentTool input. Persisted so a
    * resumed agent's notification can show the original description instead
    * of a placeholder. Optional — older metadata files lack this field. */
