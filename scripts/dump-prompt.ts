@@ -146,7 +146,7 @@ mock.module('@deepcode/builtin-tools/tools/REPLTool/constants.js', () => ({
 
 // MACRO globals
 ;(globalThis as any).MACRO = {
-  VERSION: '2.1.888',
+  VERSION: '0.0.1',
   BUILD_TIME: '2026-04-22T00:00:00Z',
   FEEDBACK_CHANNEL: '',
   ISSUES_EXPLAINER: 'report issues on GitHub',

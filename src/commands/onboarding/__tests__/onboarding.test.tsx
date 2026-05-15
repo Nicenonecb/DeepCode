@@ -208,7 +208,7 @@ describe('callOnboarding behavior', () => {
   test('status subcommand renders state view (React element)', async () => {
     fakeGlobalConfig.theme = 'dark';
     fakeGlobalConfig.hasCompletedOnboarding = true;
-    fakeGlobalConfig.lastOnboardingVersion = '2.1.888';
+    fakeGlobalConfig.lastOnboardingVersion = '0.0.1';
     const { fn } = makeOnDone();
     const result = await callOnboarding(fn, makeContext(), 'status');
     expect(React.isValidElement(result)).toBe(true);

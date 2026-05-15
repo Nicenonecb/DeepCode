@@ -88,7 +88,7 @@ bun run docs:dev
 - **Module system**: ESM (`"type": "module"`), TSX with `react-jsx` transform.
 - **Monorepo**: Bun workspaces — 15 个 workspace packages + 若干辅助目录 in `packages/` resolved via `workspace:*`。
 - **Lint/Format**: Biome (`biome.json`)。`bun run lint` / `bun run lint:fix` / `bun run format`。
-- **Defines**: 集中管理在 `scripts/defines.ts`。当前版本 `2.1.888`。
+- **Defines**: 集中管理在 `scripts/defines.ts`。当前版本 `0.0.1`。
 - **CI**: GitHub Actions — `ci.yml`（构建+测试）、`release-rcs.yml`（RCS 发布）、`update-contributors.yml`（自动更新贡献者）。
 
 ### Entry & Bootstrap

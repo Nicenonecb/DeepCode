@@ -1,6 +1,6 @@
 {
   "name": "deepcode",
-  "version": "2.4.1",
+  "version": "0.0.1",
   "description": "DeepCode — terminal coding assistant tuned for DeepSeek and OpenAI-compatible model providers",
   "type": "module",
   "author": "Nicenonecb",
