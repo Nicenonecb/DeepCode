@@ -61,6 +61,8 @@
     "test:production:bun": "bun run scripts/production-test.ts --bun",
     "check:bundle": "bun run scripts/check-bundle-integrity.ts",
     "check:unused": "knip-bun",
+    "benchmark:smoke": "bun run scripts/benchmark.ts --fixture tests/benchmark/fixtures/smoke.json --format markdown --max-tasks 2",
+    "benchmark:smoke:json": "bun run scripts/benchmark.ts --fixture tests/benchmark/fixtures/smoke.json --format json --max-tasks 2",
     "health": "bun run scripts/health-check.ts",
     "postinstall": "node scripts/postinstall.cjs",
     "docs:dev": "npx mintlify dev",

@@ -1,4 +1,7 @@
-import type { VerificationSummary } from '../verification/index.js'
+import type {
+  VerificationCommandConfig,
+  VerificationSummary,
+} from '../verification/index.js'
 
 export type BenchmarkTaskCategory =
   | 'bugfix'
@@ -47,6 +50,46 @@ export type BenchmarkTaskDataset = {
   tasks: BenchmarkTaskFixture[]
 }
 
+export type BenchmarkHarnessMode = 'dry_run' | 'execute'
+
+export type BenchmarkCandidateKind = 'agent' | 'cli'
+
+export type BenchmarkCandidateCommand = {
+  id: string
+  label?: string
+  kind: BenchmarkCandidateKind
+  command?: string
+  args?: string[]
+  cwd?: string
+  prompt?: string
+  env?: Record<string, string>
+}
+
+export type BenchmarkTaskExitStatus =
+  | 'planned'
+  | 'completed'
+  | 'failed'
+  | 'cancelled'
+  | 'timed_out'
+
+export type BenchmarkTranscriptRole =
+  | 'system'
+  | 'user'
+  | 'assistant'
+  | 'tool'
+  | 'stdout'
+  | 'stderr'
+
+export type BenchmarkTranscriptEntry = {
+  role: BenchmarkTranscriptRole
+  content: string
+}
+
+export type BenchmarkExecutionLog = {
+  level: 'info' | 'warning' | 'error'
+  message: string
+}
+
 export type BenchmarkRegressionKind =
   | 'verification_regression'
   | 'unexpected_file_change'
@@ -86,6 +129,10 @@ export type BenchmarkTaskRunMetrics = {
 export type BenchmarkTaskRun = {
   taskId: string
   candidateId?: string
+  cwd?: string
+  exitStatus?: BenchmarkTaskExitStatus
+  transcript?: BenchmarkTranscriptEntry[]
+  logs?: BenchmarkExecutionLog[]
   resolved?: boolean
   verificationSummary?: VerificationSummary
   cost?: Partial<BenchmarkCostMetrics>
@@ -96,7 +143,11 @@ export type BenchmarkTaskRun = {
 export type BenchmarkTaskSummary = BenchmarkTaskRunMetrics & {
   taskId: string
   candidateId?: string
+  cwd?: string
+  exitStatus?: BenchmarkTaskExitStatus
   score: number
+  transcript: BenchmarkTranscriptEntry[]
+  logs: BenchmarkExecutionLog[]
   regressions: BenchmarkRegression[]
 }
 
@@ -111,4 +162,49 @@ export type BenchmarkDatasetSummary = {
   regressionCount: number
   highSeverityRegressionCount: number
   tasks: BenchmarkTaskSummary[]
+}
+
+export type BenchmarkHarnessRequest = {
+  id: string
+  dataset: BenchmarkTaskDataset
+  candidates: BenchmarkCandidateCommand[]
+  mode?: BenchmarkHarnessMode
+  maxTasks?: number
+  verificationCommands?: VerificationCommandConfig[]
+}
+
+export type BenchmarkCandidateSummary = {
+  candidateId: string
+  label?: string
+  taskCount: number
+  resolvedRate: number
+  verificationPassRate: number
+  totalCostUsd: number
+  averageTurns: number
+  regressionCount: number
+  highSeverityRegressionCount: number
+}
+
+export type BenchmarkCandidateResult = {
+  candidate: BenchmarkCandidateCommand
+  tasks: BenchmarkTaskSummary[]
+  summary: BenchmarkDatasetSummary
+}
+
+export type BenchmarkHarnessSummary = {
+  requestId: string
+  datasetId: string
+  mode: BenchmarkHarnessMode
+  candidateCount: number
+  taskCount: number
+  bestCandidateId?: string
+  candidates: BenchmarkCandidateSummary[]
+}
+
+export type BenchmarkHarnessResult = {
+  requestId: string
+  datasetId: string
+  mode: BenchmarkHarnessMode
+  candidates: BenchmarkCandidateResult[]
+  summary: BenchmarkHarnessSummary
 }

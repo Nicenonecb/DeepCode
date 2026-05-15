@@ -156,6 +156,8 @@ describe('summarizeBenchmarkTaskRun', () => {
       regressionCount: 2,
       highSeverityRegressionCount: 0,
       score: 1296.9,
+      transcript: [],
+      logs: [],
       regressions: [
         {
           kind: 'unexpected_file_change',

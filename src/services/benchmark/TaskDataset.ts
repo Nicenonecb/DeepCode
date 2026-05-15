@@ -90,8 +90,12 @@ export function summarizeBenchmarkTaskRun(
   return {
     taskId: run.taskId,
     ...(run.candidateId ? { candidateId: run.candidateId } : {}),
+    ...(run.cwd ? { cwd: run.cwd } : {}),
+    ...(run.exitStatus ? { exitStatus: run.exitStatus } : {}),
     ...metrics,
     score: scoreBenchmarkTask(metrics),
+    transcript: normalizeTranscript(run.transcript ?? []),
+    logs: normalizeLogs(run.logs ?? []),
     regressions,
   }
 }
@@ -241,6 +245,24 @@ function normalizeRegressions(
       if (kind !== 0) return kind
       return left.message.localeCompare(right.message)
     })
+}
+
+function normalizeTranscript(
+  transcript: BenchmarkTaskSummary['transcript'],
+): BenchmarkTaskSummary['transcript'] {
+  return transcript.map(entry => ({
+    role: entry.role,
+    content: entry.content,
+  }))
+}
+
+function normalizeLogs(
+  logs: BenchmarkTaskSummary['logs'],
+): BenchmarkTaskSummary['logs'] {
+  return logs.map(log => ({
+    level: log.level,
+    message: log.message,
+  }))
 }
 
 function assertUniqueTaskIds(tasks: BenchmarkTaskFixture[]): void {
