@@ -549,7 +549,6 @@
     </nav>
 
     <nav aria-label="页面目录">
-      <a href="#current">本轮更新</a>
       <a href="#done">已实现</a>
       <a href="#missing">缺口状态</a>
       <a href="#optimize">可优化</a>
@@ -560,24 +559,6 @@
     </nav>
 
     <main>
-      <section id="current">
-        <div class="section-head">
-          <h2>本轮更新</h2>
-          <p>完成 Benchmark Harness 第 4 步：fixtures、脚本与低成本 smoke 门禁已落地。</p>
-        </div>
-        <table class="wide-table">
-          <thead><tr><th>项目</th><th>当前记录</th><th>下一步落点</th></tr></thead>
-          <tbody>
-            <tr><td>本轮目标</td><td>完成 Benchmark Harness 第 4 步：任务样本放 `tests/benchmark/fixtures/`，补 `package.json` 的 `benchmark:*` 脚本，支持本地对比与 CI 低成本 smoke run。</td><td>Benchmark Harness 当前四步全部 DONE；后续可接真实 agent/CLI executor 和更丰富的任务 corpus。</td></tr>
-            <tr class="done-row"><td><span class="status-chip done">DONE</span><br>已完成改动</td><td>新增 `tests/benchmark/fixtures/smoke.json` 和 `scripts/benchmark.ts`；`package.json` 新增 `benchmark:smoke` / `benchmark:smoke:json`。`BenchmarkHarness.test.ts` 已覆盖 smoke fixture 可加载并完成 dry-run。</td><td>脚本默认 dry-run、最多 2 个任务，输出 Markdown 或 JSON，不启动真实 agent，适合本地快速对比和 CI 低成本回归门禁。</td></tr>
-            <tr><td>验证命令和结果</td><td>`bun test src/services/benchmark/__tests__/TaskDataset.test.ts src/services/benchmark/__tests__/BenchmarkHarness.test.ts src/services/benchmark/__tests__/Reporter.test.ts` 通过：14 pass。`bun run benchmark:smoke` 通过并输出 Markdown report。`bun run benchmark:smoke:json` 通过并输出 JSON report。`bun run typecheck` 通过，TypeScript strict 零错误。`bunx biome check --write package.json scripts/benchmark.ts tests/benchmark/fixtures/smoke.json ...` 已格式化并通过。</td><td>测试覆盖 smoke fixture、dry-run 任务展开、Reporter 输出和 BenchmarkHarness 低成本脚本入口。</td></tr>
-            <tr><td>主要影响文件</td><td>`scripts/benchmark.ts`、`tests/benchmark/fixtures/smoke.json`、`package.json`、`src/services/benchmark/__tests__/BenchmarkHarness.test.ts`、`deepcode-deepseek-gap.html`。</td><td>没有新增专题报告，因此无需更新 `index.html`。</td></tr>
-            <tr><td>剩余风险</td><td>当前 smoke fixture 是 dry-run 门禁，不衡量真实 agent 解决率；真实 agent/CLI executor 和更大任务集仍需后续增强。</td><td>后续可以补 execute-mode runner，把真实候选 agent 命令接入 `BenchmarkHarness` 的 injected executor。</td></tr>
-            <tr><td>建议下一步</td><td>进入增强阶段：扩展真实任务 corpus，接真实 DeepCode / baseline CLI executor，并把报告产物接入 CI artifacts。</td><td>默认 CI 仍建议只跑 `benchmark:smoke:json`，避免成本失控。</td></tr>
-          </tbody>
-        </table>
-      </section>
-
       <section id="done">
         <div class="section-head">
           <h2>已经实现</h2>
