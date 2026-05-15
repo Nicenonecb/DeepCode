@@ -78,6 +78,7 @@ import type { QuerySource } from './constants/querySource.js'
 import type { SDKStatus } from './entrypoints/agentSdkTypes.js'
 import type { AppState } from './state/AppState.js'
 import type { LangfuseSpan } from './services/langfuse/index.js'
+import type { ContextWatermarkSnapshot } from './services/contextPacker/index.js'
 import type {
   HookProgress,
   PromptRequest,
@@ -178,6 +179,8 @@ export type ToolUseContext = {
     querySource?: QuerySource
     /** Optional effective context window cap for subagent/fork query loops. */
     contextWindowOverrideTokens?: number
+    /** Latest context pack / cap observability snapshot for this API request. */
+    contextWatermark?: ContextWatermarkSnapshot
     /** Optional callback to get the latest tools (e.g., after MCP servers connect mid-query) */
     refreshTools?: () => Tools
     /**

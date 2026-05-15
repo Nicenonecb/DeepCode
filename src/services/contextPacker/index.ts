@@ -15,6 +15,11 @@ export {
   createLspContext,
   findRelatedTestFiles,
 } from './ContextCollectors.js'
+export {
+  buildContextWatermarkSnapshot,
+  getLatestContextWatermarkSnapshot,
+  setLatestContextWatermarkSnapshot,
+} from './ContextWatermark.js'
 export type {
   ContextPack,
   ContextPackDiagnostic,
@@ -29,6 +34,7 @@ export type {
   ContextPackSymbol,
   ContextPackerSettings,
 } from './ContextPacker.js'
+export type { ContextWatermarkSnapshot } from './ContextWatermark.js'
 export type {
   ContentDiffEvidenceInput,
   ContextEvidenceCollectorsOptions,

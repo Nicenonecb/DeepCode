@@ -231,6 +231,9 @@ export async function* queryModelGrok(
       endTime: new Date(),
       completionStartTime: ttftMs > 0 ? new Date(start + ttftMs) : undefined,
       tools: convertToolsToLangfuse(toolSchemas as unknown[]),
+      ...(options.contextWatermark && {
+        metadata: { contextWatermark: options.contextWatermark },
+      }),
     })
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error)

@@ -645,6 +645,9 @@ export async function* queryModelOpenAI(
           injected: maxPromptPatch.injected,
           conflictPolicy: maxPromptPatch.conflictPolicy,
         },
+        ...(options.contextWatermark && {
+          contextWatermark: options.contextWatermark,
+        }),
       },
     })
 

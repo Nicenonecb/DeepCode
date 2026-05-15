@@ -45,6 +45,7 @@ import { isVimModeEnabled } from './PromptInput/utils.js';
 import { computeHitRate, tokenSignature } from '../utils/cacheStats.js';
 import { onResponse as cacheOnResponse, getCacheStatsState, initCacheStatsState } from '../utils/cacheStatsState.js';
 import { BuiltinStatusLine } from './BuiltinStatusLine.js';
+import { getLatestContextWatermarkSnapshot } from '../services/contextPacker/index.js';
 
 // ---------------------------------------------------------------------------
 // CachePill — cache hit-rate + 1-hour TTL countdown pill
@@ -485,6 +486,7 @@ function StatusLineInner({ messagesRef, lastAssistantMessageId, vimMode }: Props
     ? Math.round(calculateContextPercentages(builtinCurrentUsage, builtinContextWindowSize).used ?? 0)
     : 0;
   const builtinRawUtil = getRawUtilization();
+  const builtinContextWatermark = getLatestContextWatermarkSnapshot();
   const builtinRateLimits = {
     ...(builtinRawUtil.five_hour && {
       five_hour: {
@@ -517,6 +519,7 @@ function StatusLineInner({ messagesRef, lastAssistantMessageId, vimMode }: Props
             usedTokens={builtinUsedTokens}
             contextWindowSize={builtinContextWindowSize}
             totalCostUsd={getTotalCost()}
+            contextWatermark={builtinContextWatermark}
             rateLimits={builtinRateLimits}
           />
           <CachePill messages={messagesRef.current} />

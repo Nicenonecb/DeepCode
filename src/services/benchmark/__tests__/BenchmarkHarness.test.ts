@@ -187,6 +187,47 @@ describe('BenchmarkHarness', () => {
     })
   })
 
+  test('projects long-context expectations into dry-run context evidence', async () => {
+    const result = await dryRunBenchmarkExecutor({
+      request: {
+        id: 'direct-long-context-dry-run',
+        dataset: dataset(['task-a']),
+        candidates: [{ id: 'agent-a', kind: 'agent' }],
+      },
+      dataset: dataset(['task-a']),
+      candidate: { id: 'agent-a', kind: 'agent' },
+      candidateIndex: 0,
+      task: {
+        id: 'task-a',
+        title: 'Task A',
+        prompt: 'Prompt A',
+        expectedOutcome: { summary: 'Expected A' },
+        contextExpectations: {
+          minPromptTokens: 300000,
+          minPackChars: 900000,
+          expectedSectionHits: ['hot:task', 'warm:related_files'],
+          expectedEvidenceTiers: ['hot', 'warm', 'cold'],
+          maxTruncatedSections: 2,
+        },
+      },
+      taskIndex: 0,
+      mode: 'dry_run',
+    })
+
+    expect(result.context).toEqual({
+      promptTokens: 300000,
+      packChars: 900000,
+      sectionHits: ['hot:task', 'warm:related_files'],
+      truncatedSections: 2,
+      evidenceTiers: ['hot', 'warm', 'cold'],
+    })
+    expect(result.logs).toContainEqual({
+      level: 'info',
+      message:
+        'Planned context expectations for task-a: 300000 prompt tokens, 900000 pack chars, 2 section hits, 2 truncated sections.',
+    })
+  })
+
   test('loads the smoke fixture and produces a low-cost dry-run result', async () => {
     const fixture = JSON.parse(
       await readFile('tests/benchmark/fixtures/smoke.json', 'utf8'),
@@ -218,6 +259,77 @@ describe('BenchmarkHarness', () => {
         candidate.tasks.every(task => task.exitStatus === 'planned'),
       ),
     ).toBe(true)
+  })
+
+  test('loads the long-context fixture with context expectations', async () => {
+    const fixture = JSON.parse(
+      await readFile(
+        'tests/benchmark/fixtures/deepseek-long-context.json',
+        'utf8',
+      ),
+    ) as {
+      id: string
+      dataset: BenchmarkTaskDataset
+      candidates: BenchmarkHarnessRequest['candidates']
+    }
+
+    const result = await new BenchmarkHarness().run({
+      id: fixture.id,
+      dataset: fixture.dataset,
+      candidates: fixture.candidates,
+      maxTasks: 4,
+    })
+
+    expect(result.summary).toMatchObject({
+      requestId: 'deepseek-long-context',
+      datasetId: 'deepseek-v4-pro-long-context',
+      mode: 'dry_run',
+      candidateCount: 2,
+      taskCount: 4,
+    })
+    expect(result.candidates[0]?.tasks[0]?.context).toMatchObject({
+      promptTokens: 300000,
+      packChars: 900000,
+      sectionHits: [
+        'cold:repo_map',
+        'hot:lsp',
+        'hot:task',
+        'warm:related_files',
+      ],
+      truncatedSections: 2,
+      evidenceTiers: ['hot', 'warm', 'cold'],
+    })
+    expect(fixture.dataset.tasks.map(task => task.contextExpectations)).toEqual(
+      [
+        expect.objectContaining({
+          minPromptTokens: 300000,
+          expectedSectionHits: [
+            'cold:repo_map',
+            'hot:lsp',
+            'hot:task',
+            'warm:related_files',
+          ],
+        }),
+        expect.objectContaining({
+          minPromptTokens: 220000,
+          expectedEvidenceTiers: ['hot', 'warm', 'cold'],
+        }),
+        expect.objectContaining({
+          minPromptTokens: 360000,
+          expectedSectionHits: [
+            'cold:repo_map',
+            'hot:diff',
+            'hot:task',
+            'hot:verification',
+            'warm:test_hints',
+          ],
+        }),
+        expect.objectContaining({
+          minPromptTokens: 420000,
+          maxTruncatedSections: 3,
+        }),
+      ],
+    )
   })
 })
 

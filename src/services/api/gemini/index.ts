@@ -213,6 +213,9 @@ export async function* queryModelGemini(
               }),
             }
           : undefined,
+      ...(options.contextWatermark && {
+        metadata: { contextWatermark: options.contextWatermark },
+      }),
     })
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error)

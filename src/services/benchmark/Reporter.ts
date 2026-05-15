@@ -9,6 +9,12 @@ export type BenchmarkReportTask = {
   resolved: boolean
   exitStatus?: string
   verificationPassRate: number
+  promptTokens?: number
+  packChars?: number
+  packBudgetChars?: number
+  sectionHits?: string[]
+  truncatedSections?: number
+  evidenceTiers?: string[]
   costUsd: number
   turns: number
   regressionCount: number
@@ -99,9 +105,9 @@ export function formatBenchmarkMarkdownReport(
   for (const candidate of report.candidates) {
     lines.push('', `## ${candidate.candidateId}`, '')
     lines.push(
-      '| Task | Status | Resolved | Verification | Cost | Turns | Regressions | Score |',
+      '| Task | Status | Resolved | Verification | Context | Cost | Turns | Regressions | Score |',
     )
-    lines.push('| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |')
+    lines.push('| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |')
     for (const task of candidate.tasks) {
       lines.push(
         [
@@ -109,6 +115,7 @@ export function formatBenchmarkMarkdownReport(
           task.exitStatus ?? 'unknown',
           task.resolved ? 'yes' : 'no',
           percent(task.verificationPassRate),
+          contextSummary(task),
           currency(task.costUsd),
           String(task.turns),
           String(task.regressionCount),
@@ -141,6 +148,24 @@ function taskReport(task: BenchmarkTaskSummary): BenchmarkReportTask {
     resolved: task.resolved,
     ...(task.exitStatus ? { exitStatus: task.exitStatus } : {}),
     verificationPassRate: task.verificationPassRate,
+    ...(task.context.promptTokens === undefined
+      ? {}
+      : { promptTokens: task.context.promptTokens }),
+    ...(task.context.packChars === undefined
+      ? {}
+      : { packChars: task.context.packChars }),
+    ...(task.context.packBudgetChars === undefined
+      ? {}
+      : { packBudgetChars: task.context.packBudgetChars }),
+    ...(task.context.sectionHits
+      ? { sectionHits: task.context.sectionHits }
+      : {}),
+    ...(task.context.truncatedSections === undefined
+      ? {}
+      : { truncatedSections: task.context.truncatedSections }),
+    ...(task.context.evidenceTiers
+      ? { evidenceTiers: task.context.evidenceTiers }
+      : {}),
     costUsd: task.cost.usd,
     turns: task.turns,
     regressionCount: task.regressionCount,
@@ -154,4 +179,24 @@ function percent(value: number): string {
 
 function currency(value: number): string {
   return `$${value.toFixed(6)}`
+}
+
+function contextSummary(task: BenchmarkReportTask): string {
+  const parts: string[] = []
+  if (task.promptTokens !== undefined) {
+    parts.push(`${task.promptTokens} prompt tok`)
+  }
+  if (task.packChars !== undefined) {
+    parts.push(`${task.packChars}/${task.packBudgetChars ?? '?'} chars`)
+  }
+  if (task.sectionHits?.length) {
+    parts.push(`${task.sectionHits.length} sections`)
+  }
+  if (task.truncatedSections !== undefined) {
+    parts.push(`${task.truncatedSections} trunc`)
+  }
+  if (task.evidenceTiers?.length) {
+    parts.push(task.evidenceTiers.join('/'))
+  }
+  return parts.length > 0 ? parts.join(', ') : 'n/a'
 }

@@ -13,6 +13,7 @@ import type {
   BenchmarkCandidateCommand,
   BenchmarkCandidateResult,
   BenchmarkCandidateSummary,
+  BenchmarkContextMetrics,
   BenchmarkDatasetSummary,
   BenchmarkExecutionLog,
   BenchmarkHarnessMode,
@@ -228,6 +229,7 @@ export function buildBenchmarkHarnessSummary(
 export async function dryRunBenchmarkExecutor(
   input: BenchmarkTaskExecutorInput,
 ): Promise<BenchmarkTaskExecutorResult> {
+  const context = plannedContextMetricsFor(input.task)
   return {
     exitStatus: 'planned',
     resolved: false,
@@ -244,7 +246,16 @@ export async function dryRunBenchmarkExecutor(
         level: 'info',
         message: `Planned ${input.candidate.kind} candidate ${input.candidate.id} for task ${input.task.id}.`,
       },
+      ...(context
+        ? [
+            {
+              level: 'info' as const,
+              message: `Planned context expectations for ${input.task.id}: ${contextSummary(context)}.`,
+            },
+          ]
+        : []),
     ],
+    ...(context ? { context } : {}),
   }
 }
 
@@ -349,6 +360,7 @@ function normalizeTaskRun(
       : {}),
     ...(result.cost ? { cost: result.cost } : {}),
     ...(result.turns === undefined ? {} : { turns: result.turns }),
+    ...(result.context ? { context: result.context } : {}),
     ...(result.regressions
       ? { regressions: normalizeRegressions(result.regressions) }
       : {}),
@@ -501,6 +513,48 @@ function sortStringRecord(
   return Object.fromEntries(
     Object.entries(record).sort(([left], [right]) => left.localeCompare(right)),
   )
+}
+
+function plannedContextMetricsFor(
+  task: BenchmarkTaskFixture,
+): BenchmarkContextMetrics | undefined {
+  const expectations = task.contextExpectations
+  if (!expectations) return undefined
+
+  return {
+    ...(expectations.minPromptTokens === undefined
+      ? {}
+      : { promptTokens: expectations.minPromptTokens }),
+    ...(expectations.minPackChars === undefined
+      ? {}
+      : { packChars: expectations.minPackChars }),
+    ...(expectations.expectedSectionHits
+      ? { sectionHits: expectations.expectedSectionHits }
+      : {}),
+    ...(expectations.maxTruncatedSections === undefined
+      ? {}
+      : { truncatedSections: expectations.maxTruncatedSections }),
+    ...(expectations.expectedEvidenceTiers
+      ? { evidenceTiers: expectations.expectedEvidenceTiers }
+      : {}),
+  }
+}
+
+function contextSummary(context: BenchmarkContextMetrics): string {
+  const parts: string[] = []
+  if (context.promptTokens !== undefined) {
+    parts.push(`${Math.trunc(context.promptTokens)} prompt tokens`)
+  }
+  if (context.packChars !== undefined) {
+    parts.push(`${Math.trunc(context.packChars)} pack chars`)
+  }
+  if (context.sectionHits?.length) {
+    parts.push(`${context.sectionHits.length} section hits`)
+  }
+  if (context.truncatedSections !== undefined) {
+    parts.push(`${Math.trunc(context.truncatedSections)} truncated sections`)
+  }
+  return parts.length > 0 ? parts.join(', ') : 'no context metrics'
 }
 
 function errorMessage(error: unknown): string {

@@ -235,6 +235,7 @@ import { getInitializationStatus } from '../lsp/manager.js'
 import { isToolFromMcpServer } from '../mcp/utils.js'
 import { recordLLMObservation } from '../langfuse/index.js'
 import type { LangfuseSpan } from '../langfuse/index.js'
+import type { ContextWatermarkSnapshot } from '../contextPacker/index.js'
 import {
   convertMessagesToLangfuse,
   convertOutputToLangfuse,
@@ -733,6 +734,8 @@ export type Options = {
   taskBudget?: { total: number; remaining?: number }
   /** Langfuse root trace span for observability. No-op if null/undefined. */
   langfuseTrace?: LangfuseSpan | null
+  /** Context pack / agent cap observability snapshot for this request. */
+  contextWatermark?: ContextWatermarkSnapshot
 }
 
 export async function queryModelWithoutStreaming({
@@ -2995,6 +2998,9 @@ async function* queryModel(
     completionStartTime: ttftMs > 0 ? new Date(start + ttftMs) : undefined,
     tools: convertToolsToLangfuse(toolSchemas as unknown[]),
     thinking: langfuseThinking,
+    ...(options.contextWatermark && {
+      metadata: { contextWatermark: options.contextWatermark },
+    }),
   })
 
   void options.getToolPermissionContext().then(permissionContext => {

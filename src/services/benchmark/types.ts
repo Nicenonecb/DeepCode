@@ -27,6 +27,16 @@ export type BenchmarkExpectedOutcome = {
   verificationCommands?: string[]
 }
 
+export type BenchmarkContextEvidenceTier = 'hot' | 'warm' | 'cold'
+
+export type BenchmarkContextExpectation = {
+  minPromptTokens?: number
+  expectedSectionHits?: string[]
+  expectedEvidenceTiers?: BenchmarkContextEvidenceTier[]
+  maxTruncatedSections?: number
+  minPackChars?: number
+}
+
 export type BenchmarkTaskFixture = {
   id: string
   title: string
@@ -38,6 +48,7 @@ export type BenchmarkTaskFixture = {
   setupCommands?: string[]
   verificationCommands?: string[]
   expectedOutcome: BenchmarkExpectedOutcome
+  contextExpectations?: BenchmarkContextExpectation
   timeoutMs?: number
   metadata?: Record<string, string | number | boolean>
 }
@@ -126,6 +137,15 @@ export type BenchmarkTaskRunMetrics = {
   highSeverityRegressionCount: number
 }
 
+export type BenchmarkContextMetrics = {
+  promptTokens?: number
+  packChars?: number
+  packBudgetChars?: number
+  sectionHits?: string[]
+  truncatedSections?: number
+  evidenceTiers?: BenchmarkContextEvidenceTier[]
+}
+
 export type BenchmarkTaskRun = {
   taskId: string
   candidateId?: string
@@ -137,6 +157,7 @@ export type BenchmarkTaskRun = {
   verificationSummary?: VerificationSummary
   cost?: Partial<BenchmarkCostMetrics>
   turns?: number
+  context?: BenchmarkContextMetrics
   regressions?: BenchmarkRegression[]
 }
 
@@ -148,6 +169,7 @@ export type BenchmarkTaskSummary = BenchmarkTaskRunMetrics & {
   score: number
   transcript: BenchmarkTranscriptEntry[]
   logs: BenchmarkExecutionLog[]
+  context: BenchmarkContextMetrics
   regressions: BenchmarkRegression[]
 }
 

@@ -127,8 +127,11 @@ import {
   formatContextPackForPrompt,
   ContextPacker,
   resolveContextPackMaxChars,
+  buildContextWatermarkSnapshot,
+  setLatestContextWatermarkSnapshot,
   type ContextPackerSettings,
   type ContextPackRuntimeBudget,
+  type ContextWatermarkSnapshot,
 } from './services/contextPacker/index.js'
 import {
   createWorkingMemoryPrompt,
@@ -1075,7 +1078,7 @@ async function* queryLoop(
       }
     }
 
-    const messagesWithContextPack = await buildContextPackedMessages(
+    const contextPackedResult = await buildContextPackedMessages(
       messagesForQuery,
       toolUseContext,
       toolUseContext.getAppState().settings.contextPacker as
@@ -1087,6 +1090,12 @@ async function* queryLoop(
         | DeepSeekEffortBudgetSettings
         | undefined,
     )
+    const messagesWithContextPack = contextPackedResult.messages
+    if (contextPackedResult.snapshot) {
+      toolUseContext.options.contextWatermark = contextPackedResult.snapshot
+    } else {
+      delete toolUseContext.options.contextWatermark
+    }
     const messagesWithMetaContext = buildWorkingMemoryMessages(
       messagesWithContextPack,
       toolUseContext,
@@ -1163,6 +1172,9 @@ async function* queryLoop(
                 },
               }),
               langfuseTrace: toolUseContext.langfuseTrace,
+              ...(toolUseContext.options.contextWatermark && {
+                contextWatermark: toolUseContext.options.contextWatermark,
+              }),
             },
           })) {
             // We won't use the tool_calls from the first attempt
@@ -2414,8 +2426,15 @@ async function buildContextPackedMessages(
   model: string,
   effortValue: unknown,
   deepSeekEffortBudgets: DeepSeekEffortBudgetSettings | undefined,
-): Promise<Message[]> {
-  if (!shouldInjectContextPack(toolUseContext, settings)) return messages
+): Promise<{
+  messages: Message[]
+  snapshot?: ContextWatermarkSnapshot
+}> {
+  if (!shouldInjectContextPack(toolUseContext, settings)) {
+    setLatestContextWatermarkSnapshot(null)
+    delete toolUseContext.options.contextWatermark
+    return { messages }
+  }
 
   try {
     const runtimeBudget = resolveContextPackRuntimeBudget(
@@ -2433,21 +2452,63 @@ async function buildContextPackedMessages(
       maxChars: resolveContextPackMaxChars(settings, runtimeBudget),
     })
 
-    if (contextPack.sections.length === 0) return messages
+    if (contextPack.sections.length === 0) {
+      setLatestContextWatermarkSnapshot(null)
+      delete toolUseContext.options.contextWatermark
+      return { messages }
+    }
 
-    return [
-      ...messages,
-      createUserMessage({
-        content: formatContextPackForPrompt(contextPack),
-        isMeta: true,
-      }),
-    ]
+    const snapshot = buildContextWatermarkSnapshot({
+      pack: contextPack,
+      runtimeBudget,
+      ...(toolUseContext.options.contextWindowOverrideTokens === undefined
+        ? {}
+        : {
+            agentContextCapTokens:
+              toolUseContext.options.contextWindowOverrideTokens,
+          }),
+    })
+    setLatestContextWatermarkSnapshot(snapshot)
+    logContextWatermark(snapshot)
+
+    return {
+      messages: [
+        ...messages,
+        createUserMessage({
+          content: formatContextPackForPrompt(contextPack),
+          isMeta: true,
+        }),
+      ],
+      snapshot,
+    }
   } catch (error) {
     logForDebugging(
       `[ContextPacker] Failed to build context pack: ${error instanceof Error ? error.message : String(error)}`,
     )
-    return messages
+    setLatestContextWatermarkSnapshot(null)
+    delete toolUseContext.options.contextWatermark
+    return { messages }
   }
+}
+
+function logContextWatermark(snapshot: ContextWatermarkSnapshot): void {
+  logEvent('tengu_context_watermark', {
+    context_watermark: snapshot.contextWatermark,
+    max_context_tokens: snapshot.maxContextTokens,
+    pack_budget_chars: snapshot.packBudgetChars,
+    pack_chars: snapshot.packChars,
+    pack_usage_percent: snapshot.packUsagePercent,
+    section_count: snapshot.sectionCount,
+    truncated_section_count: snapshot.truncatedSectionCount,
+    hot_section_count: snapshot.hotSectionCount,
+    warm_section_count: snapshot.warmSectionCount,
+    cold_section_count: snapshot.coldSectionCount,
+    agent_context_cap_tokens: snapshot.agentContextCapTokens,
+    agent_context_cap_hit: snapshot.agentContextCapHit,
+  })
+  logForDebugging(
+    `[ContextPacker] watermark source=${snapshot.source} pack=${snapshot.packChars}/${snapshot.packBudgetChars} chars usage=${snapshot.packUsagePercent}% sections=${snapshot.sectionCount} truncated=${snapshot.truncatedSectionCount} agentCap=${snapshot.agentContextCapTokens ?? 'none'}`,
+  )
 }
 
 function resolveContextPackRuntimeBudget(

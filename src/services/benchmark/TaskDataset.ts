@@ -1,5 +1,7 @@
 import type {
   BenchmarkCostMetrics,
+  BenchmarkContextEvidenceTier,
+  BenchmarkContextMetrics,
   BenchmarkDatasetSummary,
   BenchmarkRegression,
   BenchmarkTaskDataset,
@@ -74,6 +76,52 @@ export function normalizeBenchmarkTaskFixture(
           }
         : {}),
     },
+    ...(fixture.contextExpectations
+      ? {
+          contextExpectations: {
+            ...(fixture.contextExpectations.minPromptTokens === undefined
+              ? {}
+              : {
+                  minPromptTokens: Math.max(
+                    0,
+                    Math.trunc(fixture.contextExpectations.minPromptTokens),
+                  ),
+                }),
+            ...(fixture.contextExpectations.expectedSectionHits
+              ? {
+                  expectedSectionHits: [
+                    ...fixture.contextExpectations.expectedSectionHits,
+                  ].sort(),
+                }
+              : {}),
+            ...(fixture.contextExpectations.expectedEvidenceTiers
+              ? {
+                  expectedEvidenceTiers: normalizeEvidenceTiers(
+                    fixture.contextExpectations.expectedEvidenceTiers,
+                  ),
+                }
+              : {}),
+            ...(fixture.contextExpectations.maxTruncatedSections === undefined
+              ? {}
+              : {
+                  maxTruncatedSections: Math.max(
+                    0,
+                    Math.trunc(
+                      fixture.contextExpectations.maxTruncatedSections,
+                    ),
+                  ),
+                }),
+            ...(fixture.contextExpectations.minPackChars === undefined
+              ? {}
+              : {
+                  minPackChars: Math.max(
+                    0,
+                    Math.trunc(fixture.contextExpectations.minPackChars),
+                  ),
+                }),
+          },
+        }
+      : {}),
     ...(fixture.timeoutMs ? { timeoutMs: fixture.timeoutMs } : {}),
     ...(fixture.metadata
       ? { metadata: sortRecordByKey(fixture.metadata) }
@@ -96,6 +144,7 @@ export function summarizeBenchmarkTaskRun(
     score: scoreBenchmarkTask(metrics),
     transcript: normalizeTranscript(run.transcript ?? []),
     logs: normalizeLogs(run.logs ?? []),
+    context: normalizeContextMetrics(run.context ?? {}),
     regressions,
   }
 }
@@ -210,6 +259,35 @@ export function normalizeCostMetrics(
   }
 }
 
+export function normalizeContextMetrics(
+  context: BenchmarkContextMetrics,
+): BenchmarkContextMetrics {
+  return {
+    ...(context.promptTokens === undefined
+      ? {}
+      : { promptTokens: Math.max(0, Math.trunc(context.promptTokens)) }),
+    ...(context.packChars === undefined
+      ? {}
+      : { packChars: Math.max(0, Math.trunc(context.packChars)) }),
+    ...(context.packBudgetChars === undefined
+      ? {}
+      : {
+          packBudgetChars: Math.max(0, Math.trunc(context.packBudgetChars)),
+        }),
+    ...(context.sectionHits
+      ? { sectionHits: [...new Set(context.sectionHits)].sort() }
+      : {}),
+    ...(context.truncatedSections === undefined
+      ? {}
+      : {
+          truncatedSections: Math.max(0, Math.trunc(context.truncatedSections)),
+        }),
+    ...(context.evidenceTiers
+      ? { evidenceTiers: normalizeEvidenceTiers(context.evidenceTiers) }
+      : {}),
+  }
+}
+
 function scoreBenchmarkTask(metrics: BenchmarkTaskRunMetrics): number {
   const resolvedBonus = metrics.resolved ? 1000 : 0
   const verificationScore = metrics.verificationPassRate * 500
@@ -282,6 +360,17 @@ function sortRecordByKey(
   return Object.fromEntries(
     Object.entries(record).sort(([left], [right]) => left.localeCompare(right)),
   )
+}
+
+function normalizeEvidenceTiers(
+  tiers: BenchmarkContextEvidenceTier[],
+): BenchmarkContextEvidenceTier[] {
+  const rank: Record<BenchmarkContextEvidenceTier, number> = {
+    hot: 0,
+    warm: 1,
+    cold: 2,
+  }
+  return [...new Set(tiers)].sort((left, right) => rank[left] - rank[right])
 }
 
 function severityRank(severity: BenchmarkRegression['severity']): number {
