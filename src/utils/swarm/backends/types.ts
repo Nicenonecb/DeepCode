@@ -240,6 +240,10 @@ export type TeammateSpawnConfig = TeammateIdentity & {
   parentSessionId: string
   /** request_id of the API call that spawned this teammate. */
   invokingRequestId?: string
+  /** Agentic sandbox session id for long-task traceability. */
+  sandboxSessionId?: string
+  /** Agentic sandbox manifest path for replay/recovery evidence. */
+  sandboxTraceManifest?: string
   /** Tool permissions to grant this teammate */
   permissions?: string[]
   /** Whether this teammate can show permission prompts for unlisted tools.
@@ -284,6 +288,10 @@ export type TeammateSpawnResult = {
   windowName?: string
   /** Whether the backend used split panes. */
   isSplitPane?: boolean
+  /** Agentic sandbox session id for long-task traceability. */
+  sandboxSessionId?: string
+  /** Agentic sandbox manifest path for replay/recovery evidence. */
+  sandboxTraceManifest?: string
 }
 
 /**

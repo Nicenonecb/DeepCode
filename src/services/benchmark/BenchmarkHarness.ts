@@ -1,3 +1,9 @@
+import { join } from 'node:path'
+import {
+  createAgenticSandboxVerificationExecutor,
+  type AgenticSandboxTraceBundle,
+  type AgenticSandboxTraceRef,
+} from '../agenticSandbox/index.js'
 import {
   VerificationRunner,
   type VerificationRunnerSettings,
@@ -5,6 +11,7 @@ import {
   type VerificationCommandConfig,
 } from '../verification/index.js'
 import {
+  createSandboxTraceBundle,
   createBenchmarkTaskDataset,
   summarizeBenchmarkDataset,
   summarizeBenchmarkTaskRun,
@@ -67,6 +74,7 @@ export type BenchmarkTaskVerifierResult = {
   verificationSummary?: VerificationSummary
   logs?: BenchmarkExecutionLog[]
   regressions?: BenchmarkRegression[]
+  sandbox?: AgenticSandboxTraceBundle
 }
 
 export class BenchmarkHarness {
@@ -285,14 +293,38 @@ export function createDefaultBenchmarkVerifier(): BenchmarkTaskVerifier {
     }
 
     const settings = verificationSettingsFor(input.request, input.task)
-    const summary = await new VerificationRunner({ cwd, settings }).run()
+    const sandboxSessionId = sandboxSessionIdFor(input)
+    const sandboxTraces: AgenticSandboxTraceRef[] = []
+    const summary = await new VerificationRunner({
+      cwd,
+      settings,
+      executor: createAgenticSandboxVerificationExecutor({
+        sessionId: sandboxSessionId,
+        purpose: 'benchmark-verification',
+        traceDir: join(cwd, '.deepcode', 'sandbox-traces', 'benchmark'),
+        metadata: {
+          benchmarkRequestId: input.request.id,
+          benchmarkDatasetId: input.dataset.id,
+          benchmarkTaskId: input.task.id,
+          benchmarkCandidateId: input.candidate.id,
+          benchmarkMode: input.mode,
+        },
+        onTrace: trace => sandboxTraces.push(trace),
+      }),
+    }).run()
+    const sandbox = createSandboxTraceBundle(sandboxSessionId, sandboxTraces)
 
     return {
       verificationSummary: summary,
+      sandbox,
       logs: [
         {
           level: 'info',
           message: `Verification completed for ${input.task.id} with status ${summary.status}.`,
+        },
+        {
+          level: 'info',
+          message: `Sandbox trace recorded ${sandbox.manifestPaths.length} manifest(s) for ${input.task.id}.`,
         },
       ],
       regressions:
@@ -364,6 +396,7 @@ function normalizeTaskRun(
     ...(result.regressions
       ? { regressions: normalizeRegressions(result.regressions) }
       : {}),
+    ...(result.sandbox ? { sandbox: result.sandbox } : {}),
   }
 }
 
@@ -381,6 +414,7 @@ function mergeVerificationResult(
       ...(run.regressions ?? []),
       ...(verification.regressions ?? []),
     ],
+    ...(verification.sandbox ? { sandbox: verification.sandbox } : {}),
   }
 }
 
@@ -475,9 +509,25 @@ function verificationCommandsFor(
   )
 }
 
+function sandboxSessionIdFor(input: BenchmarkTaskVerifierInput): string {
+  return sanitizeSessionId(
+    `benchmark-${input.request.id}-${input.dataset.id}-${input.candidate.id}-${input.task.id}`,
+  )
+}
+
 function normalizeMaxTasks(value: number | undefined): number {
   if (!Number.isFinite(value) || value === undefined) return DEFAULT_MAX_TASKS
   return Math.max(1, Math.floor(value))
+}
+
+function sanitizeSessionId(value: string): string {
+  return (
+    value
+      .toLowerCase()
+      .replace(/[^a-z0-9._-]+/g, '-')
+      .replace(/^-|-$/g, '')
+      .slice(0, 96) || 'benchmark'
+  )
 }
 
 function normalizeTranscript(

@@ -44,6 +44,13 @@ describe('Benchmark Reporter', () => {
               costUsd: 0.01,
               turns: 2,
               regressionCount: 0,
+              sandboxSessionId: 'benchmark-report-agent-good-task-a',
+              sandboxManifestCount: 1,
+              sandboxCommandCount: 2,
+              sandboxPolicyViolationCount: 0,
+              sandboxManifestPaths: [
+                '/tmp/benchmark-report-agent-good-task-a.sandbox.json',
+              ],
               score: 1497.95,
             },
           ],
@@ -71,6 +78,9 @@ describe('Benchmark Reporter', () => {
               costUsd: 0.02,
               turns: 4,
               regressionCount: 1,
+              sandboxManifestCount: 0,
+              sandboxCommandCount: 0,
+              sandboxPolicyViolationCount: 0,
               score: -4.1,
             },
           ],
@@ -89,7 +99,7 @@ describe('Benchmark Reporter', () => {
       markdown.indexOf('| cli-slow |'),
     )
     expect(markdown).toContain(
-      '| task-a | completed | yes | 100% | 320000 prompt tok, 900000/2560000 chars, 2 sections, 1 trunc, hot/warm | $0.010000 | 2 | 0 | 1497.95 |',
+      '| task-a | completed | yes | 100% | 320000 prompt tok, 900000/2560000 chars, 2 sections, 1 trunc, hot/warm | benchmark-report-agent-good-task-a, 1 manifest, 2 cmd | $0.010000 | 2 | 0 | 1497.95 |',
     )
   })
 })
@@ -144,6 +154,44 @@ async function benchmarkResult() {
               severity: 'high',
             },
           ],
+    ...(input.candidate.id === 'agent-good'
+      ? {
+          sandbox: {
+            sessionId: 'benchmark-report-agent-good-task-a',
+            traceDir: '/tmp',
+            traces: [
+              {
+                sessionId: 'benchmark-report-agent-good-task-a-typecheck',
+                purpose: 'benchmark-verification',
+                status: 'completed',
+                substrate: 'local',
+                requestedSubstrate: 'local',
+                traceDir: '/tmp',
+                manifestPath:
+                  '/tmp/benchmark-report-agent-good-task-a.sandbox.json',
+                replayScriptPath:
+                  '/tmp/benchmark-report-agent-good-task-a.replay.sh',
+                snapshotPath:
+                  '/tmp/benchmark-report-agent-good-task-a.snapshot.json',
+                commandCount: 2,
+                policyViolationCount: 0,
+              },
+            ],
+            manifestPaths: [
+              '/tmp/benchmark-report-agent-good-task-a.sandbox.json',
+            ],
+            replayScriptPaths: [
+              '/tmp/benchmark-report-agent-good-task-a.replay.sh',
+            ],
+            snapshotPaths: [
+              '/tmp/benchmark-report-agent-good-task-a.snapshot.json',
+            ],
+            commandCount: 2,
+            policyViolationCount: 0,
+            fallbackReasons: [],
+          },
+        }
+      : {}),
   })
 
   return new BenchmarkHarness({

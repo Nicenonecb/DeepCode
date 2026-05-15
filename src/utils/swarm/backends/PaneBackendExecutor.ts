@@ -246,6 +246,8 @@ export class PaneBackendExecutor implements TeammateExecutor {
             ? (paneResult as { windowName: string }).windowName
             : undefined,
         isSplitPane: config.useSplitPane !== false,
+        sandboxSessionId: config.sandboxSessionId,
+        sandboxTraceManifest: config.sandboxTraceManifest,
       }
     } catch (error) {
       const errorMessage =

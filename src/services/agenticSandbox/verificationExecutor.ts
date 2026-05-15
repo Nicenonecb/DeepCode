@@ -6,7 +6,9 @@ import type {
 } from '../verification/index.js'
 import { AgenticSandboxSession } from './AgenticSandboxSession.js'
 import type {
+  AgenticSandboxManifest,
   AgenticSandboxRequest,
+  AgenticSandboxTraceRef,
   AgenticSandboxSubstrateKind,
 } from './types.js'
 
@@ -17,6 +19,7 @@ export type AgenticSandboxVerificationExecutorOptions = {
   fallbackPolicy?: AgenticSandboxRequest['fallbackPolicy']
   traceDir?: string
   metadata?: Record<string, string | number | boolean>
+  onTrace?: (trace: AgenticSandboxTraceRef) => void
 }
 
 export function createAgenticSandboxVerificationExecutor(
@@ -34,6 +37,7 @@ export function createAgenticSandboxVerificationExecutor(
       description: command.name,
     })
     await session.close(result.status)
+    options.onTrace?.(traceRefFromManifest(session.manifest()))
 
     return {
       exitCode: result.exitCode,
@@ -42,6 +46,35 @@ export function createAgenticSandboxVerificationExecutor(
       ...(result.status === 'timed_out' ? { timedOut: true } : {}),
       ...(result.error ? { error: result.error } : {}),
     }
+  }
+}
+
+export function traceRefFromManifest(
+  manifest: AgenticSandboxManifest,
+): AgenticSandboxTraceRef {
+  return {
+    sessionId: manifest.sessionId,
+    purpose: manifest.purpose,
+    status: manifest.status,
+    substrate: manifest.substrate,
+    ...(manifest.requestedSubstrate
+      ? { requestedSubstrate: manifest.requestedSubstrate }
+      : {}),
+    ...(manifest.fallbackReason
+      ? { fallbackReason: manifest.fallbackReason }
+      : {}),
+    traceDir: manifest.traceDir,
+    manifestPath:
+      manifest.recovery?.replay?.manifestPath ??
+      join(manifest.traceDir, `${manifest.sessionId}.sandbox.json`),
+    ...(manifest.recovery?.replay?.scriptPath
+      ? { replayScriptPath: manifest.recovery.replay.scriptPath }
+      : {}),
+    ...(manifest.recovery?.snapshot?.path
+      ? { snapshotPath: manifest.recovery.snapshot.path }
+      : {}),
+    commandCount: manifest.summary.commandCount,
+    policyViolationCount: manifest.policyViolations.length,
   }
 }
 

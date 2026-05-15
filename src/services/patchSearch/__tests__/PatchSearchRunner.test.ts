@@ -1,5 +1,10 @@
 import { describe, expect, test } from 'bun:test'
+import { mkdtemp, readFile } from 'node:fs/promises'
+import { join } from 'node:path'
+import { tmpdir } from 'node:os'
 import {
+  createDefaultCandidateVerifier,
+  createSpawnConfig,
   createCandidateTrajectories,
   PatchSearchRunner,
   type PatchCandidateExecutor,
@@ -129,6 +134,20 @@ describe('PatchSearchRunner', () => {
       '/tmp/patch-search-patch-search-test-1',
       '/tmp/patch-search-patch-search-test-2',
     ])
+    const spawnConfig = createSpawnConfig({
+      id: 'patch-search-test-candidate-1',
+      index: 0,
+      prompt: 'fix',
+      worktree: {
+        slug: 'patch-search-patch-search-test-1',
+        path: '/tmp/patch-search-patch-search-test-1',
+      },
+    })
+    expect(spawnConfig).toMatchObject({
+      sandboxSessionId: 'patch-search-patch-search-test-candidate-1',
+      sandboxTraceManifest:
+        '/tmp/patch-search-patch-search-test-1/.deepcode/sandbox-traces/patch-search/patch-search-patch-search-test-candidate-1.sandbox.json',
+    })
     expect(result.candidates[0]?.candidate.worktreePath).toContain('/tmp/')
     expect(
       result.candidates[0]?.candidate.executionLogs?.map(log => log.message),
@@ -281,6 +300,48 @@ describe('PatchSearchRunner', () => {
     })
     expect(result.winner?.summary.failure?.kind).toBe('verification_failed')
     expect(result.winner?.summary.riskFlags).toContain('verification_failed')
+  })
+
+  test('default verifier records sandbox manifests on candidates and summaries', async () => {
+    const cwd = await mkdtemp(join(tmpdir(), 'patch-search-sandbox-'))
+    const verifier = createDefaultCandidateVerifier()
+    const trajectory = createCandidateTrajectories(
+      request({ id: 'patch sandbox', maxCandidates: 1 }),
+    )[0]!
+    const candidate = {
+      id: trajectory.id,
+      worktreePath: cwd,
+      diffStats: { filesChanged: 1, insertions: 1, deletions: 0 },
+      touchedFiles: [{ path: 'src/query.ts', status: 'modified' as const }],
+    }
+
+    const verification = await verifier(trajectory, candidate, {
+      request: request({
+        id: 'patch sandbox',
+        mode: 'execute',
+        verificationCommands: ['bun --version'],
+      }),
+      mode: 'execute',
+    })
+
+    expect(verification.summary?.status).toBe('passed')
+    expect(verification.sandbox).toMatchObject({
+      sessionId: 'patch-search-patch-sandbox-patch-sandbox-candidate-1',
+      commandCount: 1,
+      policyViolationCount: 0,
+    })
+    const manifestPath = verification.sandbox?.manifestPaths[0] ?? ''
+    const manifest = JSON.parse(await readFile(manifestPath, 'utf8')) as {
+      purpose: string
+      metadata: Record<string, string>
+    }
+    expect(manifest).toMatchObject({
+      purpose: 'patch-search-verification',
+      metadata: {
+        patchSearchRequestId: 'patch sandbox',
+        patchSearchCandidateId: 'patch sandbox-candidate-1',
+      },
+    })
   })
 
   test('keeps structured failed candidates when worktree creation or execution fails', async () => {

@@ -1,0 +1,110 @@
+{
+  "id": "agentic-sandbox-stability",
+  "dataset": {
+    "id": "terminal-swe-pro-stability",
+    "name": "Terminal-Bench / SWE-Pro style sandbox stability",
+    "description": "Dry-run fixture for long terminal tasks that must expose sandbox session ids, trace manifests, replay plans, and cost/step/regression metrics.",
+    "version": "1",
+    "tasks": [
+      {
+        "id": "terminal-bench-replay",
+        "title": "Replayable terminal repair",
+        "prompt": "Run a multi-command terminal repair, preserve command order, and produce a replayable sandbox manifest for recovery.",
+        "category": "bugfix",
+        "difficulty": "hard",
+        "tags": ["agentic-sandbox", "terminal-bench", "trace-manifest"],
+        "targetFiles": [
+          {
+            "path": "src/services/agenticSandbox/AgenticSandboxSession.ts",
+            "required": true
+          },
+          {
+            "path": "src/services/agenticSandbox/verificationExecutor.ts"
+          }
+        ],
+        "verificationCommands": [
+          "bun test src/services/agenticSandbox/__tests__/AgenticSandboxSession.test.ts"
+        ],
+        "expectedOutcome": {
+          "summary": "Each verification command writes a sandbox manifest, snapshot, and replay script that can be inspected after the run.",
+          "requiredFiles": [
+            "src/services/agenticSandbox/AgenticSandboxSession.ts",
+            "src/services/agenticSandbox/verificationExecutor.ts"
+          ],
+          "assertions": [
+            "Manifest includes sessionId, traceDir, command count, resource limits, and policy violations.",
+            "Replay script path is included in the trace bundle.",
+            "Terminal task can be rerun from the trace manifest."
+          ],
+          "verificationCommands": [
+            "bun test src/services/agenticSandbox/__tests__/AgenticSandboxSession.test.ts"
+          ]
+        },
+        "timeoutMs": 120000,
+        "metadata": {
+          "benchmarkStyle": "terminal-bench",
+          "requiresSandboxTrace": true,
+          "expectedMaxSteps": 500
+        }
+      },
+      {
+        "id": "swe-pro-regression-budget",
+        "title": "SWE-Pro regression and budget accounting",
+        "prompt": "Verify a patch candidate with cost, step count, pass rate, and regression accounting while keeping sandbox evidence attached to the task report.",
+        "category": "test",
+        "difficulty": "hard",
+        "tags": ["agentic-sandbox", "cost", "regression", "swe-pro"],
+        "targetFiles": [
+          {
+            "path": "src/services/benchmark/Reporter.ts",
+            "required": true
+          },
+          {
+            "path": "src/services/patchSearch/PatchSearchRunner.ts",
+            "required": true
+          }
+        ],
+        "verificationCommands": [
+          "bun test src/services/benchmark/__tests__/Reporter.test.ts",
+          "bun test src/services/patchSearch/__tests__/PatchSearchRunner.test.ts"
+        ],
+        "expectedOutcome": {
+          "summary": "Benchmark and PatchSearch reports expose sandbox manifest counts, command counts, policy violations, cost, turns, and regressions.",
+          "requiredFiles": [
+            "src/services/benchmark/Reporter.ts",
+            "src/services/patchSearch/PatchSearchRunner.ts"
+          ],
+          "assertions": [
+            "Report JSON includes sandboxManifestPaths.",
+            "Markdown includes a Sandbox column.",
+            "Patch candidate summaries retain sandbox trace bundles."
+          ],
+          "verificationCommands": [
+            "bun test src/services/benchmark/__tests__/Reporter.test.ts",
+            "bun test src/services/patchSearch/__tests__/PatchSearchRunner.test.ts"
+          ]
+        },
+        "timeoutMs": 180000,
+        "metadata": {
+          "benchmarkStyle": "swe-pro",
+          "tracksCost": true,
+          "tracksRegressionRate": true
+        }
+      }
+    ]
+  },
+  "candidates": [
+    {
+      "id": "deepcode-agentic-sandbox",
+      "label": "DeepCode agentic sandbox",
+      "kind": "agent",
+      "command": "deepcode"
+    },
+    {
+      "id": "baseline-agent",
+      "label": "Baseline agent",
+      "kind": "agent",
+      "command": "baseline-agent"
+    }
+  ]
+}

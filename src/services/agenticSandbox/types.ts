@@ -147,6 +147,33 @@ export type AgenticSandboxManifest = {
   }
 }
 
+export type AgenticSandboxTraceRef = {
+  sessionId: string
+  purpose: string
+  status: AgenticSandboxStatus
+  substrate: AgenticSandboxSubstrateKind
+  requestedSubstrate?: AgenticSandboxSubstrateKind
+  fallbackReason?: string
+  traceDir: string
+  manifestPath: string
+  replayScriptPath?: string
+  snapshotPath?: string
+  commandCount: number
+  policyViolationCount: number
+}
+
+export type AgenticSandboxTraceBundle = {
+  sessionId: string
+  traceDir?: string
+  traces: AgenticSandboxTraceRef[]
+  manifestPaths: string[]
+  replayScriptPaths: string[]
+  snapshotPaths: string[]
+  commandCount: number
+  policyViolationCount: number
+  fallbackReasons: string[]
+}
+
 export type AgenticSandboxPrepareResult = {
   substrate: AgenticSandboxSubstrateKind
   requestedSubstrate?: AgenticSandboxSubstrateKind

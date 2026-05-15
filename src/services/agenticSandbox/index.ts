@@ -13,7 +13,10 @@ export {
   resolveAgenticSandboxSubstrate,
 } from './SubstrateRegistry.js'
 export { UnavailableAgenticSandboxSubstrate } from './UnavailableSubstrate.js'
-export { createAgenticSandboxVerificationExecutor } from './verificationExecutor.js'
+export {
+  createAgenticSandboxVerificationExecutor,
+  traceRefFromManifest,
+} from './verificationExecutor.js'
 export type {
   AgenticSandboxCacheSpec,
   AgenticSandboxCommand,
@@ -28,6 +31,8 @@ export type {
   AgenticSandboxStatus,
   AgenticSandboxSubstrate,
   AgenticSandboxSubstrateKind,
+  AgenticSandboxTraceBundle,
+  AgenticSandboxTraceRef,
 } from './types.js'
 export type {
   AgenticSandboxSubstrateRegistry,

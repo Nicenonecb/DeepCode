@@ -1,3 +1,10 @@
+import { join } from 'node:path'
+import {
+  createAgenticSandboxVerificationExecutor,
+  type AgenticSandboxTraceBundle,
+  type AgenticSandboxTraceRef,
+} from '../agenticSandbox/index.js'
+import { createSandboxTraceBundle } from '../benchmark/TaskDataset.js'
 import type { SpawnTeammateConfig } from '../../../packages/builtin-tools/src/tools/shared/spawnMultiAgent.js'
 import {
   createAgentWorktree,
@@ -105,6 +112,7 @@ export type PatchCandidateVerificationResult = {
   summary?: VerificationSummary
   failure?: PatchCandidateFailure
   logs?: PatchCandidateExecutionLog[]
+  sandbox?: AgenticSandboxTraceBundle
 }
 
 export class PatchSearchRunner {
@@ -308,6 +316,7 @@ export class PatchSearchRunner {
         ...candidate,
         verificationSummary:
           verification.summary ?? candidate.verificationSummary,
+        sandbox: verification.sandbox ?? candidate.sandbox,
         failure: verification.failure ?? candidate.failure,
         executionLogs: logs,
         riskFlags: verification.failure
@@ -396,13 +405,37 @@ export function createDefaultCandidateVerifier(): PatchCandidateVerifier {
     }
 
     const settings = verificationSettingsFor(context.request)
-    const summary = await new VerificationRunner({ cwd, settings }).run()
+    const sandboxSessionId = sanitizeSessionId(
+      `patch-search-${context.request.id}-${candidate.id}`,
+    )
+    const sandboxTraces: AgenticSandboxTraceRef[] = []
+    const summary = await new VerificationRunner({
+      cwd,
+      settings,
+      executor: createAgenticSandboxVerificationExecutor({
+        sessionId: sandboxSessionId,
+        purpose: 'patch-search-verification',
+        traceDir: join(cwd, '.deepcode', 'sandbox-traces', 'patch-search'),
+        metadata: {
+          patchSearchRequestId: context.request.id,
+          patchSearchCandidateId: candidate.id,
+          patchSearchMode: context.mode,
+        },
+        onTrace: trace => sandboxTraces.push(trace),
+      }),
+    }).run()
+    const sandbox = createSandboxTraceBundle(sandboxSessionId, sandboxTraces)
     return {
       summary,
+      sandbox,
       logs: [
         {
           level: 'info',
           message: `Verification completed with status ${summary.status}.`,
+        },
+        {
+          level: 'info',
+          message: `Sandbox trace recorded ${sandbox.manifestPaths.length} manifest(s) for ${candidate.id}.`,
         },
       ],
     }
@@ -435,6 +468,16 @@ export function createCandidateTrajectories(
 export function createSpawnConfig(
   trajectory: PatchCandidateTrajectory,
 ): SpawnTeammateConfig {
+  const sandboxSessionId = sanitizeSessionId(`patch-search-${trajectory.id}`)
+  const sandboxTraceManifest = trajectory.worktree.path
+    ? join(
+        trajectory.worktree.path,
+        '.deepcode',
+        'sandbox-traces',
+        'patch-search',
+        `${sandboxSessionId}.sandbox.json`,
+      )
+    : undefined
   return {
     name: trajectory.id,
     prompt: trajectory.prompt,
@@ -442,6 +485,8 @@ export function createSpawnConfig(
     team_name: 'patch-search',
     agent_type: 'worker',
     description: 'Patch Search candidate trajectory',
+    sandboxSessionId,
+    ...(sandboxTraceManifest ? { sandboxTraceManifest } : {}),
   }
 }
 
@@ -564,6 +609,16 @@ function sanitizeSlug(value: string): string {
     .replace(/[^a-zA-Z0-9._-]+/g, '-')
     .replace(/^-|-$/g, '')
   return sanitized.slice(0, 40) || 'candidate'
+}
+
+function sanitizeSessionId(value: string): string {
+  return (
+    value
+      .toLowerCase()
+      .replace(/[^a-z0-9._-]+/g, '-')
+      .replace(/^-|-$/g, '')
+      .slice(0, 96) || 'sandbox'
+  )
 }
 
 function mergeRiskFlags(

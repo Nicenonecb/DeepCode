@@ -82,6 +82,10 @@ export type TeammateAgentContext = {
   invocationKind?: 'spawn' | 'resume'
   /** Mutable flag: see SubagentContext.invocationEmitted. */
   invocationEmitted?: boolean
+  /** Agentic sandbox session id for long-task traceability. */
+  sandboxSessionId?: string
+  /** Agentic sandbox manifest path for replay/recovery evidence. */
+  sandboxTraceManifest?: string
 }
 
 /**
@@ -164,6 +168,8 @@ export function consumeInvokingRequestId():
   | {
       invokingRequestId: string
       invocationKind: 'spawn' | 'resume' | undefined
+      sandboxSessionId?: string
+      sandboxTraceManifest?: string
     }
   | undefined {
   const context = getAgentContext()
@@ -174,5 +180,11 @@ export function consumeInvokingRequestId():
   return {
     invokingRequestId: context.invokingRequestId,
     invocationKind: context.invocationKind,
+    ...(context.agentType === 'teammate' && context.sandboxSessionId
+      ? { sandboxSessionId: context.sandboxSessionId }
+      : {}),
+    ...(context.agentType === 'teammate' && context.sandboxTraceManifest
+      ? { sandboxTraceManifest: context.sandboxTraceManifest }
+      : {}),
   }
 }

@@ -130,6 +130,8 @@ export class InProcessBackend implements TeammateExecutor {
         allowedTools: config.permissions,
         allowPermissionPrompts: config.allowPermissionPrompts,
         invokingRequestId: config.invokingRequestId,
+        sandboxSessionId: config.sandboxSessionId,
+        sandboxTraceManifest: config.sandboxTraceManifest,
       })
 
       logForDebugging(
@@ -144,6 +146,8 @@ export class InProcessBackend implements TeammateExecutor {
       abortController: result.abortController,
       backendType: this.type,
       color: config.color,
+      sandboxSessionId: config.sandboxSessionId,
+      sandboxTraceManifest: config.sandboxTraceManifest,
       error: result.error,
     }
   }

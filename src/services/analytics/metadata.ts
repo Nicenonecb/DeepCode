@@ -488,6 +488,8 @@ export type EventMetadata = {
   parentSessionId?: string // CLAUDE_CODE_PARENT_SESSION_ID (team lead's session)
   agentType?: 'teammate' | 'subagent' | 'standalone' // Distinguishes swarm teammates, Agent tool subagents, and standalone agents
   teamName?: string // Team name for swarm agents (from env var or AsyncLocalStorage)
+  sandboxSessionId?: string // Agentic sandbox session id for long-task traceability
+  sandboxTraceManifest?: string // Agentic sandbox manifest path for replay/recovery evidence
   subscriptionType?: string // OAuth subscription tier (max, pro, enterprise, team)
   rh?: string // Hashed repo remote URL (first 16 chars of SHA256), for joining with server-side data
   kairosActive?: true // KAIROS assistant mode active (ant-only; set in main.tsx after gate check)
@@ -516,6 +518,8 @@ function getAgentIdentification(): {
   parentSessionId?: string
   agentType?: 'teammate' | 'subagent' | 'standalone'
   teamName?: string
+  sandboxSessionId?: string
+  sandboxTraceManifest?: string
 } {
   // Check AsyncLocalStorage first (for subagents running in same process)
   const agentContext = getAgentContext()
@@ -527,6 +531,12 @@ function getAgentIdentification(): {
     }
     if (agentContext.agentType === 'teammate') {
       result.teamName = agentContext.teamName
+      if (agentContext.sandboxSessionId) {
+        result.sandboxSessionId = agentContext.sandboxSessionId
+      }
+      if (agentContext.sandboxTraceManifest) {
+        result.sandboxTraceManifest = agentContext.sandboxTraceManifest
+      }
     }
     return result
   }
@@ -762,6 +772,8 @@ export type FirstPartyEventLoggingCoreMetadata = {
   parent_session_id?: string
   agent_type?: 'teammate' | 'subagent' | 'standalone'
   team_name?: string
+  sandbox_session_id?: string
+  sandbox_trace_manifest?: string
 }
 
 /**
@@ -929,6 +941,12 @@ export function to1PEventFormat(
   }
   if (coreFields.teamName) {
     core.team_name = coreFields.teamName
+  }
+  if (coreFields.sandboxSessionId) {
+    core.sandbox_session_id = coreFields.sandboxSessionId
+  }
+  if (coreFields.sandboxTraceManifest) {
+    core.sandbox_trace_manifest = coreFields.sandboxTraceManifest
   }
 
   // Map userMetadata to output fields.

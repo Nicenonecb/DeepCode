@@ -84,6 +84,8 @@ export type TeamFile = {
     sessionId?: string
     subscriptions: string[]
     backendType?: BackendType
+    sandboxSessionId?: string
+    sandboxTraceManifest?: string
     isActive?: boolean // false when idle, undefined/true when active
     mode?: PermissionMode // Current permission mode for this teammate
   }>

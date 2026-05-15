@@ -18,6 +18,11 @@ export type BenchmarkReportTask = {
   costUsd: number
   turns: number
   regressionCount: number
+  sandboxSessionId?: string
+  sandboxManifestCount: number
+  sandboxCommandCount: number
+  sandboxPolicyViolationCount: number
+  sandboxManifestPaths?: string[]
   score: number
 }
 
@@ -105,9 +110,11 @@ export function formatBenchmarkMarkdownReport(
   for (const candidate of report.candidates) {
     lines.push('', `## ${candidate.candidateId}`, '')
     lines.push(
-      '| Task | Status | Resolved | Verification | Context | Cost | Turns | Regressions | Score |',
+      '| Task | Status | Resolved | Verification | Context | Sandbox | Cost | Turns | Regressions | Score |',
     )
-    lines.push('| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |')
+    lines.push(
+      '| --- | --- | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: |',
+    )
     for (const task of candidate.tasks) {
       lines.push(
         [
@@ -116,6 +123,7 @@ export function formatBenchmarkMarkdownReport(
           task.resolved ? 'yes' : 'no',
           percent(task.verificationPassRate),
           contextSummary(task),
+          sandboxSummary(task),
           currency(task.costUsd),
           String(task.turns),
           String(task.regressionCount),
@@ -169,6 +177,15 @@ function taskReport(task: BenchmarkTaskSummary): BenchmarkReportTask {
     costUsd: task.cost.usd,
     turns: task.turns,
     regressionCount: task.regressionCount,
+    ...(task.sandbox?.sessionId
+      ? { sandboxSessionId: task.sandbox.sessionId }
+      : {}),
+    sandboxManifestCount: task.sandbox?.manifestPaths.length ?? 0,
+    sandboxCommandCount: task.sandbox?.commandCount ?? 0,
+    sandboxPolicyViolationCount: task.sandbox?.policyViolationCount ?? 0,
+    ...(task.sandbox?.manifestPaths.length
+      ? { sandboxManifestPaths: task.sandbox.manifestPaths }
+      : {}),
     score: task.score,
   }
 }
@@ -199,4 +216,17 @@ function contextSummary(task: BenchmarkReportTask): string {
     parts.push(task.evidenceTiers.join('/'))
   }
   return parts.length > 0 ? parts.join(', ') : 'n/a'
+}
+
+function sandboxSummary(task: BenchmarkReportTask): string {
+  if (!task.sandboxSessionId) return 'n/a'
+  const parts = [
+    task.sandboxSessionId,
+    `${task.sandboxManifestCount} manifest`,
+    `${task.sandboxCommandCount} cmd`,
+  ]
+  if (task.sandboxPolicyViolationCount > 0) {
+    parts.push(`${task.sandboxPolicyViolationCount} policy`)
+  }
+  return parts.join(', ')
 }

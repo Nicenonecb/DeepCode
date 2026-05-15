@@ -1,4 +1,8 @@
 import type {
+  AgenticSandboxTraceBundle,
+  AgenticSandboxTraceRef,
+} from '../agenticSandbox/index.js'
+import type {
   BenchmarkCostMetrics,
   BenchmarkContextEvidenceTier,
   BenchmarkContextMetrics,
@@ -146,6 +150,9 @@ export function summarizeBenchmarkTaskRun(
     logs: normalizeLogs(run.logs ?? []),
     context: normalizeContextMetrics(run.context ?? {}),
     regressions,
+    ...(run.sandbox
+      ? { sandbox: normalizeSandboxTraceBundle(run.sandbox) }
+      : {}),
   }
 }
 
@@ -341,6 +348,105 @@ function normalizeLogs(
     level: log.level,
     message: log.message,
   }))
+}
+
+export function createSandboxTraceBundle(
+  sessionId: string,
+  traces: AgenticSandboxTraceRef[],
+): AgenticSandboxTraceBundle {
+  const normalizedTraces = normalizeSandboxTraceRefs(traces)
+  return {
+    sessionId,
+    ...(normalizedTraces[0]?.traceDir
+      ? { traceDir: normalizedTraces[0].traceDir }
+      : {}),
+    traces: normalizedTraces,
+    manifestPaths: uniqueSorted(
+      normalizedTraces.map(trace => trace.manifestPath),
+    ),
+    replayScriptPaths: uniqueSorted(
+      normalizedTraces.flatMap(trace =>
+        trace.replayScriptPath ? [trace.replayScriptPath] : [],
+      ),
+    ),
+    snapshotPaths: uniqueSorted(
+      normalizedTraces.flatMap(trace =>
+        trace.snapshotPath ? [trace.snapshotPath] : [],
+      ),
+    ),
+    commandCount: normalizedTraces.reduce(
+      (total, trace) => total + trace.commandCount,
+      0,
+    ),
+    policyViolationCount: normalizedTraces.reduce(
+      (total, trace) => total + trace.policyViolationCount,
+      0,
+    ),
+    fallbackReasons: uniqueSorted(
+      normalizedTraces.flatMap(trace =>
+        trace.fallbackReason ? [trace.fallbackReason] : [],
+      ),
+    ),
+  }
+}
+
+export function normalizeSandboxTraceBundle(
+  bundle: AgenticSandboxTraceBundle,
+): AgenticSandboxTraceBundle {
+  const traces = normalizeSandboxTraceRefs(bundle.traces)
+  return {
+    sessionId: bundle.sessionId,
+    ...(bundle.traceDir ? { traceDir: bundle.traceDir } : {}),
+    traces,
+    manifestPaths: uniqueSorted([
+      ...bundle.manifestPaths,
+      ...traces.map(trace => trace.manifestPath),
+    ]),
+    replayScriptPaths: uniqueSorted([
+      ...bundle.replayScriptPaths,
+      ...traces.flatMap(trace =>
+        trace.replayScriptPath ? [trace.replayScriptPath] : [],
+      ),
+    ]),
+    snapshotPaths: uniqueSorted([
+      ...bundle.snapshotPaths,
+      ...traces.flatMap(trace =>
+        trace.snapshotPath ? [trace.snapshotPath] : [],
+      ),
+    ]),
+    commandCount: Math.max(0, Math.trunc(bundle.commandCount)),
+    policyViolationCount: Math.max(0, Math.trunc(bundle.policyViolationCount)),
+    fallbackReasons: uniqueSorted(bundle.fallbackReasons),
+  }
+}
+
+function normalizeSandboxTraceRefs(
+  traces: AgenticSandboxTraceRef[],
+): AgenticSandboxTraceRef[] {
+  return traces
+    .map(trace => ({
+      sessionId: trace.sessionId,
+      purpose: trace.purpose,
+      status: trace.status,
+      substrate: trace.substrate,
+      ...(trace.requestedSubstrate
+        ? { requestedSubstrate: trace.requestedSubstrate }
+        : {}),
+      ...(trace.fallbackReason ? { fallbackReason: trace.fallbackReason } : {}),
+      traceDir: trace.traceDir,
+      manifestPath: trace.manifestPath,
+      ...(trace.replayScriptPath
+        ? { replayScriptPath: trace.replayScriptPath }
+        : {}),
+      ...(trace.snapshotPath ? { snapshotPath: trace.snapshotPath } : {}),
+      commandCount: Math.max(0, Math.trunc(trace.commandCount)),
+      policyViolationCount: Math.max(0, Math.trunc(trace.policyViolationCount)),
+    }))
+    .sort((left, right) => left.sessionId.localeCompare(right.sessionId))
+}
+
+function uniqueSorted(values: string[]): string[] {
+  return [...new Set(values)].sort()
 }
 
 function assertUniqueTaskIds(tasks: BenchmarkTaskFixture[]): void {

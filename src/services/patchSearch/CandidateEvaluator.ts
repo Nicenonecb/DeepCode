@@ -34,6 +34,7 @@ export function evaluatePatchCandidate(
       touchedTargetFileCount: score.touchedTargetFileCount,
       targetCoverage: score.targetCoverage,
       riskFlags: riskFlagsFor(candidate, score),
+      ...(candidate.sandbox ? { sandbox: candidate.sandbox } : {}),
       total: score.total,
       reasons,
     },

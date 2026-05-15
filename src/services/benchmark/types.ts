@@ -1,3 +1,4 @@
+import type { AgenticSandboxTraceBundle } from '../agenticSandbox/index.js'
 import type {
   VerificationCommandConfig,
   VerificationSummary,
@@ -159,6 +160,7 @@ export type BenchmarkTaskRun = {
   turns?: number
   context?: BenchmarkContextMetrics
   regressions?: BenchmarkRegression[]
+  sandbox?: AgenticSandboxTraceBundle
 }
 
 export type BenchmarkTaskSummary = BenchmarkTaskRunMetrics & {
@@ -171,6 +173,7 @@ export type BenchmarkTaskSummary = BenchmarkTaskRunMetrics & {
   logs: BenchmarkExecutionLog[]
   context: BenchmarkContextMetrics
   regressions: BenchmarkRegression[]
+  sandbox?: AgenticSandboxTraceBundle
 }
 
 export type BenchmarkDatasetSummary = {

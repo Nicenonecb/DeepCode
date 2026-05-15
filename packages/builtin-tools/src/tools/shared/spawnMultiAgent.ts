@@ -82,6 +82,8 @@ export type SpawnOutput = {
   team_name?: string
   is_splitpane?: boolean
   plan_mode_required?: boolean
+  sandbox_session_id?: string
+  sandbox_trace_manifest?: string
 }
 
 export type SpawnTeammateConfig = {
@@ -98,6 +100,8 @@ export type SpawnTeammateConfig = {
    *  spawned this teammate. Threaded through to TeammateAgentContext for
    *  lineage tracing on tengu_api_* events. */
   invokingRequestId?: string
+  sandboxSessionId?: string
+  sandboxTraceManifest?: string
 }
 
 // Internal input type matching TeammateTool's spawn parameters
@@ -112,6 +116,8 @@ type SpawnInput = {
   agent_type?: string
   description?: string
   invokingRequestId?: string
+  sandboxSessionId?: string
+  sandboxTraceManifest?: string
 }
 
 // ============================================================================
@@ -329,6 +335,8 @@ async function appendTeamMember(
     cwd: spawn.workingDir,
     subscriptions: [],
     backendType: result.backendType,
+    sandboxSessionId: input.sandboxSessionId,
+    sandboxTraceManifest: input.sandboxTraceManifest,
   })
   await writeTeamFileAsync(spawn.teamName, teamFile)
 }
@@ -370,6 +378,8 @@ async function handleSpawn(
     planModeRequired: input.plan_mode_required ?? false,
     parentSessionId: getSessionId(),
     invokingRequestId: input.invokingRequestId,
+    sandboxSessionId: input.sandboxSessionId,
+    sandboxTraceManifest: input.sandboxTraceManifest,
     useSplitPane: input.use_splitpane !== false,
   })
 
@@ -395,6 +405,8 @@ async function handleSpawn(
       team_name: spawn.teamName,
       is_splitpane: display.isSplitPane,
       plan_mode_required: input.plan_mode_required,
+      sandbox_session_id: input.sandboxSessionId,
+      sandbox_trace_manifest: input.sandboxTraceManifest,
     },
   }
 }

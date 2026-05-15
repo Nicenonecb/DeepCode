@@ -1,5 +1,7 @@
 import { describe, expect, test } from 'bun:test'
-import { readFile } from 'node:fs/promises'
+import { mkdtemp, readFile } from 'node:fs/promises'
+import { join } from 'node:path'
+import { tmpdir } from 'node:os'
 import {
   BenchmarkHarness,
   buildBenchmarkHarnessSummary,
@@ -128,12 +130,13 @@ describe('BenchmarkHarness', () => {
     expect(result.candidates[0]?.summary.resolvedCount).toBe(1)
   })
 
-  test('runs the default VerificationRunner verifier with configured commands', async () => {
+  test('runs the default verifier with configured commands and sandbox trace manifests', async () => {
+    const cwd = await mkdtemp(join(tmpdir(), 'benchmark-sandbox-'))
     const executor: BenchmarkTaskExecutor = async () => ({
       exitStatus: 'completed',
       turns: 1,
       cost: { usd: 0.01 },
-      cwd: process.cwd(),
+      cwd,
     })
 
     const result = await new BenchmarkHarness({
@@ -143,13 +146,13 @@ describe('BenchmarkHarness', () => {
       id: 'bench-verification',
       mode: 'execute',
       dataset: dataset(['task-a']),
-      candidates: [{ id: 'agent-a', kind: 'agent', cwd: process.cwd() }],
+      candidates: [{ id: 'agent-a', kind: 'agent', cwd }],
       verificationCommands: [
         {
           kind: 'test',
-          name: 'Bun version',
+          name: 'Sandbox Echo',
           command: 'bun',
-          args: ['--version'],
+          args: ['--eval', 'console.log("sandbox benchmark")'],
         },
       ],
     })
@@ -160,6 +163,32 @@ describe('BenchmarkHarness', () => {
     expect(task?.logs).toContainEqual({
       level: 'info',
       message: 'Verification completed for task-a with status passed.',
+    })
+    expect(task?.sandbox).toMatchObject({
+      sessionId: 'benchmark-bench-verification-dataset-agent-a-task-a',
+      commandCount: 1,
+      policyViolationCount: 0,
+    })
+    expect(task?.sandbox?.manifestPaths).toHaveLength(1)
+    const manifest = JSON.parse(
+      await readFile(task?.sandbox?.manifestPaths[0] ?? '', 'utf8'),
+    ) as {
+      sessionId: string
+      purpose: string
+      metadata: Record<string, string>
+      summary: { commandCount: number }
+    }
+    expect(manifest).toMatchObject({
+      sessionId:
+        'benchmark-bench-verification-dataset-agent-a-task-a-sandbox-echo',
+      purpose: 'benchmark-verification',
+      metadata: {
+        benchmarkRequestId: 'bench-verification',
+        benchmarkDatasetId: 'dataset',
+        benchmarkTaskId: 'task-a',
+        benchmarkCandidateId: 'agent-a',
+      },
+      summary: { commandCount: 1 },
     })
   })
 
@@ -330,6 +359,38 @@ describe('BenchmarkHarness', () => {
         }),
       ],
     )
+  })
+
+  test('loads the agentic sandbox stability fixture', async () => {
+    const fixture = JSON.parse(
+      await readFile(
+        'tests/benchmark/fixtures/agentic-sandbox-stability.json',
+        'utf8',
+      ),
+    ) as {
+      id: string
+      dataset: BenchmarkTaskDataset
+      candidates: BenchmarkHarnessRequest['candidates']
+    }
+
+    const result = await new BenchmarkHarness().run({
+      id: fixture.id,
+      dataset: fixture.dataset,
+      candidates: fixture.candidates,
+      maxTasks: 2,
+    })
+
+    expect(result.summary).toMatchObject({
+      requestId: 'agentic-sandbox-stability',
+      datasetId: 'terminal-swe-pro-stability',
+      mode: 'dry_run',
+      candidateCount: 2,
+      taskCount: 2,
+    })
+    expect(fixture.dataset.tasks.map(task => task.tags)).toEqual([
+      ['agentic-sandbox', 'terminal-bench', 'trace-manifest'],
+      ['agentic-sandbox', 'cost', 'regression', 'swe-pro'],
+    ])
   })
 })
 

@@ -1,3 +1,4 @@
+import type { AgenticSandboxTraceBundle } from '../agenticSandbox/index.js'
 import type { VerificationSummary } from '../verification/index.js'
 
 export type PatchSearchTargetFile = {
@@ -99,6 +100,7 @@ export type PatchCandidate = {
   targetFiles?: PatchSearchTargetFile[]
   riskFlags?: PatchCandidateRiskFlag[]
   verificationSummary?: VerificationSummary
+  sandbox?: AgenticSandboxTraceBundle
 }
 
 export type PatchSearchRequest = {
@@ -229,6 +231,7 @@ export type PatchCandidateScoreSummary = {
   touchedTargetFileCount: number
   targetCoverage: number
   riskFlags: PatchCandidateRiskFlag[]
+  sandbox?: AgenticSandboxTraceBundle
   total: number
   reasons: SelectionReason[]
 }

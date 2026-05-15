@@ -504,6 +504,10 @@ export type InProcessRunnerConfig = {
   /** request_id of the API call that spawned this teammate, for lineage
    *  tracing on tengu_api_* events. */
   invokingRequestId?: string
+  /** Agentic sandbox session id for long-task traceability. */
+  sandboxSessionId?: string
+  /** Agentic sandbox manifest path for replay/recovery evidence. */
+  sandboxTraceManifest?: string
 }
 
 /**
@@ -913,6 +917,8 @@ export async function runInProcessTeammate(
     allowedTools,
     allowPermissionPrompts,
     invokingRequestId,
+    sandboxSessionId,
+    sandboxTraceManifest,
   } = config
   const { setAppState } = toolUseContext
 
@@ -933,6 +939,8 @@ export async function runInProcessTeammate(
     invokingRequestId,
     invocationKind: 'spawn',
     invocationEmitted: false,
+    sandboxSessionId,
+    sandboxTraceManifest,
   }
 
   // Build system prompt based on systemPromptMode
