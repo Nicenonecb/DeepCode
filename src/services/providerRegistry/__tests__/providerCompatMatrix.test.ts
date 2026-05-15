@@ -28,6 +28,13 @@ describe('COMPAT_PROFILES', () => {
     expect(COMPAT_PROFILES['deepseek'].supportsThinkingField).toBe(true)
   })
 
+  test('deepseek advertises DSML with native OpenAI tools fallback', () => {
+    expect(COMPAT_PROFILES['deepseek'].toolProtocols).toEqual([
+      'dsml',
+      'openai-tools',
+    ])
+  })
+
   test('strict-openai strips stream_options', () => {
     expect(COMPAT_PROFILES['strict-openai'].supportsStreamUsageOption).toBe(
       false,

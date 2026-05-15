@@ -98,17 +98,28 @@ async function runSingleToolUse(
   context: ToolUseContext,
   canUseTool: CanUseToolFn = async () => ({ behavior: 'allow' }),
 ): Promise<Message> {
-  const updates = []
+  const updates: Message[] = []
   for await (const update of runToolUse(
     toolUse,
     makeAssistantMessage(toolUse),
     canUseTool,
     context,
   )) {
-    updates.push(update)
+    updates.push(update.message)
   }
-  expect(updates).toHaveLength(1)
-  return updates[0]!.message
+  const toolResult = updates.find(message => {
+    if (message.type !== 'user' || !message.message) return false
+    const content = message.message.content
+    return (
+      Array.isArray(content) &&
+      content.some(
+        block =>
+          block.type === 'tool_result' && block.tool_use_id === toolUse.id,
+      )
+    )
+  })
+  expect(toolResult).toBeDefined()
+  return toolResult!
 }
 
 function getRepairIssue(message: Message): ToolCallRepairIssue {

@@ -17,7 +17,7 @@ import {
   anthropicToolsToOpenAI,
   anthropicToolChoiceToOpenAI,
 } from '@ant/model-provider'
-import { resolveOpenAICompatModel } from './env.js'
+import { resolveOpenAICompatEnv, resolveOpenAICompatModel } from './env.js'
 import { isChatGPTAuthEnabled } from './chatgptAuth.js'
 import {
   adaptResponsesStreamToAnthropic,
@@ -72,7 +72,12 @@ import { applyDSMLRequestGateway } from './dsmlRequest.js'
 import {
   applyDSMLResponseGateway,
   createDSMLToolUseId,
+  type DSMLResponseGatewayResult,
 } from './dsmlResponse.js'
+import {
+  logEvent,
+  type AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+} from '../../analytics/index.js'
 
 function convertToResponsesReasoningEffort(
   effortValue: unknown,
@@ -155,6 +160,7 @@ function assembleFinalAssistantOutputs(params: {
   stopReason: string | null
   maxTokens: number
   dsmlGateway: Options['dsmlGateway']
+  onDSMLResponse?: (result: DSMLResponseGatewayResult) => void
 }): (AssistantMessage | SystemAPIErrorMessage)[] {
   const {
     partialMessage,
@@ -176,7 +182,9 @@ function assembleFinalAssistantOutputs(params: {
     contentBlocks: rawBlocks,
     settings: dsmlGateway,
     createToolUseId: createDSMLToolUseId,
+    knownToolNames: new Set(tools.map(tool => tool.name)),
   })
+  params.onDSMLResponse?.(dsmlResponse)
   const allBlocks = dsmlResponse.contentBlocks
   const effectiveStopReason = dsmlResponse.hasToolUse ? 'tool_use' : stopReason
 
@@ -234,6 +242,7 @@ export async function* queryModelOpenAI(
   try {
     // 1. Resolve model name
     const openaiModel = resolveOpenAICompatModel(options.model)
+    const openaiCompatEnv = resolveOpenAICompatEnv()
 
     // 2. Normalize messages using shared preprocessing
     const messagesForAPI = normalizeMessagesForAPI(messages, tools)
@@ -312,6 +321,8 @@ export async function* queryModelOpenAI(
       options.toolChoice,
     )
     const requestToolProtocol = applyDSMLRequestGateway({
+      model: openaiModel,
+      baseURL: openaiCompatEnv.baseURL,
       messages: messagesWithDeferredToolList,
       standardTools: standardTools as unknown as Array<Record<string, unknown>>,
       nativeTools: nativeOpenAITools,
@@ -330,6 +341,33 @@ export async function* queryModelOpenAI(
     )
     const openaiTools = requestToolProtocol.tools
     const openaiToolChoice = requestToolProtocol.toolChoice
+    const effectiveDSMLGatewaySettings: Options['dsmlGateway'] =
+      requestToolProtocol.enabled
+        ? {
+            ...options.dsmlGateway,
+            enabled: true,
+          }
+        : {
+            ...options.dsmlGateway,
+            enabled: false,
+          }
+    const dsmlMetrics = {
+      request: requestToolProtocol.metrics,
+      response: {
+        parseAttemptCount: 0,
+        parseErrorCount: 0,
+        parsedToolUseCount: 0,
+        fallbackToTextCount: 0,
+        unknownToolCount: 0,
+      },
+    }
+    const observeDSMLResponse = (result: DSMLResponseGatewayResult): void => {
+      dsmlMetrics.response.parseAttemptCount += result.parseAttemptCount
+      dsmlMetrics.response.parseErrorCount += result.parseErrorCount
+      dsmlMetrics.response.parsedToolUseCount += result.toolUseCount
+      dsmlMetrics.response.unknownToolCount += result.unknownToolCount
+      if (result.fellBackToText) dsmlMetrics.response.fallbackToTextCount++
+    }
     const reasoningEffort = getChatGPTResponsesReasoningEffort(
       options.effortValue,
     )
@@ -372,8 +410,23 @@ export async function* queryModelOpenAI(
     )
 
     logForDebugging(
-      `[OpenAI] Calling model=${openaiModel}, messages=${openaiMessages.length}, tools=${openaiTools.length}, thinking=${enableThinking}`,
+      `[OpenAI] Calling model=${openaiModel}, messages=${openaiMessages.length}, tools=${openaiTools.length}, thinking=${enableThinking}, toolProtocol=${requestToolProtocol.decision.toolProtocol}, dsmlSource=${requestToolProtocol.decision.source}${requestToolProtocol.decision.fallbackReason ? `, dsmlFallback=${requestToolProtocol.decision.fallbackReason}` : ''}`,
     )
+    logEvent('tengu_dsml_gateway_request', {
+      model:
+        openaiModel as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+      tool_protocol: requestToolProtocol.decision
+        .toolProtocol as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+      source: requestToolProtocol.decision
+        .source as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+      fallback_reason: (requestToolProtocol.decision.fallbackReason ??
+        'none') as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+      provider_evidence: requestToolProtocol.decision
+        .providerEvidence as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+      standard_tool_count: requestToolProtocol.metrics.standardToolCount,
+      native_tool_count: requestToolProtocol.metrics.nativeToolCount,
+      prompt_chars: requestToolProtocol.metrics.promptChars,
+    })
 
     // 11. Call OpenAI API with streaming. ChatGPT subscription auth uses the
     // Codex Responses backend; API-key/OpenAI-compatible auth keeps the
@@ -498,7 +551,8 @@ export async function* queryModelOpenAI(
               contentBlocks,
               tools,
               agentId: options.agentId,
-              dsmlGateway: options.dsmlGateway,
+              dsmlGateway: effectiveDSMLGatewaySettings,
+              onDSMLResponse: observeDSMLResponse,
               usage,
               stopReason,
               maxTokens,
@@ -546,6 +600,10 @@ export async function* queryModelOpenAI(
       completionStartTime: ttftMs > 0 ? new Date(start + ttftMs) : undefined,
       tools: convertToolsToLangfuse(toolSchemas as unknown[]),
       ...(enableThinking && { thinking: { type: 'enabled' } }),
+      metadata: {
+        toolProtocol: requestToolProtocol.decision.toolProtocol,
+        dsmlGateway: dsmlMetrics,
+      },
     })
 
     // Safety: if stream ended without message_stop, assemble and yield whatever we have
@@ -555,7 +613,8 @@ export async function* queryModelOpenAI(
         contentBlocks,
         tools,
         agentId: options.agentId,
-        dsmlGateway: options.dsmlGateway,
+        dsmlGateway: effectiveDSMLGatewaySettings,
+        onDSMLResponse: observeDSMLResponse,
         usage,
         stopReason,
         maxTokens,

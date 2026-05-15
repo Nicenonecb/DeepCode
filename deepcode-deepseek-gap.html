@@ -521,12 +521,12 @@
       <div>
         <div class="eyebrow">DeepCode Progress Board</div>
         <h1>DeepCode 进度看板：实现差距和下一步。</h1>
-        <p class="lead">DeepCode 已有 coding agent 底盘，但还不是 DeepSeek V4 Pro 原生系统。要赢其他 CLI / agent，核心是模型画像、验证闭环、上下文工程、工具协议和多轨迹修复。</p>
+        <p class="lead">DeepCode 已有 coding agent 底盘，但还不是 DeepSeek V4 Pro 原生系统。要赢其他 CLI / agent，核心是模型画像、验证闭环、上下文工程、工具协议、多轨迹修复和 V4 原生推理预算。</p>
         <div class="verdict">
           <span class="pill">结论：底盘已具备</span>
-          <span class="pill">短板：DeepSeek 原生层不足</span>
-          <span class="pill">优先：VerificationRunner + ContextPacker + WorkingMemory</span>
-          <span class="pill">后续：LSP Collector + Patch Search</span>
+          <span class="pill">短板：V4 原生策略仍不足</span>
+          <span class="pill">优先：DSML 默认化 + Effort Budget + Sandbox/Benchmark</span>
+          <span class="pill">后续：Interleaved Thinking + Agentic Search</span>
           <span class="pill">开源删减：3 / 12 已完成</span>
           <span class="pill">版本：0.0.1</span>
         </div>
@@ -535,7 +535,7 @@
         <h2>当前判断</h2>
         <div class="score-grid">
           <div class="metric"><strong>20</strong><span>项底层能力已具备</span></div>
-          <div class="metric"><strong>7</strong><span>项关键能力未产品化</span></div>
+          <div class="metric"><strong>10</strong><span>项 V4 原生缺口待补</span></div>
           <div class="metric"><strong>4</strong><span>项应优先开工</span></div>
           <div class="metric"><strong>3/12</strong><span>项开源删减已同步状态</span></div>
         </div>
@@ -555,6 +555,7 @@
       <a href="#optimize">可优化</a>
       <a href="#rewrite">要重写</a>
       <a href="#paper">论文新增</a>
+      <a href="#audit">本轮复核</a>
       <a href="#remove">开源删减</a>
       <a href="#priority">优先级</a>
     </nav>
@@ -653,6 +654,36 @@
             <tr><td>Large-scale Agentic Tasks</td><td>DeepCode Benchmark Harness</td><td>让产品能力可测、可回归、可优化。</td></tr>
           </tbody>
         </table>
+      </section>
+
+      <section id="audit">
+        <div class="section-head">
+          <h2>本轮论文复核新增缺口</h2>
+          <p>2026-05-15 对桌面 `DeepSeek V4 Pro 相关论文` 和当前代码做静态复核。结论：前几轮确实补上了很多骨架，但下面这些还没完全 cover 论文里的 V4 Pro 强项。</p>
+          <p><strong>口径修正：</strong>写完下面这些只是达到“V4 Pro 原生发挥”的必要条件，不等于自动完成 120%。120% 的验收必须再通过真实 coding / terminal / MCP / search benchmark 证明：成功率、回归率、成本、步数和长任务稳定性都优于当前主流 agent。</p>
+        </div>
+        <table class="wide-table">
+          <thead><tr><th>论文能力</th><th>当前覆盖</th><th>还缺什么</th></tr></thead>
+          <tbody>
+            <tr class="done-row"><td colspan="3"><details class="feature-details" open><summary><span class="feature-title"><span class="status-chip done">DONE</span><strong>V4 DSML 是原生工具协议</strong></span><span class="feature-note">本轮已按生产级默认化实现；分步是验收清单，不是 MVP 开关。</span><span class="feature-next">验收状态：DeepSeek V4 Pro 官方 endpoint 默认走 DSML，native OpenAI tools 仅作为 settings/env/custom endpoint 显式或保守回退路径，并补测试、指标和 provider fixture。</span></summary><div class="feature-steps"><ol class="step-list"><li><div><span class="status-chip done">DONE</span><strong>协议能力画像改准</strong></div><p>`DeepSeekToolProtocol` 已扩为 `dsml` / `openai-tools`；V4 Pro profile 声明 DSML 优先、native OpenAI tools fallback，V4 Flash / V3.2 保持 native tools；model profile 单测覆盖该能力。</p></li><li><div><span class="status-chip done">DONE</span><strong>生产级默认启用策略</strong></div><p>OpenAI-compatible 请求路径会基于 DeepSeek V4 Pro profile + 官方 DeepSeek base URL 默认启用 DSML；`dsmlGateway.enabled=false` 和 `DEEPSEEK_DSML_GATEWAY=0` 可显式回退；custom DeepSeek-compatible / localhost / vLLM endpoint 默认保守走 native tools。</p></li><li><div><span class="status-chip done">DONE</span><strong>响应回退和错误边界</strong></div><p>响应侧记录 parse attempt/error/tool count；malformed DSML 可按策略保留文本或发出可解析 tool_use；未知工具会保留原 DSML invoke 文本，同时继续执行同一响应里已知工具调用。</p></li><li><div><span class="status-chip done">DONE</span><strong>指标和 Debug 可见性</strong></div><p>新增 `tengu_dsml_gateway_request` 和 `tengu_dsml_gateway_tool_results` 指标，记录协议、fallback、provider evidence、prompt chars、parse metrics、工具数量和成功/失败数；OpenAI debug log 输出 `toolProtocol=dsml|openai-tools`；Langfuse generation metadata 携带 DSML request/response metrics。</p></li><li><div><span class="status-chip done">DONE</span><strong>真实 provider 验证和回归门禁</strong></div><p>新增 `deepseek-v4-pro-dsml` provider fixture，覆盖官方 DeepSeek base URL、多工具、字符串参数、JSON schema prompt 和响应映射；相关 DSML/profile/provider 测试 46 pass，更宽 OpenAI/DSML 回归 104 pass，OpenAI isolated 12 pass，`benchmark:smoke` dry-run 通过；`bun run precheck` 通过（typecheck + biome check:fix + 全量 bun test 5537 pass）。此前全量测试里的 `toolExecution.repair.test.ts` 顺序 flaky 已定位为 stats store mock 污染并修复。</p></li></ol></div></details></td></tr>
+            <tr><td><span class="status-chip next">NEXT</span><br>Non-think / High / Max 三档推理预算</td><td>`/effort max` 和 `reasoning_effort` 已接入，但 V4 profile 只表达 high/max；low/medium 会折到 high，非思考模式不是一等能力。</td><td><strong>缺 per-effort profile。</strong>按论文把 Non-think、High、Max 绑定不同 context / output / max reasoning token / 系统注入；小任务可真 non-think，大任务才 Max。</td></tr>
+            <tr><td><span class="status-chip next">NEXT</span><br>Think Max 专用系统指令</td><td>当前主要发送 `reasoning_effort=max`，没有看到论文 Table 3 的 Max 指令作为 DeepSeek 专属 system prompt patch。</td><td><strong>缺 Max prompt injector。</strong>只在 DeepSeek V4 Pro Max 路径注入“彻底分解、压力测试、列出替代和排除假设”的系统提示，并和用户显式简洁要求做冲突处理。</td></tr>
+            <tr><td><span class="status-chip next">NEXT</span><br>V4 Interleaved Thinking 跨用户轮保留</td><td>`reasoning_content` 可回传，tool_result 也会转成 tool role；但没有显式 V4 retention manager，meta context 仍用 user message 注入。</td><td><strong>缺会话级策略。</strong>需要区分 tool-calling / normal conversation：工具任务跨用户轮保留 reasoning_content，普通聊天按预算丢弃；同时避免 meta user message 破坏工具上下文路径。</td></tr>
+            <tr><td><span class="status-chip next">NEXT</span><br>1M/512K 长上下文工程</td><td>V4 profile 识别 1M，ContextPacker 有 24K 默认预算且默认关闭。</td><td><strong>缺大上下文调度。</strong>需要 80% context 水位策略、512K agent task cap、分层证据包、长仓库/多文档 benchmark，而不是只塞 24K 摘要。</td></tr>
+            <tr><td><span class="status-chip next">NEXT</span><br>生产级 Agentic Sandbox / DSec</td><td>本地 Bash、worktree、PatchSearch 隔离已具备。</td><td><strong>缺统一沙箱 API。</strong>还没有 function/container/microVM/fullVM substrate、镜像缓存、命令轨迹日志、可重放恢复和资源配额；这影响 Terminal-Bench/SWE-Pro 级长任务稳定性。</td></tr>
+            <tr><td><span class="status-chip next">NEXT</span><br>大规模真实 agent benchmark</td><td>BenchmarkHarness 是骨架，当前 fixture 是 smoke/dry-run。</td><td><strong>缺任务语料和真实 executor。</strong>需要 SWE-Verified/Terminal-Bench/MCP/Toolathlon 风格数据、500 step 长任务、F2P/P2F/JUnit 指标和成本/成功率趋势。</td></tr>
+            <tr><td><span class="status-chip next">NEXT</span><br>Generative Reward Model / hard-to-verify 评估</td><td>VerificationRunner 适合 typecheck/lint/test，可解析失败并回灌。</td><td><strong>缺 rubric judge。</strong>论文强调难验证任务用生成式评估/打分；DeepCode 还需要 LLM-as-judge、成对比较、事实性/实用性 rubrics 和人工复核接口。</td></tr>
+            <tr><td><span class="status-chip next">NEXT</span><br>Agentic Search</td><td>WebSearch/WebFetch、MCP、Python/Bash 能组合使用。</td><td><strong>缺搜索编排器。</strong>还没有 thinking budget 下的多轮搜索、并行 fetch、候选答案交叉验证、引用证据压缩和 RAG/Agentic Search A/B。</td></tr>
+            <tr><td><span class="status-chip opt">OPT</span><br>模型内部架构能力</td><td>CSA/HCA、mHC、MoE、MTP、FP4、MegaMoE 属于 DeepSeek 模型/服务端能力，CLI 只能通过 API 继承。</td><td><strong>若要本地 serving 才需要补。</strong>当前项目不覆盖 inference engine、KV cache、FP4 QAT、MoE kernel；作为 API agent 可标“依赖 DeepSeek 服务端”。</td></tr>
+          </tbody>
+        </table>
+        <div class="grid" style="margin-top:16px">
+          <article class="item done"><span class="tag">本轮目标</span><h3>DSML 默认化</h3><p>把 V4 DSML 从实验开关升级为 DeepSeek V4 Pro 官方 provider 的默认工具协议，native OpenAI tools 只作为显式/保守回退路径。</p></article>
+          <article class="item done"><span class="tag">验证</span><h3>测试矩阵</h3><p>DSML/profile/provider 目标测试 46 pass；OpenAI/DSML 扩展回归 104 pass；`queryModelOpenAI.isolated.ts` 显式路径 12 pass；`bun run typecheck` 通过；`benchmark:smoke` dry-run 通过；`bun run precheck` 通过（typecheck + biome check:fix + 全量 bun test 5537 pass）。`bun run test:all` 不存在，仓库当前对应脚本是 `precheck`。</p></article>
+          <article class="item opt"><span class="tag">影响文件</span><h3>主要改动</h3><p>`src/services/deepseek/modelProfiles.ts`、`src/services/api/openai/dsmlRequest.ts`、`src/services/api/openai/dsmlResponse.ts`、`src/services/api/openai/index.ts`、`src/services/providerRegistry/providerCompatMatrix.ts`、Langfuse metadata、DSML fixture 和相关测试。</p></article>
+          <article class="item rewrite"><span class="tag">剩余风险</span><h3>真实线上 A/B</h3><p>已有官方 provider fixture 和 dry-run benchmark，但还没有现场调用 DeepSeek API 的 VCR/真实 benchmark 对比；需要继续量化 DSML vs native tools 的成功率、成本、步数和长任务稳定性，全量测试顺序 flaky 已在本轮清掉；下一步仍需真实线上 A/B。</p></article>
+          <article class="item rewrite"><span class="tag">下一步</span><h3>继续优先项</h3><p>做 per-effort context/output budget、Think Max prompt injector、真实 benchmark executor 和 sandbox trajectory log；只有 benchmark 赢了，才算接近 120%。</p></article>
+        </div>
       </section>
 
       <section id="remove">

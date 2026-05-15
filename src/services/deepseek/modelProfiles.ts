@@ -5,7 +5,12 @@ export type DeepSeekModelId =
   | 'deepseek-v4-flash'
   | 'deepseek-v3.2'
 
-export type DeepSeekToolProtocol = 'openai-tools'
+export type DeepSeekToolProtocol = 'dsml' | 'openai-tools'
+
+export type DeepSeekToolProtocolProfile = {
+  preferred: DeepSeekToolProtocol
+  fallbacks: readonly DeepSeekToolProtocol[]
+}
 
 export type DeepSeekThinkingMode = {
   supported: boolean
@@ -44,7 +49,7 @@ export type DeepSeekModelProfile = {
   maxOutputTokens: number
   maxCoTTokens?: number
   thinking: DeepSeekThinkingMode
-  toolProtocol: DeepSeekToolProtocol
+  toolProtocol: DeepSeekToolProtocolProfile
   pricing: DeepSeekPricing
   defaultStrategy: DeepSeekDefaultStrategy
 }
@@ -76,7 +81,10 @@ export const DEEPSEEK_MODEL_PROFILES: Record<
       defaultEffort: 'max',
       supportedEfforts: ['high', 'max'],
     },
-    toolProtocol: 'openai-tools',
+    toolProtocol: {
+      preferred: 'dsml',
+      fallbacks: ['openai-tools'],
+    },
     pricing: {
       currency: 'USD',
       unit: 'MTok',
@@ -108,7 +116,10 @@ export const DEEPSEEK_MODEL_PROFILES: Record<
       defaultEffort: 'high',
       supportedEfforts: ['high', 'max'],
     },
-    toolProtocol: 'openai-tools',
+    toolProtocol: {
+      preferred: 'openai-tools',
+      fallbacks: [],
+    },
     pricing: {
       currency: 'USD',
       unit: 'MTok',
@@ -140,7 +151,10 @@ export const DEEPSEEK_MODEL_PROFILES: Record<
       defaultEffort: 'high',
       supportedEfforts: ['high', 'max'],
     },
-    toolProtocol: 'openai-tools',
+    toolProtocol: {
+      preferred: 'openai-tools',
+      fallbacks: [],
+    },
     pricing: {
       currency: 'USD',
       unit: 'MTok',
@@ -223,6 +237,12 @@ export function getDeepSeekThinkingDefault(model: string): boolean {
   if (match.alias === 'deepseek-reasoner') return true
 
   return match.profile.thinking.defaultEnabled
+}
+
+export function getDeepSeekToolProtocolProfile(
+  model: string,
+): DeepSeekToolProtocolProfile | undefined {
+  return getDeepSeekModelProfile(model)?.toolProtocol
 }
 
 export function resolveDeepSeekReasoningEffort(

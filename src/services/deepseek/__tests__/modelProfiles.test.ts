@@ -5,6 +5,7 @@ import {
   DEEPSEEK_MODEL_PROFILES,
   getDeepSeekModelFamily,
   getDeepSeekModelProfile,
+  getDeepSeekToolProtocolProfile,
   getDefaultDeepSeekModelForAnthropicModel,
   getDefaultDeepSeekModelForFamily,
   getDeepSeekThinkingDefault,
@@ -24,7 +25,10 @@ describe('DeepSeek model profiles', () => {
     expect(profile.maxOutputTokens).toBe(384_000)
     expect(profile.thinking.defaultEnabled).toBe(true)
     expect(profile.thinking.defaultEffort).toBe('max')
-    expect(profile.toolProtocol).toBe('openai-tools')
+    expect(profile.toolProtocol).toEqual({
+      preferred: 'dsml',
+      fallbacks: ['openai-tools'],
+    })
     expect(profile.pricing).toMatchObject({
       inputCacheHit: 0.003625,
       inputCacheMiss: 0.435,
@@ -68,6 +72,17 @@ describe('DeepSeek model profiles', () => {
     )
     expect(getDeepSeekThinkingDefault('deepseek-chat')).toBe(false)
     expect(getDeepSeekThinkingDefault('deepseek-reasoner')).toBe(true)
+  })
+
+  test('declares DSML as V4 Pro primary tool protocol with native fallback', () => {
+    expect(getDeepSeekToolProtocolProfile('deepseek-v4-pro')).toEqual({
+      preferred: 'dsml',
+      fallbacks: ['openai-tools'],
+    })
+    expect(getDeepSeekToolProtocolProfile('deepseek-v4-flash')).toEqual({
+      preferred: 'openai-tools',
+      fallbacks: [],
+    })
   })
 
   test('maps effort values through DeepSeek supported levels', () => {

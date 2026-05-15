@@ -109,6 +109,7 @@ export function recordLLMObservation(
       budget_tokens?: number
       budgetTokens?: number
     }
+    metadata?: Record<string, unknown>
   },
 ): void {
   if (!rootSpan || !isLangfuseEnabled()) return
@@ -130,6 +131,7 @@ export function recordLLMObservation(
           provider: params.provider,
           model: params.model,
           ...(params.thinking && { thinking: params.thinking }),
+          ...params.metadata,
         },
         ...(params.completionStartTime && {
           completionStartTime: params.completionStartTime,

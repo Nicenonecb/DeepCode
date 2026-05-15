@@ -19,6 +19,7 @@ import type {
   AssistantMessage,
   StreamEvent,
 } from '../../../../types/message.js'
+import { join } from 'path'
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -223,19 +224,41 @@ mock.module('@ant/model-provider', () => ({
 }))
 
 mock.module('../../../../utils/envUtils.js', () => ({
+  getClaudeConfigHomeDir: () => join(process.cwd(), '.test-claude'),
+  getTeamsDir: () => join(process.cwd(), '.test-claude', 'teams'),
+  hasNodeOption: () => false,
   isEnvTruthy: (value: string | undefined) =>
     value === '1' || value === 'true' || value === 'yes' || value === 'on',
   isEnvDefinedFalsy: (value: string | undefined) =>
     value === '0' || value === 'false' || value === 'no' || value === 'off',
+  isBareMode: () => false,
+  isRunningOnHomespace: () => false,
+  isInProtectedNamespace: () => false,
+  getAWSRegion: () => 'us-east-1',
+  getDefaultVertexRegion: () => 'us-east5',
+  getVertexRegionForModel: () => 'us-east5',
+  shouldMaintainProjectWorkingDir: () => false,
+  parseEnvVars: () => ({}),
 }))
 
 mock.module('../../../../services/analytics/growthbook.js', () => ({
   getFeatureValue_CACHED_MAY_BE_STALE: (_key: string, fallback: unknown) =>
     fallback,
+  getFeatureValue_CACHED_WITH_REFRESH: async (
+    _key: string,
+    fallback: unknown,
+  ) => fallback,
+  checkStatsigFeatureGate_CACHED_MAY_BE_STALE: () => false,
+  getDynamicConfig_CACHED_MAY_BE_STALE: <T>(_key: string, fallback: T) =>
+    fallback,
 }))
 
-mock.module('src/bootstrap/state.js', () => ({
-  isReplBridgeActive: () => false,
+mock.module('../../../deepseek/config.js', () => ({
+  DEEPSEEK_DEFAULT_BASE_URL: 'https://api.deepseek.com/v1',
+  DEEPSEEK_DEFAULT_MODEL: 'deepseek-v4-pro',
+  getStoredDeepSeekConfig: () => ({}),
+  hasStoredDeepSeekApiKey: () => false,
+  hasStoredDeepSeekConfig: () => false,
 }))
 
 mock.module('bun:bundle', () => ({
@@ -349,6 +372,11 @@ mock.module('../../../../utils/modelCost.js', () => ({
 
 mock.module('../../../../services/langfuse/tracing.js', () => ({
   recordLLMObservation: () => {},
+}))
+
+mock.module('../../../../services/analytics/index.js', () => ({
+  logEvent: () => {},
+  logEventAsync: async () => {},
 }))
 
 mock.module('../../../../services/langfuse/convert.js', () => ({

@@ -217,7 +217,7 @@ export const DSMLGatewaySettingsSchema = lazySchema(() =>
         .boolean()
         .optional()
         .describe(
-          'Whether to serialize OpenAI-compatible tool schemas into a DSML prompt instead of native OpenAI function calling. Defaults to false.',
+          'Whether to serialize OpenAI-compatible tool schemas into a DSML prompt instead of native OpenAI function calling. For DeepSeek V4 Pro on the official DeepSeek endpoint, undefined defaults to DSML; false explicitly falls back to native OpenAI tools.',
         ),
       tagStyle: z
         .enum(['fullwidth', 'ascii'])

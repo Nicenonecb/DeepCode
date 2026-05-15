@@ -1987,6 +1987,20 @@ async function* queryLoop(
     }
     queryCheckpoint('query_tool_execution_end')
 
+    const dsmlToolUseIds = toolUseBlocks
+      .map(block => block.id)
+      .filter(id => id.startsWith('toolu_dsml_'))
+    if (dsmlToolUseIds.length > 0) {
+      const dsmlSucceeded = dsmlToolUseIds.filter(id =>
+        successfulToolUseIds.has(id),
+      ).length
+      logEvent('tengu_dsml_gateway_tool_results', {
+        tool_count: dsmlToolUseIds.length,
+        success_count: dsmlSucceeded,
+        error_count: dsmlToolUseIds.length - dsmlSucceeded,
+      })
+    }
+
     // Generate tool use summary after tool batch completes — passed to next recursive call
     let nextPendingToolUseSummary:
       | Promise<ToolUseSummaryMessage | null>
@@ -2407,6 +2421,7 @@ async function buildContextPackedMessages(
 function resolveDSMLGatewaySettings(
   settings: DSMLGatewaySettings | undefined,
 ): DSMLGatewaySettings | undefined {
+  if (settings?.enabled === false) return settings
   if (feature('DSML_GATEWAY')) {
     return {
       ...settings,

@@ -23,6 +23,7 @@ describe('applyDSMLResponseGateway', () => {
 
     expect(result.hasToolUse).toBe(false)
     expect(result.contentBlocks).toBe(contentBlocks)
+    expect(result.toolUseCount).toBe(0)
   })
 
   test('maps DSML tool calls in text into Anthropic tool_use blocks', () => {
@@ -45,6 +46,8 @@ describe('applyDSMLResponseGateway', () => {
     })
 
     expect(result.hasToolUse).toBe(true)
+    expect(result.toolUseCount).toBe(1)
+    expect(result.parseErrorCount).toBe(0)
     expect(result.contentBlocks).toEqual([
       {
         type: 'text',
@@ -103,6 +106,7 @@ Then I will continue.`,
         text: '\nThen I will continue.',
       },
     ])
+    expect(result.toolUseCount).toBe(2)
   })
 
   test('falls back to original text for malformed DSML by default', () => {
@@ -126,6 +130,7 @@ Then I will continue.`,
 
     expect(result.hasToolUse).toBe(false)
     expect(result.fellBackToText).toBe(true)
+    expect(result.parseErrorCount).toBe(1)
     expect(result.contentBlocks).toEqual(contentBlocks)
   })
 
@@ -148,12 +153,55 @@ Then I will continue.`,
 
     expect(result.hasToolUse).toBe(true)
     expect(result.fellBackToText).toBe(false)
+    expect(result.parseErrorCount).toBe(1)
     expect(result.contentBlocks).toEqual([
       {
         type: 'tool_use',
         id: 'toolu_dsml_0_Read',
         name: 'Read',
         input: { limit: 'not-json' },
+      },
+    ])
+  })
+
+  test('emits known tool calls while preserving unknown DSML invokes as text', () => {
+    const result = applyDSMLResponseGateway({
+      contentBlocks: [
+        {
+          type: 'text',
+          citations: null,
+          text: `<|DSML|tool_calls>
+<|DSML|invoke name="Read">
+<|DSML|parameter name="file_path" string="true">a.ts</|DSML|parameter>
+</|DSML|invoke>
+<|DSML|invoke name="NotATool">
+<|DSML|parameter name="x" string="true">1</|DSML|parameter>
+</|DSML|invoke>
+</|DSML|tool_calls>`,
+        },
+      ],
+      settings: { enabled: true },
+      createToolUseId: createDSMLToolUseId,
+      knownToolNames: new Set(['Read']),
+    })
+
+    expect(result.hasToolUse).toBe(true)
+    expect(result.fellBackToText).toBe(true)
+    expect(result.toolUseCount).toBe(1)
+    expect(result.unknownToolCount).toBe(1)
+    expect(result.contentBlocks).toEqual([
+      {
+        type: 'tool_use',
+        id: 'toolu_dsml_0_Read',
+        name: 'Read',
+        input: { file_path: 'a.ts' },
+      },
+      {
+        type: 'text',
+        citations: null,
+        text: `<|DSML|invoke name="NotATool">
+<|DSML|parameter name="x" string="true">1</|DSML|parameter>
+</|DSML|invoke>`,
       },
     ])
   })

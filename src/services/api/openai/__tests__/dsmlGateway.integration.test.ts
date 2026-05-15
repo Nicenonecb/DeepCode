@@ -5,10 +5,13 @@ import {
   applyDSMLResponseGateway,
   createDSMLToolUseId,
 } from '../dsmlResponse.js'
+import { deepSeekV4ProDSMLFixture } from '../__fixtures__/deepseek-v4-pro-dsml.js'
 
 describe('DSML OpenAI gateway integration', () => {
   test('switches request to DSML prompt and maps DSML response back to tool_use', () => {
     const request = applyDSMLRequestGateway({
+      model: 'deepseek-v4-pro',
+      baseURL: 'https://api.deepseek.com/v1',
       messages: ['user asks to inspect README'],
       standardTools: [
         {
@@ -66,6 +69,8 @@ describe('DSML OpenAI gateway integration', () => {
 
   test('keeps native function calling path when disabled', () => {
     const request = applyDSMLRequestGateway({
+      model: 'deepseek-v4-pro',
+      baseURL: 'https://api.deepseek.com/v1',
       messages: ['user asks to inspect README'],
       standardTools: [{ name: 'Read' }],
       nativeTools: [{ type: 'function', function: { name: 'Read' } }],
@@ -94,5 +99,71 @@ describe('DSML OpenAI gateway integration', () => {
     expect(request.toolChoice).toEqual({ type: 'auto' })
     expect(response.hasToolUse).toBe(false)
     expect(response.contentBlocks).toBe(responseBlocks)
+  })
+
+  test('matches the DeepSeek V4 Pro provider fixture for DSML request and response', () => {
+    const request = applyDSMLRequestGateway({
+      model: deepSeekV4ProDSMLFixture.model,
+      baseURL: deepSeekV4ProDSMLFixture.baseURL,
+      messages: ['run provider fixture'],
+      standardTools: [
+        {
+          name: 'Read',
+          description: 'Read a file',
+          input_schema: {
+            type: 'object',
+            properties: { file_path: { type: 'string' } },
+          },
+        },
+        {
+          name: 'Bash',
+          description: 'Run a shell command',
+          input_schema: {
+            type: 'object',
+            properties: {
+              command: { type: 'string' },
+              description: { type: 'string' },
+            },
+          },
+        },
+      ],
+      nativeTools: [{ type: 'function', function: { name: 'Read' } }],
+      nativeToolChoice: { type: 'auto' },
+      settings: { tagStyle: 'ascii' },
+      createMetaMessage: content => content,
+    })
+
+    expect(request.decision.providerEvidence).toBe('official-deepseek')
+    expect(request.decision.toolProtocol).toBe(
+      deepSeekV4ProDSMLFixture.request.toolProtocol,
+    )
+    expect(request.tools).toEqual([
+      ...deepSeekV4ProDSMLFixture.request.nativeTools,
+    ])
+    for (const expected of deepSeekV4ProDSMLFixture.request.promptIncludes) {
+      expect(request.messages[0]).toContain(expected)
+    }
+
+    const response = applyDSMLResponseGateway({
+      contentBlocks: [
+        {
+          type: 'text',
+          citations: null,
+          text: deepSeekV4ProDSMLFixture.response.text,
+        },
+      ] satisfies BetaMessage['content'],
+      settings: { enabled: true, tagStyle: 'ascii' },
+      createToolUseId: createDSMLToolUseId,
+      knownToolNames: new Set(['Read', 'Bash']),
+    })
+
+    expect(response.toolUseCount).toBe(2)
+    expect(
+      response.contentBlocks.map(block =>
+        block.type === 'tool_use'
+          ? { name: block.name, input: block.input }
+          : block,
+      ),
+    ).toEqual([...deepSeekV4ProDSMLFixture.response.expectedToolCalls])
   })
 })
