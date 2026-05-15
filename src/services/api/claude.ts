@@ -109,6 +109,7 @@ import { getAPIContextManagement } from '../compact/apiMicrocompact.js'
 import { bedrockAdapter } from '../providerUsage/adapters/bedrock.js'
 import { updateProviderBuckets } from '../providerUsage/store.js'
 import type { DSMLGatewaySettings } from '../dsml/index.js'
+import type { DeepSeekEffortBudgetSettings } from '../deepseek/modelProfiles.js'
 
 /* eslint-disable @typescript-eslint/no-require-imports */
 const autoModeStateModule = feature('TRANSCRIPT_CLASSIFIER')
@@ -722,6 +723,7 @@ export type Options = {
   advisorModel?: string
   addNotification?: (notif: Notification) => void
   dsmlGateway?: DSMLGatewaySettings
+  deepSeekEffortBudgets?: DeepSeekEffortBudgetSettings
   // API-side task budget (output_config.task_budget). Distinct from the
   // tokenBudget.ts +500k auto-continue feature — this one is sent to the API
   // so the model can pace itself. `remaining` is computed by the caller
@@ -1344,6 +1346,7 @@ async function* queryModel(
       tools,
       signal,
       options,
+      thinkingConfig,
     )
     return
   }

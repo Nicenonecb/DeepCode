@@ -5,6 +5,7 @@ export type TaskAwareRouteKind = 'explain' | 'bugfix' | 'complex'
 export type TaskAwareModelRouteTarget = {
   model: string
   effort: EffortLevel
+  thinking?: 'enabled' | 'disabled'
 }
 
 export type TaskAwareModelRoute = TaskAwareModelRouteTarget & {
@@ -29,6 +30,7 @@ export const DEFAULT_TASK_AWARE_MODEL_ROUTING_CONFIG: TaskAwareModelRoutingConfi
       explain: {
         model: 'haiku',
         effort: 'low',
+        thinking: 'disabled',
       },
       bugfix: {
         model: 'opus',
@@ -78,6 +80,9 @@ const ROUTE_PATTERNS: Record<TaskAwareRouteKind, RegExp[]> = {
     /\b(error|failing|failed|failure|crash|exception|regression|broken|doesn'?t work)\b/,
   ],
   explain: [
+    /^(继续|好的|可以|行|嗯|ok|yes|next|go on|continue)$/i,
+    /^(列出|整理|总结|概括|翻译|改写|润色|命名|取名|生成|写个|给我)(?!.*(修复|重构|迁移|架构|复杂|疑难))/,
+    /\b(list|summarize|translate|rewrite|polish|rename|name|generate)\b(?!.*\b(fix|debug|refactor|migration|architecture|complex|hard)\b)/,
     /解释/,
     /说明/,
     /讲讲/,

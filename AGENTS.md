@@ -10,6 +10,7 @@ This is a **reverse-engineered / decompiled** version of Anthropic's official Cl
 
 - 根目录 `deepcode-deepseek-gap.html` 是当前实现差距和进度状态的固定看板。任何 agent 完成代码、配置、测试、功能边界或风险状态变更后，必须同步更新 `deepcode-deepseek-gap.html`。
 - `deepcode-deepseek-gap.html` 至少保持这些信息最新：本轮目标、已完成改动、验证命令和结果、主要影响文件、剩余风险、建议下一步。
+- 如果某个旧缺口、路线图条目或表格行已经被后续实现覆盖，必须在 `deepcode-deepseek-gap.html` 对应位置显式标注 `DONE` / `已完成`，并写清楚完成证据、默认行为和仍然存在的后续增强项；不要保留会让下一轮 agent 误判为未完成的旧描述。
 - 如果新增专题报告或长期决策页，同时更新根目录 `index.html` 的跳转；但 `deepcode-deepseek-gap.html` 仍然是默认查看进度的入口。
 - 不要只在聊天里说明进度，也不要只更新 markdown；用户需要通过浏览器打开 `deepcode-deepseek-gap.html` 直接看到当前状态。
 

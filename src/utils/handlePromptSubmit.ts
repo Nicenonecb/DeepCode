@@ -25,6 +25,7 @@ import type { EffortValue } from './effort.js'
 import type { FileHistoryState } from './fileHistory.js'
 import { fileHistoryEnabled, fileHistoryMakeSnapshot } from './fileHistory.js'
 import { gracefulShutdownSync } from './gracefulShutdown.js'
+import type { ThinkingConfig } from './thinking.js'
 import { toError } from './errors.js'
 import { logError } from './log.js'
 import { enqueue } from './messageQueueManager.js'
@@ -76,6 +77,7 @@ type BaseExecutionParams = {
     onBeforeQuery?: (input: string, newMessages: Message[]) => Promise<boolean>,
     input?: string,
     effort?: EffortValue,
+    thinkingConfig?: ThinkingConfig,
   ) => Promise<boolean>
   setAppState: (updater: (prev: AppState) => AppState) => void
   onBeforeQuery?: (input: string, newMessages: Message[]) => Promise<boolean>
@@ -454,6 +456,7 @@ async function executeUserInput(params: ExecuteUserInputParams): Promise<void> {
     let allowedTools: string[] | undefined
     let model: string | undefined
     let effort: EffortValue | undefined
+    let thinkingConfig: ThinkingConfig | undefined
     let nextInput: string | undefined
     let submitNextInput: boolean | undefined
 
@@ -547,6 +550,7 @@ async function executeUserInput(params: ExecuteUserInputParams): Promise<void> {
             allowedTools = result.allowedTools
             model = result.model
             effort = result.effort
+            thinkingConfig = result.thinkingConfig
             nextInput = result.nextInput
             submitNextInput = result.submitNextInput
           }
@@ -599,6 +603,7 @@ async function executeUserInput(params: ExecuteUserInputParams): Promise<void> {
             shouldCallBeforeQuery ? onBeforeQuery : undefined,
             primaryInput,
             effort,
+            thinkingConfig,
           )
         } else {
           // Local slash commands that skip messages (e.g., /model, /theme).

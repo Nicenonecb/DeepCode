@@ -14,7 +14,11 @@ describe('getTaskAwareModelRoutingConfig', () => {
       getTaskAwareModelRoutingConfig({
         taskAwareModelRouting: {
           routes: {
-            explain: { model: 'deepseek-v4-flash', effort: 'medium' },
+            explain: {
+              model: 'deepseek-v4-flash',
+              effort: 'medium',
+              thinking: 'enabled',
+            },
             complex: { effort: 'high' },
           },
         },
@@ -22,11 +26,17 @@ describe('getTaskAwareModelRoutingConfig', () => {
     ).toEqual({
       enabled: true,
       routes: {
-        explain: { model: 'deepseek-v4-flash', effort: 'medium' },
+        explain: {
+          model: 'deepseek-v4-flash',
+          effort: 'medium',
+          thinking: 'enabled',
+        },
         bugfix: DEFAULT_TASK_AWARE_MODEL_ROUTING_CONFIG.routes.bugfix,
         complex: {
           model: DEFAULT_TASK_AWARE_MODEL_ROUTING_CONFIG.routes.complex.model,
           effort: 'high',
+          thinking:
+            DEFAULT_TASK_AWARE_MODEL_ROUTING_CONFIG.routes.complex.thinking,
         },
       },
     })

@@ -12,6 +12,7 @@ describe('classifyTaskAwareModelRoute', () => {
         kind: 'explain',
         model: 'haiku',
         effort: 'low',
+        thinking: 'disabled',
       },
     )
 
@@ -21,6 +22,23 @@ describe('classifyTaskAwareModelRoute', () => {
       kind: 'explain',
       model: 'haiku',
       effort: 'low',
+      thinking: 'disabled',
+    })
+  })
+
+  test('routes small utility prompts to the non-think explain lane', () => {
+    expect(classifyTaskAwareModelRoute('总结这个文件')).toEqual({
+      kind: 'explain',
+      model: 'haiku',
+      effort: 'low',
+      thinking: 'disabled',
+    })
+
+    expect(classifyTaskAwareModelRoute('continue')).toEqual({
+      kind: 'explain',
+      model: 'haiku',
+      effort: 'low',
+      thinking: 'disabled',
     })
   })
 
@@ -69,7 +87,7 @@ describe('classifyTaskAwareModelRoute', () => {
   })
 
   test('does not route unrelated short prompts', () => {
-    expect(classifyTaskAwareModelRoute('继续')).toBeUndefined()
+    expect(classifyTaskAwareModelRoute('随便弄一下')).toBeUndefined()
   })
 
   test('uses configured route targets', () => {
@@ -78,13 +96,18 @@ describe('classifyTaskAwareModelRoute', () => {
         ...DEFAULT_TASK_AWARE_MODEL_ROUTING_CONFIG,
         routes: {
           ...DEFAULT_TASK_AWARE_MODEL_ROUTING_CONFIG.routes,
-          explain: { model: 'custom-flash', effort: 'medium' },
+          explain: {
+            model: 'custom-flash',
+            effort: 'medium',
+            thinking: 'enabled',
+          },
         },
       }),
     ).toEqual({
       kind: 'explain',
       model: 'custom-flash',
       effort: 'medium',
+      thinking: 'enabled',
     })
   })
 
@@ -107,7 +130,12 @@ describe('getTaskAwareModelRoutePatch', () => {
         hasEffortOverride: false,
       }),
     ).toEqual({
-      route: { kind: 'explain', model: 'haiku', effort: 'low' },
+      route: {
+        kind: 'explain',
+        model: 'haiku',
+        effort: 'low',
+        thinking: 'disabled',
+      },
       effort: 'low',
     })
 

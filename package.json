@@ -63,6 +63,8 @@
     "check:unused": "knip-bun",
     "benchmark:smoke": "bun run scripts/benchmark.ts --fixture tests/benchmark/fixtures/smoke.json --format markdown --max-tasks 2",
     "benchmark:smoke:json": "bun run scripts/benchmark.ts --fixture tests/benchmark/fixtures/smoke.json --format json --max-tasks 2",
+    "benchmark:deepseek-effort": "bun run scripts/benchmark.ts --fixture tests/benchmark/fixtures/deepseek-effort-smoke.json --format markdown --max-tasks 3",
+    "benchmark:deepseek-effort:json": "bun run scripts/benchmark.ts --fixture tests/benchmark/fixtures/deepseek-effort-smoke.json --format json --max-tasks 3",
     "health": "bun run scripts/health-check.ts",
     "postinstall": "node scripts/postinstall.cjs",
     "docs:dev": "npx mintlify dev",

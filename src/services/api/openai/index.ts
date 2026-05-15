@@ -1,6 +1,7 @@
 import type { BetaToolUnion } from '@anthropic-ai/sdk/resources/beta/messages/messages.mjs'
 import type { ChatCompletionCreateParamsStreaming } from 'openai/resources/chat/completions/completions.mjs'
 import type { SystemPrompt } from '../../../utils/systemPromptType.js'
+import type { ThinkingConfig } from '../../../utils/thinking.js'
 import type {
   Message,
   StreamEvent,
@@ -39,6 +40,8 @@ import {
   resolveOpenAIMaxTokens,
   buildOpenAIRequestBody,
 } from './requestBody.js'
+import { applyDeepSeekMaxPromptPatch } from '../../deepseek/maxPrompt.js'
+import { resolveDeepSeekRequestEffortProfile } from '../../deepseek/modelProfiles.js'
 import { recordLLMObservation } from '../../../services/langfuse/tracing.js'
 import {
   convertMessagesToLangfuse,
@@ -235,6 +238,7 @@ export async function* queryModelOpenAI(
   tools: Tools,
   signal: AbortSignal,
   options: Options,
+  thinkingConfig?: ThinkingConfig,
 ): AsyncGenerator<
   StreamEvent | AssistantMessage | SystemAPIErrorMessage,
   void
@@ -306,7 +310,12 @@ export async function* queryModelOpenAI(
     )
 
     // 8. Convert messages and tools to OpenAI format
-    const enableThinking = isOpenAIThinkingEnabled(openaiModel)
+    const requestEffortValue =
+      thinkingConfig?.type === 'disabled' ? 'low' : options.effortValue
+    const enableThinking =
+      thinkingConfig?.type === 'disabled'
+        ? false
+        : isOpenAIThinkingEnabled(openaiModel, options.effortValue)
     const openAIConvertibleMessages = messagesForAPI.filter(
       isOpenAIConvertibleMessage,
     )
@@ -334,9 +343,21 @@ export async function* queryModelOpenAI(
           isMeta: true,
         }),
     })
+    const deepSeekEffortProfile = resolveDeepSeekRequestEffortProfile(
+      openaiModel,
+      requestEffortValue,
+      options.deepSeekEffortBudgets,
+    )
+    const maxPromptPatch = applyDeepSeekMaxPromptPatch({
+      model: openaiModel,
+      effortProfile: deepSeekEffortProfile,
+      enableThinking,
+      systemPrompt,
+      messages: requestToolProtocol.messages,
+    })
     const openaiMessages = anthropicMessagesToOpenAI(
       requestToolProtocol.messages,
-      systemPrompt,
+      maxPromptPatch.systemPrompt,
       { enableThinking },
     )
     const openaiTools = requestToolProtocol.tools
@@ -408,9 +429,8 @@ export async function* queryModelOpenAI(
       upperLimit,
       options.maxOutputTokensOverride,
     )
-
     logForDebugging(
-      `[OpenAI] Calling model=${openaiModel}, messages=${openaiMessages.length}, tools=${openaiTools.length}, thinking=${enableThinking}, toolProtocol=${requestToolProtocol.decision.toolProtocol}, dsmlSource=${requestToolProtocol.decision.source}${requestToolProtocol.decision.fallbackReason ? `, dsmlFallback=${requestToolProtocol.decision.fallbackReason}` : ''}`,
+      `[OpenAI] Calling model=${openaiModel}, messages=${openaiMessages.length}, tools=${openaiTools.length}, thinking=${enableThinking}, effortTier=${deepSeekEffortProfile?.tier ?? 'default'}, reasoningEffort=${deepSeekEffortProfile?.reasoningEffort ?? 'none'}, maxTokens=${deepSeekEffortProfile ? Math.min(maxTokens, deepSeekEffortProfile.maxOutputTokens) : maxTokens}, maxReasoningTokens=${deepSeekEffortProfile?.maxReasoningTokens ?? 'n/a'}, maxContextTokens=${deepSeekEffortProfile?.maxContextTokens ?? 'n/a'}, contextWatermark=${deepSeekEffortProfile?.contextWatermark ?? 'n/a'}, maxPromptInjected=${maxPromptPatch.injected}, toolProtocol=${requestToolProtocol.decision.toolProtocol}, dsmlSource=${requestToolProtocol.decision.source}${requestToolProtocol.decision.fallbackReason ? `, dsmlFallback=${requestToolProtocol.decision.fallbackReason}` : ''}`,
     )
     logEvent('tengu_dsml_gateway_request', {
       model:
@@ -426,6 +446,19 @@ export async function* queryModelOpenAI(
       standard_tool_count: requestToolProtocol.metrics.standardToolCount,
       native_tool_count: requestToolProtocol.metrics.nativeToolCount,
       prompt_chars: requestToolProtocol.metrics.promptChars,
+      effort_tier: (deepSeekEffortProfile?.tier ??
+        'default') as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+      reasoning_effort: (deepSeekEffortProfile?.reasoningEffort ??
+        'none') as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+      max_output_tokens: deepSeekEffortProfile
+        ? Math.min(maxTokens, deepSeekEffortProfile.maxOutputTokens)
+        : maxTokens,
+      max_reasoning_tokens: deepSeekEffortProfile?.maxReasoningTokens ?? 0,
+      max_context_tokens: deepSeekEffortProfile?.maxContextTokens ?? 0,
+      context_watermark: deepSeekEffortProfile?.contextWatermark ?? 0,
+      max_prompt_injected: maxPromptPatch.injected,
+      max_prompt_conflict_policy:
+        maxPromptPatch.conflictPolicy as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
     })
 
     // 11. Call OpenAI API with streaming. ChatGPT subscription auth uses the
@@ -460,7 +493,8 @@ export async function* queryModelOpenAI(
               enableThinking,
               maxTokens,
               temperatureOverride: options.temperatureOverride,
-              effortValue: options.effortValue,
+              effortValue: requestEffortValue,
+              effortBudgetSettings: options.deepSeekEffortBudgets,
             }) as unknown as ChatCompletionCreateParamsStreaming,
             { signal },
           ),
@@ -603,6 +637,11 @@ export async function* queryModelOpenAI(
       metadata: {
         toolProtocol: requestToolProtocol.decision.toolProtocol,
         dsmlGateway: dsmlMetrics,
+        deepSeekEffortProfile,
+        deepSeekMaxPromptPatch: {
+          injected: maxPromptPatch.injected,
+          conflictPolicy: maxPromptPatch.conflictPolicy,
+        },
       },
     })
 

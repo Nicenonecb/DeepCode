@@ -2,6 +2,10 @@ import { describe, expect, test } from 'bun:test'
 import type { BetaMessage } from '@anthropic-ai/sdk/resources/beta/messages/messages.mjs'
 import { applyDSMLRequestGateway } from '../dsmlRequest.js'
 import {
+  buildOpenAIRequestBody,
+  isOpenAIThinkingEnabled,
+} from '../requestBody.js'
+import {
   applyDSMLResponseGateway,
   createDSMLToolUseId,
 } from '../dsmlResponse.js'
@@ -165,5 +169,32 @@ describe('DSML OpenAI gateway integration', () => {
           : block,
       ),
     ).toEqual([...deepSeekV4ProDSMLFixture.response.expectedToolCalls])
+  })
+
+  test('matches the DeepSeek V4 Pro provider fixture for non-think requests', () => {
+    const body = buildOpenAIRequestBody({
+      model: deepSeekV4ProDSMLFixture.model,
+      messages: [{ role: 'user', content: 'summarize this file' }],
+      tools: [],
+      toolChoice: undefined,
+      enableThinking: isOpenAIThinkingEnabled(
+        deepSeekV4ProDSMLFixture.model,
+        deepSeekV4ProDSMLFixture.request.nonThink.effortValue,
+      ),
+      effortValue: deepSeekV4ProDSMLFixture.request.nonThink.effortValue,
+      maxTokens: 384_000,
+      temperatureOverride: 0.7,
+    })
+
+    expect(body.max_tokens).toBe(
+      deepSeekV4ProDSMLFixture.request.nonThink.maxTokens,
+    )
+    expect(body.thinking).toBeUndefined()
+    expect(body.reasoning_effort).toBe(
+      deepSeekV4ProDSMLFixture.request.nonThink.reasoningEffort,
+    )
+    expect(body.enable_thinking).toBeUndefined()
+    expect(body.chat_template_kwargs).toBeUndefined()
+    expect(body.temperature).toBe(0.7)
   })
 })

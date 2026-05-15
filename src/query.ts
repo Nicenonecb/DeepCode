@@ -136,6 +136,7 @@ import {
   type WorkingMemorySettings,
 } from './services/workingMemory/index.js'
 import type { DSMLGatewaySettings } from './services/dsml/index.js'
+import type { DeepSeekEffortBudgetSettings } from './services/deepseek/modelProfiles.js'
 import type { ToolCallRepairIssue } from './services/toolRepair/types.js'
 import { runPatchSearchForHighRiskContext } from './services/patchSearch/PatchSearchIntegration.js'
 import { getCwd } from './utils/cwd.js'
@@ -1130,6 +1131,9 @@ async function* queryLoop(
                   | DSMLGatewaySettings
                   | undefined,
               ),
+              deepSeekEffortBudgets: appState.settings.deepSeekEffortBudgets as
+                | DeepSeekEffortBudgetSettings
+                | undefined,
               addNotification: toolUseContext.addNotification,
               ...(params.taskBudget && {
                 taskBudget: {

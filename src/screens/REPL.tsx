@@ -3230,6 +3230,7 @@ export function REPL({
       additionalAllowedTools: string[],
       mainLoopModelParam: string,
       effort?: EffortValue,
+      turnThinkingConfig?: ThinkingConfig,
     ) => {
       // Prepare IDE integration for new prompt. Read mcpClients fresh from
       // store — useManageMCPConnections may have populated it since the
@@ -3354,6 +3355,9 @@ export function REPL({
           ...previousGetAppState(),
           effortValue: effort,
         });
+      }
+      if (turnThinkingConfig !== undefined) {
+        toolUseContext.options.thinkingConfig = turnThinkingConfig;
       }
 
       queryCheckpoint('query_context_loading_start');
@@ -3514,6 +3518,7 @@ export function REPL({
       onBeforeQueryCallback?: (input: string, newMessages: MessageType[]) => Promise<boolean>,
       input?: string,
       effort?: EffortValue,
+      turnThinkingConfig?: ThinkingConfig,
     ): Promise<boolean> => {
       // If this is a teammate, mark them as active when starting a turn
       if (isAgentSwarmsEnabled()) {
@@ -3591,6 +3596,7 @@ export function REPL({
             additionalAllowedTools,
             mainLoopModelParam,
             effort,
+            turnThinkingConfig,
           );
         } catch (error) {
           if (feature('UDS_INBOX')) {

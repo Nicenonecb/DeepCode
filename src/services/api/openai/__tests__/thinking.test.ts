@@ -139,6 +139,16 @@ describe('isOpenAIThinkingEnabled', () => {
       expect(isOpenAIThinkingEnabled('deepseek-v4-pro')).toBe(true)
     })
 
+    test('uses V4 Pro effort profile to disable thinking for low and medium', () => {
+      expect(isOpenAIThinkingEnabled('deepseek-v4-pro', 'low')).toBe(false)
+      expect(isOpenAIThinkingEnabled('deepseek-v4-pro', 'medium')).toBe(false)
+    })
+
+    test('uses V4 Pro effort profile to enable thinking for high and max', () => {
+      expect(isOpenAIThinkingEnabled('deepseek-v4-pro', 'high')).toBe(true)
+      expect(isOpenAIThinkingEnabled('deepseek-v4-pro', 'max')).toBe(true)
+    })
+
     test('returns false when model name is unknown legacy "deepseek-r1"', () => {
       expect(isOpenAIThinkingEnabled('deepseek-r1')).toBe(false)
     })
@@ -200,8 +210,85 @@ describe('buildOpenAIRequestBody — thinking params', () => {
       model: 'deepseek-v4-pro',
       enableThinking: true,
       effortValue: 'xhigh',
+      maxTokens: 384_000,
     })
     expect(body.reasoning_effort).toBe('max')
+  })
+
+  test('maps V4 Pro low and medium to non-think request bodies', () => {
+    for (const effortValue of ['low', 'medium']) {
+      const body = buildOpenAIRequestBody({
+        ...baseParams,
+        model: 'deepseek-v4-pro',
+        enableThinking: true,
+        effortValue,
+        maxTokens: 384_000,
+        temperatureOverride: 0.7,
+      })
+
+      expect(body.max_tokens).toBe(16_000)
+      expect(body.thinking).toBeUndefined()
+      expect(body.reasoning_effort).toBeUndefined()
+      expect(body.enable_thinking).toBeUndefined()
+      expect(body.chat_template_kwargs).toBeUndefined()
+      expect(body.temperature).toBe(0.7)
+    }
+  })
+
+  test('maps V4 Pro high to high reasoning budget', () => {
+    const body = buildOpenAIRequestBody({
+      ...baseParams,
+      model: 'deepseek-v4-pro',
+      enableThinking: true,
+      effortValue: 'high',
+      maxTokens: 384_000,
+      temperatureOverride: 0.7,
+    })
+
+    expect(body.max_tokens).toBe(64_000)
+    expect(body.thinking).toEqual({ type: 'enabled' })
+    expect(body.reasoning_effort).toBe('high')
+    expect(body.enable_thinking).toBe(true)
+    expect(body.chat_template_kwargs).toEqual({ thinking: true })
+    expect(body.temperature).toBeUndefined()
+  })
+
+  test('uses DeepSeek effort budget settings to clamp V4 Pro request output', () => {
+    const body = buildOpenAIRequestBody({
+      ...baseParams,
+      model: 'deepseek-v4-pro',
+      enableThinking: true,
+      effortValue: 'high',
+      maxTokens: 384_000,
+      effortBudgetSettings: {
+        high: {
+          maxOutputTokens: 32_000,
+          maxReasoningTokens: 48_000,
+          maxContextTokens: 256_000,
+          contextWatermark: 0.5,
+        },
+      },
+    })
+
+    expect(body.max_tokens).toBe(32_000)
+    expect(body.reasoning_effort).toBe('high')
+    expect(body.thinking).toEqual({ type: 'enabled' })
+  })
+
+  test('maps V4 Pro max to max reasoning budget', () => {
+    const body = buildOpenAIRequestBody({
+      ...baseParams,
+      model: 'deepseek-v4-pro',
+      enableThinking: true,
+      effortValue: 'max',
+      maxTokens: 384_000,
+    })
+
+    expect(body.max_tokens).toBe(384_000)
+    expect(body.thinking).toEqual({ type: 'enabled' })
+    expect(body.reasoning_effort).toBe('max')
+    expect(body.enable_thinking).toBe(true)
+    expect(body.chat_template_kwargs).toEqual({ thinking: true })
   })
 
   test('includes vLLM/self-hosted thinking format when enabled', () => {

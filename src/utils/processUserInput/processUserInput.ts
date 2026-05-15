@@ -64,6 +64,7 @@ import { getTaskAwareModelRoutingConfig } from '../taskAwareModelRoutingConfig.j
 import type { TaskAwareModelRoutingConfig } from '../taskAwareModelRouter.js'
 import { getTaskAwareModelRoutePatch } from '../taskAwareModelRouter.js'
 import { processTextPrompt } from './processTextPrompt.js'
+import type { ThinkingConfig } from '../thinking.js'
 export type ProcessUserInputContext = ToolUseContext & LocalJSXCommandContext
 
 export type ProcessUserInputBaseResult = {
@@ -78,6 +79,7 @@ export type ProcessUserInputBaseResult = {
   allowedTools?: string[]
   model?: string
   effort?: EffortValue
+  thinkingConfig?: ThinkingConfig
   // Output text for non-interactive mode (e.g., forked commands)
   // When set, this is used as the result in -p mode instead of empty string
   resultText?: string
@@ -653,5 +655,8 @@ export function applyTaskAwareModelRoute(
     ...result,
     ...(patch.model ? { model: parseUserSpecifiedModel(patch.model) } : {}),
     ...(patch.effort ? { effort: patch.effort } : {}),
+    ...(patch.route.thinking === 'disabled'
+      ? { thinkingConfig: { type: 'disabled' as const } }
+      : {}),
   }
 }

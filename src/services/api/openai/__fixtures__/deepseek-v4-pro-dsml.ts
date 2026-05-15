@@ -4,6 +4,13 @@ export const deepSeekV4ProDSMLFixture = {
   model: 'deepseek-v4-pro',
   request: {
     toolProtocol: 'dsml',
+    nonThink: {
+      effortValue: 'low',
+      maxTokens: 16_000,
+      thinking: false,
+      reasoningEffort: undefined,
+      selfHostedThinking: false,
+    },
     promptIncludes: [
       '<dsml_tool_protocol>',
       '<|DSML|tool_calls>...</|DSML|tool_calls>',

@@ -131,6 +131,11 @@ async function* eventStream(events: BetaRawMessageStreamEvent[]) {
 async function runQueryModel(
   events: BetaRawMessageStreamEvent[],
   envOverrides: Record<string, string | undefined> = {},
+  optionOverrides: Record<string, any> = {},
+  thinkingConfig?: {
+    type: 'adaptive' | 'disabled' | 'enabled'
+    budgetTokens?: number
+  },
 ) {
   // Wire events into the mocked stream adapter
   _nextEvents = events
@@ -164,6 +169,7 @@ async function runQueryModel(
         mode: 'default',
         isBypassingPermissions: false,
       }),
+      ...optionOverrides,
     }
 
     for await (const item of queryModelOpenAI(
@@ -172,6 +178,7 @@ async function runQueryModel(
       [],
       new AbortController().signal,
       minimalOptions,
+      thinkingConfig as any,
     )) {
       if (item.type === 'assistant') {
         assistantMessages.push(item as AssistantMessage)
@@ -629,6 +636,36 @@ describe('queryModelOpenAI — max_tokens forwarded to request', () => {
 
     expect(_lastCreateArgs).not.toBeNull()
     expect(_lastCreateArgs!.max_tokens).toBe(8192)
+  })
+})
+
+describe('queryModelOpenAI — DeepSeek non-think path', () => {
+  test('turn-level disabled thinking forces V4 Pro onto non-think request body', async () => {
+    _nextEvents = [
+      makeMessageStart(),
+      makeContentBlockStart(0, 'text'),
+      makeTextDelta(0, 'hi'),
+      makeContentBlockStop(0),
+      makeMessageDelta('end_turn', 5),
+      makeMessageStop(),
+    ]
+
+    await runQueryModel(
+      _nextEvents,
+      {
+        OPENAI_MODEL: 'deepseek-v4-pro',
+        OPENAI_BASE_URL: 'https://api.deepseek.com/v1',
+      },
+      { model: 'deepseek-v4-pro', effortValue: 'max' },
+      { type: 'disabled' },
+    )
+
+    expect(_lastCreateArgs).not.toBeNull()
+    expect(_lastCreateArgs!.max_tokens).toBe(8192)
+    expect(_lastCreateArgs!.thinking).toBeUndefined()
+    expect(_lastCreateArgs!.reasoning_effort).toBeUndefined()
+    expect(_lastCreateArgs!.enable_thinking).toBeUndefined()
+    expect(_lastCreateArgs!.chat_template_kwargs).toBeUndefined()
   })
 })
 
