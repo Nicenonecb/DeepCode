@@ -305,19 +305,27 @@ describe('DeepSeek thinking mode (enableThinking)', () => {
     expect(assistant.reasoning_content).toBe('Let me reason about this...')
   })
 
-  test('preserves thinking block as reasoning_content even without enableThinking', () => {
+  test('preserves only recent conversation reasoning_content by default', () => {
     const result = anthropicMessagesToOpenAI(
       [
+        makeUserMsg('earlier question'),
         makeAssistantMsg([
-          { type: 'thinking' as const, thinking: 'internal thoughts...' },
-          { type: 'text', text: 'visible response' },
+          { type: 'thinking' as const, thinking: 'old thoughts...' },
+          { type: 'text', text: 'old response' },
+        ]),
+        makeUserMsg('latest question'),
+        makeAssistantMsg([
+          { type: 'thinking' as const, thinking: 'recent thoughts...' },
+          { type: 'text', text: 'recent response' },
         ]),
       ],
       [] as any,
     )
-    const assistant = result[0] as any
-    expect(assistant.content).toBe('visible response')
-    expect(assistant.reasoning_content).toBe('internal thoughts...')
+    const assistants = result.filter(m => m.role === 'assistant') as any[]
+    expect(assistants[0].content).toBe('old response')
+    expect(assistants[0].reasoning_content).toBeUndefined()
+    expect(assistants[1].content).toBe('recent response')
+    expect(assistants[1].reasoning_content).toBe('recent thoughts...')
   })
 
   test('preserves reasoning_content with tool_calls in same turn', () => {
@@ -358,7 +366,7 @@ describe('DeepSeek thinking mode (enableThinking)', () => {
     expect(assistant.tool_calls[0].function.name).toBe('get_weather')
   })
 
-  test('always preserves reasoning_content from all turns', () => {
+  test('drops normal conversation reasoning_content outside the recent budget', () => {
     const result = anthropicMessagesToOpenAI(
       [
         // Turn 1: user → assistant (with thinking)
@@ -367,8 +375,7 @@ describe('DeepSeek thinking mode (enableThinking)', () => {
           { type: 'thinking' as const, thinking: 'Turn 1 reasoning...' },
           { type: 'text', text: 'Turn 1 answer' },
         ]),
-        // Turn 2: new user message → reasoning should still be preserved
-        // (DeepSeek requires reasoning_content to be passed back when tool calls are involved)
+        // Turn 2: new user message → only this recent non-tool reasoning is kept.
         makeUserMsg('question 2'),
         makeAssistantMsg([
           { type: 'thinking' as const, thinking: 'Turn 2 reasoning...' },
@@ -380,11 +387,102 @@ describe('DeepSeek thinking mode (enableThinking)', () => {
     )
 
     const assistants = result.filter(m => m.role === 'assistant')
-    // Both turns preserve reasoning_content (DeepSeek API requires it for tool calls)
-    expect((assistants[0] as any).reasoning_content).toBe('Turn 1 reasoning...')
+    expect((assistants[0] as any).reasoning_content).toBeUndefined()
     expect((assistants[0] as any).content).toBe('Turn 1 answer')
     expect((assistants[1] as any).reasoning_content).toBe('Turn 2 reasoning...')
     expect((assistants[1] as any).content).toBe('Turn 2 answer')
+  })
+
+  test('preserves tool-chain reasoning_content across user turns', () => {
+    const result = anthropicMessagesToOpenAI(
+      [
+        makeUserMsg('run a command'),
+        makeAssistantMsg([
+          { type: 'thinking' as const, thinking: 'I need a shell command.' },
+          {
+            type: 'tool_use' as const,
+            id: 'toolu_1',
+            name: 'bash',
+            input: { command: 'pwd' },
+          },
+        ]),
+        makeUserMsg([
+          {
+            type: 'tool_result' as const,
+            tool_use_id: 'toolu_1',
+            content: '/repo',
+          },
+        ]),
+        makeUserMsg('next normal question'),
+        makeAssistantMsg([
+          { type: 'thinking' as const, thinking: 'Recent normal reasoning.' },
+          { type: 'text', text: 'Answer.' },
+        ]),
+      ],
+      [] as any,
+      { enableThinking: true },
+    )
+
+    const assistants = result.filter(m => m.role === 'assistant') as any[]
+    expect(assistants[0].reasoning_content).toBe('I need a shell command.')
+    expect(assistants[1].reasoning_content).toBe('Recent normal reasoning.')
+  })
+
+  test('tool_result remains adjacent to tool_calls when a meta user message follows', () => {
+    const result = anthropicMessagesToOpenAI(
+      [
+        makeUserMsg('run ls'),
+        makeAssistantMsg([
+          {
+            type: 'thinking' as const,
+            thinking: 'I need to inspect files.',
+          },
+          {
+            type: 'tool_use' as const,
+            id: 'toolu_meta',
+            name: 'bash',
+            input: { command: 'ls' },
+          },
+        ]),
+        makeUserMsg([
+          {
+            type: 'tool_result' as const,
+            tool_use_id: 'toolu_meta',
+            content: 'file.txt',
+          },
+          {
+            type: 'text' as const,
+            text: '<available-deferred-tools>extra</available-deferred-tools>',
+          },
+        ]),
+      ],
+      [] as any,
+      { enableThinking: true },
+    )
+
+    const assistantIndex = result.findIndex(m => m.role === 'assistant')
+    expect((result[assistantIndex] as any).reasoning_content).toBe(
+      'I need to inspect files.',
+    )
+    expect(result[assistantIndex + 1].role).toBe('tool')
+    expect(result[assistantIndex + 2].role).toBe('user')
+  })
+
+  test('trims retained reasoning_content to the configured budget', () => {
+    const result = anthropicMessagesToOpenAI(
+      [
+        makeUserMsg('question'),
+        makeAssistantMsg([
+          { type: 'thinking' as const, thinking: '0123456789abcdef' },
+          { type: 'text', text: 'answer' },
+        ]),
+      ],
+      [] as any,
+      { interleavedThinkingRetention: { maxReasoningChars: 6 } },
+    )
+
+    const assistant = result.filter(m => m.role === 'assistant')[0] as any
+    expect(assistant.reasoning_content).toBe('abcdef')
   })
 
   test('preserves reasoning_content in multi-iteration tool call within same turn', () => {

@@ -81,6 +81,18 @@ describe('SettingsSchema', () => {
     expect(result.success).toBe(true)
   })
 
+  test('accepts DeepSeek interleaved thinking retention settings', () => {
+    const result = SettingsSchema().safeParse({
+      deepSeekInterleavedThinking: {
+        mode: 'tool-chain',
+        keepRecentAssistantTurns: 1,
+        maxReasoningChars: 12_000,
+      },
+    })
+
+    expect(result.success).toBe(true)
+  })
+
   test('accepts verification runner settings', () => {
     const result = SettingsSchema().safeParse({
       verificationRunner: {

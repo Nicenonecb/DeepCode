@@ -288,6 +288,35 @@ export const DeepSeekEffortBudgetSettingsSchema = lazySchema(() =>
     .passthrough(),
 )
 
+export const DeepSeekInterleavedThinkingSettingsSchema = lazySchema(() =>
+  z
+    .object({
+      mode: z
+        .enum(['tool-chain', 'conversation'])
+        .optional()
+        .describe(
+          'How DeepSeek reasoning_content is retained across turns. tool-chain preserves tool-call reasoning only; conversation also keeps recent assistant turns.',
+        ),
+      keepRecentAssistantTurns: z
+        .number()
+        .int()
+        .nonnegative()
+        .optional()
+        .describe(
+          'Number of recent assistant turns whose reasoning_content may be retained in conversation mode.',
+        ),
+      maxReasoningChars: z
+        .number()
+        .int()
+        .nonnegative()
+        .optional()
+        .describe(
+          'Maximum reasoning_content characters retained per assistant message.',
+        ),
+    })
+    .passthrough(),
+)
+
 /**
  * Schema for extra marketplaces defined in repository settings
  * Same as KnownMarketplace but without lastUpdated (which is managed automatically)
@@ -654,6 +683,11 @@ export const SettingsSchema = lazySchema(() =>
         .optional()
         .describe(
           'Override DeepSeek V4 Pro non-think, high, and max context/output/reasoning budgets.',
+        ),
+      deepSeekInterleavedThinking: DeepSeekInterleavedThinkingSettingsSchema()
+        .optional()
+        .describe(
+          'Configure DeepSeek V4 reasoning_content retention across tool and conversation turns.',
         ),
       // Whether to automatically approve all MCP servers in the project
       enableAllProjectMcpServers: z

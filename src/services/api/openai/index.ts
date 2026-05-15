@@ -358,7 +358,10 @@ export async function* queryModelOpenAI(
     const openaiMessages = anthropicMessagesToOpenAI(
       requestToolProtocol.messages,
       maxPromptPatch.systemPrompt,
-      { enableThinking },
+      {
+        enableThinking,
+        interleavedThinkingRetention: options.deepSeekInterleavedThinking,
+      },
     )
     const openaiTools = requestToolProtocol.tools
     const openaiToolChoice = requestToolProtocol.toolChoice
