@@ -131,6 +131,48 @@ describe('rankPatchCandidates', () => {
     })
   })
 
+  test('ranks non-passing candidates by fewer failed commands before status flavor', () => {
+    const manyFailures = candidate({
+      id: 'many-failures',
+      verificationSummary: verificationSummary({
+        status: 'failed',
+        total: 5,
+        passed: 1,
+        failed: 4,
+        timedOut: 0,
+      }),
+    })
+    const oneTimeout = candidate({
+      id: 'one-timeout',
+      verificationSummary: verificationSummary({
+        status: 'timed_out',
+        total: 5,
+        passed: 4,
+        failed: 0,
+        timedOut: 1,
+      }),
+    })
+
+    const result = rankPatchCandidates(
+      {
+        id: 'patch-search-failures',
+        targetFiles: [{ path: 'src/query.ts' }],
+      },
+      [manyFailures, oneTimeout],
+    )
+
+    expect(result.winner?.candidate.id).toBe('one-timeout')
+    expect(
+      result.candidates.map(evaluation => ({
+        id: evaluation.candidate.id,
+        failures: evaluation.summary.verificationFailureCount,
+      })),
+    ).toEqual([
+      { id: 'one-timeout', failures: 1 },
+      { id: 'many-failures', failures: 4 },
+    ])
+  })
+
   test('uses target coverage, risk flags, diff size, and id as deterministic tie breakers', () => {
     const risky = candidate({
       id: 'candidate-b',

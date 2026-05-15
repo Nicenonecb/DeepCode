@@ -8,6 +8,7 @@ import type {
   MCPServerConnection,
   ServerResource,
 } from '../services/mcp/types.js'
+import type { PatchSearchFooterStatus } from '../services/patchSearch/types.js'
 import type { WorkingMemory } from '../services/workingMemory/index.js'
 import { shouldEnablePromptSuggestion } from '../services/PromptSuggestion/promptSuggestion.js'
 import {
@@ -105,6 +106,7 @@ export type AppState = DeepImmutable<{
   mainLoopModelForSession: ModelSetting
   statusLineText: string | undefined
   verificationStatus: VerificationFooterStatus | undefined
+  patchSearchStatus: PatchSearchFooterStatus | undefined
   workingMemory: WorkingMemory | undefined
   expandedView: 'none' | 'tasks' | 'teammates'
   isBriefOnly: boolean
@@ -491,6 +493,7 @@ export function getDefaultAppState(): AppState {
     mainLoopModelForSession: null,
     statusLineText: undefined,
     verificationStatus: undefined,
+    patchSearchStatus: undefined,
     workingMemory: undefined,
     expandedView: 'none',
     isBriefOnly: false,

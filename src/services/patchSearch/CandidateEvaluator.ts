@@ -23,6 +23,8 @@ export function evaluatePatchCandidate(
     summary: {
       candidateId: candidate.id,
       ...(candidate.label ? { label: candidate.label } : {}),
+      ...(candidate.exitStatus ? { exitStatus: candidate.exitStatus } : {}),
+      ...(candidate.failure ? { failure: candidate.failure } : {}),
       verificationStatus: score.verificationStatus,
       verificationPassRate: score.verificationPassRate,
       verificationFailureCount: score.verificationFailureCount,
@@ -102,7 +104,9 @@ function scorePatchCandidate(
     touchedTargetFileCount: targetMatches.size,
     targetFileCount: targetFiles.length,
   })
-  const riskFlagCount = riskFlags.length
+  const riskFlagCount = riskFlags.filter(
+    flag => flag === 'high_risk_file',
+  ).length
   const total =
     verification.passRate * 1000 +
     targetCoverage * 200 -
@@ -126,12 +130,11 @@ function scorePatchCandidate(
     total: roundMetric(total),
     sortKey: [
       verificationRank(verification.status),
-      roundMetric(verification.passRate),
       -verification.failureCount,
       -verification.timedOutCount,
-      roundMetric(targetCoverage),
-      -riskFlagCount,
       -diffSize,
+      -riskFlagCount,
+      roundMetric(targetCoverage),
     ],
   }
 }
@@ -223,9 +226,8 @@ function touchedTargetFiles(
 function verificationRank(status: CandidateScore['verificationStatus']) {
   switch (status) {
     case 'passed':
-      return 3
-    case 'failed':
       return 2
+    case 'failed':
     case 'timed_out':
       return 1
     case 'not_run':

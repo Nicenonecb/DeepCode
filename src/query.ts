@@ -137,6 +137,7 @@ import {
 } from './services/workingMemory/index.js'
 import type { DSMLGatewaySettings } from './services/dsml/index.js'
 import type { ToolCallRepairIssue } from './services/toolRepair/types.js'
+import { runPatchSearchForHighRiskContext } from './services/patchSearch/PatchSearchIntegration.js'
 import { getCwd } from './utils/cwd.js'
 import { feature } from 'bun:bundle'
 import {
@@ -2332,6 +2333,12 @@ async function* queryLoop(
       toolCallRepairIssues,
       toolCallRepairBudget,
     )
+    void runPatchSearchForHighRiskContext({
+      source: 'query',
+      prompt: getLatestUserPrompt(messagesForQuery) ?? 'Repair failed tools',
+      toolUseContext,
+      repairIssues: repairBudgetSelection.retryableIssues,
+    }).catch(logError)
     const toolCallRepairMetaMessage = buildToolCallRepairMetaMessage(
       toolUseBlocks,
       repairBudgetSelection.retryableIssues,

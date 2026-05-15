@@ -292,6 +292,90 @@
       border-right: 4px solid var(--green);
     }
 
+    .feature-details {
+      border: 1px solid var(--line);
+      background: rgba(255,250,242,.76);
+    }
+
+    .feature-details summary {
+      display: grid;
+      grid-template-columns: minmax(180px, .28fr) minmax(0, 1fr) minmax(220px, .34fr) auto;
+      gap: 24px;
+      align-items: start;
+      padding: 18px 24px;
+      cursor: pointer;
+      color: var(--ink);
+    }
+
+    .feature-details summary::after {
+      content: "展开";
+      justify-self: end;
+      grid-column: 4;
+      color: var(--muted);
+      font: 800 12px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+
+    .feature-details[open] summary::after {
+      content: "收起";
+    }
+
+    .feature-title {
+      grid-column: 1;
+    }
+
+    .feature-title strong {
+      display: block;
+      margin-top: 10px;
+      color: #244e36;
+      font-size: 21px;
+      line-height: 1.35;
+    }
+
+    .feature-note {
+      grid-column: 2;
+      font-size: 17px;
+      line-height: 1.55;
+    }
+
+    .feature-next {
+      grid-column: 3;
+      font-size: 17px;
+      line-height: 1.55;
+    }
+
+    .step-list {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      border-top: 1px solid var(--line);
+    }
+
+    .step-list li {
+      display: grid;
+      grid-template-columns: minmax(120px, .32fr) minmax(0, 1fr);
+      gap: 14px;
+      padding: 12px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .step-list li:last-child {
+      border-bottom: 0;
+    }
+
+    .step-list strong {
+      display: block;
+      margin-bottom: 4px;
+      color: var(--ink);
+      font-size: 15px;
+      line-height: 1.25;
+    }
+
+    .step-list p {
+      margin: 0;
+      color: #4c4943;
+      font-size: 14px;
+    }
+
     .wide-table {
       width: 100%;
       border-collapse: collapse;
@@ -479,17 +563,17 @@
       <section id="current">
         <div class="section-head">
           <h2>本轮更新</h2>
-          <p>完成多轨迹 Patch Search 第 1 步：类型与候选评分模型已落地。</p>
+          <p>完成 Benchmark Harness 第 1 步：任务样本与指标模型已落地。</p>
         </div>
         <table class="wide-table">
           <thead><tr><th>项目</th><th>当前记录</th><th>下一步落点</th></tr></thead>
           <tbody>
-            <tr><td>本轮目标</td><td>完成多轨迹 Patch Search 第 1 步：新增纯结构层，不接运行时、不创建 worktree、不启动 agent、不执行验证命令；先把候选、请求、结果、评分和选择理由标准化。</td><td>第 2 步再接 `PatchSearchRunner.ts`，复用 worktree 和多 agent helper 做候选编排。</td></tr>
-            <tr class="done-row"><td><span class="status-chip done">DONE</span><br>已完成改动</td><td>新增 `src/services/patchSearch/types.ts`、`CandidateEvaluator.ts`、`__tests__/CandidateEvaluator.test.ts`。已定义 `PatchCandidate`、`PatchSearchRequest`、`PatchSearchResult`、`CandidateScore`、`SelectionReason`，并提供 `evaluatePatchCandidate()`、`rankPatchCandidates()`、`buildPatchSearchSummary()`。</td><td>评分 summary 稳定可序列化，覆盖验证通过率、失败数量、超时数量、diff 规模、目标文件覆盖率、风险标记和 deterministic tie-break。</td></tr>
-            <tr><td>验证命令和结果</td><td>`bun test src/services/patchSearch/__tests__/CandidateEvaluator.test.ts` 通过：5 pass。`bun run typecheck` 通过，TypeScript strict 零错误。`bunx biome check src/services/patchSearch/types.ts src/services/patchSearch/CandidateEvaluator.ts src/services/patchSearch/__tests__/CandidateEvaluator.test.ts` 通过。</td><td>单测覆盖指标标准化、failed verification / missing target 派生风险、验证成功优先、目标覆盖与风险 tie-break、空候选稳定 summary。</td></tr>
-            <tr><td>主要影响文件</td><td>`src/services/patchSearch/types.ts`、`src/services/patchSearch/CandidateEvaluator.ts`、`src/services/patchSearch/__tests__/CandidateEvaluator.test.ts`、`deepcode-deepseek-gap.html`。</td><td>没有新增专题报告，因此无需更新 `index.html`。</td></tr>
-            <tr><td>剩余风险</td><td>Patch Search 仍未接运行时；当前只完成评分模型。候选 worktree 生命周期、agent prompt 轨迹、候选 diff 采集、验证命令执行和胜出 patch 应用还没有落地。</td><td>实现时要避免自动覆盖用户未提交改动，候选 worktree 必须可清理、可审计、可回滚。</td></tr>
-            <tr><td>建议下一步</td><td>第 2 步：新增 `src/services/patchSearch/PatchSearchRunner.ts`，先支持 dry-run / fake candidate executor，把候选请求拆成 N 条轨迹并收集结构化候选结果。</td><td>Runner 先依赖注入 executor，等测试稳定后再接真实 `spawnMultiAgent` 和 worktree 创建。</td></tr>
+            <tr><td>本轮目标</td><td>完成 Benchmark Harness 第 1 步：新增纯结构层，不接运行时；定义 task fixture、expected outcome、resolved、verification pass rate、cost、turns、regression 等稳定指标。</td><td>第 2 步再接 `BenchmarkHarness.ts` 执行壳，先支持 dry-run / injected executor。</td></tr>
+            <tr class="done-row"><td><span class="status-chip done">DONE</span><br>已完成改动</td><td>新增 `src/services/benchmark/types.ts`、`TaskDataset.ts`、`__tests__/TaskDataset.test.ts`。已定义 `BenchmarkTaskFixture`、`BenchmarkExpectedOutcome`、`BenchmarkTaskRunMetrics`、`BenchmarkTaskSummary`、`BenchmarkDatasetSummary` 和 regression / cost 类型。</td><td>`TaskDataset.ts` 提供 dataset/task 归一化、重复 task id 校验、run metrics 派生、单任务 summary 和 dataset 聚合 summary；输出可稳定 JSON 序列化。</td></tr>
+            <tr><td>验证命令和结果</td><td>`bun test src/services/benchmark/__tests__/TaskDataset.test.ts` 通过：5 pass。`bun run typecheck` 通过，TypeScript strict 零错误。`bunx biome check --write src/services/benchmark/types.ts src/services/benchmark/TaskDataset.ts src/services/benchmark/__tests__/TaskDataset.test.ts` 已格式化并通过。</td><td>测试覆盖 fixture 稳定排序、重复 id 拒绝、verification pass rate 派生、cost / turns / regression 归一化、task score 和 dataset 聚合。</td></tr>
+            <tr><td>主要影响文件</td><td>`src/services/benchmark/types.ts`、`src/services/benchmark/TaskDataset.ts`、`src/services/benchmark/__tests__/TaskDataset.test.ts`、`deepcode-deepseek-gap.html`。</td><td>没有新增专题报告，因此无需更新 `index.html`。</td></tr>
+            <tr><td>剩余风险</td><td>Benchmark Harness 当前仍是纯结构层；还没有执行 agent/CLI、收集 transcript、运行 verification 或输出 reporter。</td><td>第 2 步需要把执行器设计成可注入，避免一开始就绑定真实 agent 或外部命令。</td></tr>
+            <tr><td>建议下一步</td><td>新增 `src/services/benchmark/BenchmarkHarness.ts`，按任务集顺序运行候选 agent/CLI 命令，收集 transcript、退出状态、token/cost、turn count 和 verification summary。</td><td>继续保持 dry-run / fake executor 先行，等测试稳定后再接真实 Query/Agent runner。</td></tr>
           </tbody>
         </table>
       </section>
@@ -529,13 +613,9 @@
             <tr class="done-row"><td><span class="status-chip done">DONE</span><br>ContextPacker</td><td>第 1-4 轮已完成：`ContextPacker.ts` 负责预算内结构化打包且优先保留 verification/LSP 错误；`ContextCollectors.ts` 收集 git/package/test/verification/LSP 证据；`src/query.ts` 在 settings 显式启用时把 pack 作为 meta context 注入 API 输入。已删除完成分步卡，避免下一轮 agent 重复执行旧步骤。<br><strong>当前搜索起点：</strong>`src/services/contextPacker/ContextCollectors.ts` 的 `collectLspEvidence()`，`src/services/lsp/LSPDiagnosticRegistry.ts` 的 `peekPendingLSPDiagnostics()`，`packages/builtin-tools/src/tools/LSPTool/symbolContext.ts` 的 `getSymbolAtPosition()`。</td><td><strong>已完成当前阶段。</strong>后续增强拆两步：1. 主动 LSP request collector，接 `documentSymbol` / `findReferences`，只对高优先级错误位置按预算请求；2. Verification runtime summary 接入 Query pack，把最近一次 `VerificationSummary` 或 `verificationStatus` 喂进 ContextPacker。</td></tr>
             <tr class="done-row"><td><span class="status-chip done">DONE</span><br>WorkingMemory</td><td>长任务靠聊天历史维持状态的问题当前阶段已完成：第 1-2 步完成 Store / Summarizer；第 3 步完成 QueryEngine / query runtime；第 4 步完成 compact boundary checkpoint、项目级 `.deepcode/working-memory.json` 写入、checkpoint 恢复和 Query/compact 测试。<br><strong>搜索起点：</strong>`src/services/workingMemory/WorkingMemoryRuntime.ts`、`src/services/compact/compact.ts`、`src/QueryEngine.ts`、`src/query.ts`。</td><td>结构化保存目标、事实、排除假设、已改文件、命令、测试状态、下一步。<br><strong>后续增强：</strong>补 resume 端到端测试、陈旧项替换/完成态清理、以及可见 debug/status 面板。</td></tr>
             <tr class="done-row"><td><span class="status-chip done">DONE</span><br>DSML Gateway</td><td>V4 DSML 工具协议当前阶段已完成：1. 纯 DSML parser / serializer / types 和单测；2. OpenAI-compatible 请求侧 DSML prompt / tool schema 开关；3. 响应侧 DSML tool call 解析并映射回 Anthropic `tool_use`；4. settings/feature A/B、集成式测试和 malformed response 回退策略。<br><strong>搜索起点：</strong>`src/services/dsml/`、`src/services/api/openai/dsmlRequest.ts`、`src/services/api/openai/dsmlResponse.ts`、`src/services/api/openai/index.ts`、`src/query.ts`。</td><td><strong>已完成当前阶段。</strong>`dsmlGateway.enabled` 默认关闭；可用 settings 或 `FEATURE_DSML_GATEWAY=1` 实验启用。相关测试 16 pass，`bun run typecheck` 通过。<br><strong>后续增强：</strong>真实 provider VCR fixture、灰度指标、function calling / DSML 成功率对比。</td></tr>
-            <tr class="done-row"><td><span class="status-chip done">DONE</span><br>Tool Call Repair</td><td>第 1-4 步已落地：`src/services/toolRepair/` 定义和分类 repair issue；`src/services/tools/toolExecution.ts` 在主要失败分支生成 `toolCallRepairIssue`；`src/query.ts` 把 retryable failed tools 回灌为下一轮 `&lt;tool_call_repair&gt;` meta context，明确列出成功工具不要重跑，并用 query turn state 限制每个 `toolUseId` / `toolName` 的 repair 次数。<br><strong>搜索起点：</strong>`src/services/tools/toolExecution.ts` 的 `runToolUse()`、`safeParse`、`InputValidationError` 和 runtime error 分支；并行执行在 `src/services/tools/toolOrchestration.ts`、streaming 执行在 `src/services/tools/StreamingToolExecutor.ts`。</td><td><strong>已完成当前阶段。</strong>后续增强可补 streaming synthetic 失败 metadata，并设计真正的局部 retry 执行器。<br><strong>建议落点：</strong>`StreamingToolExecutor.createSyntheticErrorMessage()`、streaming unknown tool 分支、以及 `src/query.ts` 中 retryable issue 聚合后的 retry plan。</td></tr>
-            <tr class="done-row"><td><span class="status-chip done">STEP 1 DONE</span><br>Patch Search 类型与评分模型</td><td>已新增纯结构层，不接运行时：`src/services/patchSearch/types.ts`、`CandidateEvaluator.ts`、`__tests__/CandidateEvaluator.test.ts`。定义 `PatchCandidate`、`PatchSearchRequest`、`PatchSearchResult`、`CandidateScore`、`SelectionReason`，把验证通过率、失败数量、diff 规模、是否触达目标文件和风险标记标准化。</td><td><strong>已完成。</strong>输出稳定可序列化的候选评分 summary；不创建 worktree、不启动 agent、不执行验证命令。验证：`bun test src/services/patchSearch/__tests__/CandidateEvaluator.test.ts` 5 pass，`bun run typecheck` 通过。</td></tr>
-            <tr><td><span class="status-chip todo">STEP 2</span><br>候选 worktree 编排</td><td>新增 `src/services/patchSearch/PatchSearchRunner.ts`，复用 `src/utils/worktree.ts` 和 `packages/builtin-tools/src/tools/shared/spawnMultiAgent.ts` 的并行 agent 入口，为每个候选创建独立 worktree / branch / prompt 轨迹，并收集候选 diff、执行日志、退出状态。</td><td>先支持 dry-run 和最多 N 个候选；失败候选必须保留结构化原因，worktree 清理必须显式、可配置，不能覆盖用户当前工作区。</td></tr>
-            <tr><td><span class="status-chip todo">STEP 3</span><br>验证与候选评分</td><td>让 `PatchSearchRunner` 调用 `src/services/verification/VerificationRunner.ts`，对每个候选运行同一组 typecheck/lint/test/用户指定验证命令，再交给 `CandidateEvaluator` 排序。</td><td>评分策略优先级：验证全通过 &gt; 失败更少 &gt; diff 更小 &gt; 更少高风险文件 &gt; 更贴近目标文件。测试覆盖 verification 失败、部分通过、并列分数 tie-break。</td></tr>
-            <tr><td><span class="status-chip todo">STEP 4</span><br>胜出 patch 应用与回滚边界</td><td>新增安全应用层：把胜出候选 diff 从候选 worktree 应用回主工作区，应用前检查主工作区 dirty 状态、目标文件冲突、候选 base commit 是否一致；失败时只报告，不自动覆盖。</td><td>默认只提出推荐候选和应用命令；自动应用必须受权限/设置控制。需要测试冲突、空 diff、候选验证失败但仍被强制查看的路径。</td></tr>
-            <tr><td><span class="status-chip todo">STEP 5</span><br>状态展示与 Query/Agent 接入</td><td>把 patch search 状态接入 `src/state/AppStateStore.ts` 和 footer：展示候选数量、运行中/验证中/已选中、最佳分数、失败摘要。之后再从 AgentTool 或 Query 的高风险修复路径触发。</td><td>补 `PatchSearchRunner.test.ts` 和 Query/Agent 集成测试，验证多候选执行、评分选择、状态更新和失败降级；看板再从 TODO 推进到 DONE。</td></tr>
-            <tr><td>Benchmark Harness</td><td>不知道优化后是否真的超过其他 agent。<br><strong>搜索起点：</strong>当前验证闭环在 `src/services/verification/`；集成测试样式在 `tests/integration/`；性能/日志分析可参考 `src/commands/perf-issue/` 和 `src/utils/queryProfiler.ts`。</td><td>用本地任务集衡量 resolved、验证通过率、成本、turns、回归。<br><strong>建议落点：</strong>新增 `src/services/benchmark/BenchmarkHarness.ts`、`TaskDataset.ts`、`Reporter.ts`、`__tests__/BenchmarkHarness.test.ts`；任务样本放 `tests/benchmark/fixtures/`；脚本入口加到 `package.json` 的 `benchmark:*`。</td></tr>
+            <tr class="done-row"><td><span class="status-chip done">DONE</span><br>Tool Call Repair</td><td>第 1-4 步已落地：工具失败已结构化、执行失败分支已产出 repair metadata、Query 已能回灌失败工具 summary，并用 turn state 限制 retry 预算。<br><strong>搜索起点：</strong>`src/services/tools/toolExecution.ts` 的 `runToolUse()`、`safeParse`、`InputValidationError` 和 runtime error 分支；并行执行在 `src/services/tools/toolOrchestration.ts`、streaming 执行在 `src/services/tools/StreamingToolExecutor.ts`。</td><td><strong>已完成当前阶段。</strong>后续增强可补 streaming synthetic 失败 metadata，并设计真正的局部 retry 执行器。<br><strong>建议落点：</strong>`StreamingToolExecutor.createSyntheticErrorMessage()`、streaming unknown tool 分支、以及 `src/query.ts` 中 retryable issue 聚合后的 retry plan。</td></tr>
+            <tr class="done-row"><td colspan="3"><details class="feature-details"><summary><span class="feature-title"><span class="status-chip done">DONE</span><strong>Patch Search</strong></span><span class="feature-note">五步已全部落地：类型评分、候选 worktree 编排、验证排序、安全应用和 Query/Agent 状态接入都已完成。</span><span class="feature-next">当前阶段 DONE；后续可把真实 sub-agent executor 和产品化触发策略作为增强项推进。</span></summary><div class="feature-steps"><ol class="step-list"><li><div><span class="status-chip done">STEP 1 DONE</span><strong>类型与评分模型</strong></div><p>新增 `src/services/patchSearch/types.ts`、`CandidateEvaluator.ts`、`__tests__/CandidateEvaluator.test.ts`，定义候选、请求、结果、评分和选择理由，并输出稳定可序列化 summary。</p></li><li><div><span class="status-chip done">STEP 2 DONE</span><strong>候选 worktree 编排</strong></div><p>`PatchSearchRunner.ts` 为每个候选生成独立 worktree slug / branch / prompt 轨迹，收集执行日志、退出状态和结构化失败原因；支持 dry-run、最多 N 个候选和显式清理。</p></li><li><div><span class="status-chip done">STEP 3 DONE</span><strong>验证与候选评分</strong></div><p>候选执行成功后调用 verifier；默认复用 `VerificationRunner.ts` 运行同一组验证命令，再交给 `CandidateEvaluator` 按全通过、失败更少、diff 更小、风险更低、目标更近排序。</p></li><li><div><span class="status-chip done">STEP 4 DONE</span><strong>胜出 patch 应用与回滚边界</strong></div><p>`PatchApplicator` 在应用前检查主工作区 dirty 状态、目标文件冲突、候选 base commit 和空 diff；默认只给推荐候选和 apply 命令，不自动覆盖。</p></li><li><div><span class="status-chip done">STEP 5 DONE</span><strong>状态展示与 Query/Agent 接入</strong></div><p>状态已接入 `AppStateStore.ts` 和 footer，展示候选数量、运行中/验证中/已选中、最佳分数和失败摘要；Query/Agent trigger bridge 已覆盖高风险修复路径。</p></li></ol></div></details></td></tr>
+            <tr><td colspan="3"><details class="feature-details"><summary><span class="feature-title"><strong>Benchmark Harness</strong></span><span class="feature-note">第 1 步已完成：任务样本、预期结果、resolved、verification pass rate、cost、turns 和 regression 指标已标准化。<br><strong>搜索起点：</strong>当前验证闭环在 `src/services/verification/`；集成测试样式在 `tests/integration/`；性能/日志分析可参考 `src/commands/perf-issue/` 和 `src/utils/queryProfiler.ts`。</span><span class="feature-next">下一步新增 `BenchmarkHarness.ts` 执行壳，先用本地任务集衡量 resolved、验证通过率、成本、turns、回归。</span></summary><div class="feature-steps"><ol class="step-list"><li><div><span class="status-chip done">STEP 1 DONE</span><strong>任务样本与指标模型</strong></div><p>已新增 `src/services/benchmark/types.ts`、`TaskDataset.ts`、`__tests__/TaskDataset.test.ts`；定义 task fixture、expected outcome、resolved、verification pass rate、cost、turns、regression 等稳定指标。</p></li><li><div><span class="status-chip todo">STEP 2</span><strong>BenchmarkRunner 执行壳</strong></div><p>新增 `BenchmarkHarness.ts`，按任务集顺序运行候选 agent/CLI 命令，收集 transcript、退出状态、token/cost、turn count 和 verification summary；先支持 dry-run / injected executor。</p></li><li><div><span class="status-chip todo">STEP 3</span><strong>Verification 与 Reporter</strong></div><p>复用 `src/services/verification/VerificationRunner.ts` 对每个任务执行同一组验证命令；新增 `Reporter.ts` 输出 JSON/Markdown summary，按 resolved、验证通过率、成本、turns 和回归排序。</p></li><li><div><span class="status-chip todo">STEP 4</span><strong>Fixtures、脚本与回归门禁</strong></div><p>任务样本放 `tests/benchmark/fixtures/`；新增 `__tests__/BenchmarkHarness.test.ts` 和 `package.json` 的 `benchmark:*` 脚本，支持本地对比与 CI 低成本 smoke run。</p></li></ol></div></details></td></tr>
           </tbody>
         </table>
       </section>
