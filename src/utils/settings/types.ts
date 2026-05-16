@@ -728,7 +728,7 @@ export const SettingsSchema = lazySchema(() =>
             .boolean()
             .optional()
             .describe(
-              'Whether task-aware model routing is enabled when the TASK_AWARE_MODEL_ROUTING feature is available.',
+              'Whether task-aware model routing is enabled. Defaults to true for OpenAI-compatible and DeepSeek providers, and false otherwise. Set false or CLAUDE_CODE_DISABLE_TASK_AWARE_MODEL_ROUTING=1 to disable.',
             ),
           routes: z
             .object({

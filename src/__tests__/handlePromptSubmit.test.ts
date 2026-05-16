@@ -163,4 +163,51 @@ describe('handlePromptSubmit', () => {
     expect(params.getToolUseContext).not.toHaveBeenCalled()
     expect(params.onQuery).not.toHaveBeenCalled()
   })
+
+  test('passes routed model and effort to onQuery for OpenAI-compatible prompts', async () => {
+    const savedOpenAIEnv = process.env.CLAUDE_CODE_USE_OPENAI
+    process.env.CLAUDE_CODE_USE_OPENAI = '1'
+    const queryGuard = new QueryGuard()
+    const params = {
+      ...createBaseParams(),
+      queryGuard,
+      getToolUseContext: mock(
+        () =>
+          ({
+            getAppState: () => ({
+              mainLoopModel: null,
+              mainLoopModelForSession: null,
+              effortValue: undefined,
+              sessionHooks: new Map(),
+              toolPermissionContext: { mode: 'default' },
+            }),
+            options: {
+              commands: [],
+              isNonInteractiveSession: false,
+            },
+          }) as any,
+      ),
+    }
+
+    try {
+      await handlePromptSubmit({
+        ...params,
+        input: '修复登录失败的问题',
+        mode: 'prompt',
+        pastedContents: {},
+        isExternalLoading: false,
+      })
+
+      expect(params.onQuery).toHaveBeenCalled()
+      const onQueryArgs = (params.onQuery as any).mock.calls[0]
+      expect(onQueryArgs[4]).toContain('opus')
+      expect(onQueryArgs[7]).toBe('high')
+    } finally {
+      if (savedOpenAIEnv === undefined) {
+        delete process.env.CLAUDE_CODE_USE_OPENAI
+      } else {
+        process.env.CLAUDE_CODE_USE_OPENAI = savedOpenAIEnv
+      }
+    }
+  })
 })
