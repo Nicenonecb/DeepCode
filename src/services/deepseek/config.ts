@@ -1,5 +1,9 @@
 import { promises as fs } from 'fs'
-import { getGlobalConfig, saveGlobalConfig } from '../../utils/config.js'
+import {
+  getGlobalConfig,
+  isConfigReadingAllowed,
+  saveGlobalConfig,
+} from '../../utils/config.js'
 import { getGlobalClaudeFile } from '../../utils/env.js'
 import { logError } from '../../utils/log.js'
 import { DEEPSEEK_DEFAULT_MODEL } from './modelProfiles.js'
@@ -30,6 +34,9 @@ export function getStoredDeepSeekConfig(): StoredDeepSeekConfig {
       baseURL: clean(storedDeepSeekConfigForTesting.baseURL),
       model: clean(storedDeepSeekConfigForTesting.model),
     }
+  }
+  if (!isConfigReadingAllowed()) {
+    return {}
   }
 
   const config = getGlobalConfig()

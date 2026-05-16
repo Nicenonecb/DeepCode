@@ -131,6 +131,7 @@ import {
   runPreToolUseHooks,
 } from './toolHooks.js'
 import { isSkillLearningEnabled } from '../skillLearning/featureCheck.js'
+import { createFileEditValidationRepairHint } from '../toolRepair/FileEditRepairHints.js'
 import { createToolCallRepairSummary } from '../toolRepair/ToolCallErrorClassifier.js'
 import type {
   ToolCallErrorSource,
@@ -330,6 +331,8 @@ function buildToolCallRepairIssue({
   message,
   error,
   source,
+  retryable,
+  repairHint,
 }: {
   toolUseID: string
   toolName: string
@@ -337,6 +340,8 @@ function buildToolCallRepairIssue({
   message?: string
   error?: unknown
   source?: ToolCallErrorSource
+  retryable?: boolean
+  repairHint?: string
 }): ToolCallRepairIssue {
   return createToolCallRepairSummary({
     toolUseId: toolUseID,
@@ -345,6 +350,8 @@ function buildToolCallRepairIssue({
     message,
     error,
     source,
+    retryable,
+    repairHint,
   })
 }
 
@@ -838,20 +845,36 @@ async function checkPermissionsAndCallTool(
       }),
       ...mcpToolDetailsForAnalytics(tool.name, mcpServerType, mcpServerBaseUrl),
     })
+    const repairHint =
+      tool.name === FILE_EDIT_TOOL_NAME
+        ? createFileEditValidationRepairHint(isValidCall.message)
+        : undefined
+    const repairIssue = buildToolCallRepairIssue({
+      toolUseID,
+      toolName: tool.name,
+      input,
+      message: isValidCall.message,
+      source: 'input_validation_error',
+      retryable: true,
+      repairHint,
+    })
     return [
       {
-        message: createUserMessage({
-          content: [
-            {
-              type: 'tool_result',
-              content: `<tool_use_error>${isValidCall.message}</tool_use_error>`,
-              is_error: true,
-              tool_use_id: toolUseID,
-            },
-          ],
-          toolUseResult: `Error: ${isValidCall.message}`,
-          sourceToolAssistantUUID: assistantMessage.uuid,
-        }),
+        message: withToolCallRepairIssue(
+          createUserMessage({
+            content: [
+              {
+                type: 'tool_result',
+                content: `<tool_use_error>${isValidCall.message}</tool_use_error>`,
+                is_error: true,
+                tool_use_id: toolUseID,
+              },
+            ],
+            toolUseResult: `Error: ${isValidCall.message}`,
+            sourceToolAssistantUUID: assistantMessage.uuid,
+          }),
+          repairIssue,
+        ),
       },
     ]
   }

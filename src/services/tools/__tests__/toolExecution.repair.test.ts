@@ -148,6 +148,34 @@ function repairTestTool(options: { call?: () => Promise<{ data: string }> }) {
   })
 }
 
+function validatingRepairTestTool(options: {
+  name?: string
+  validationMessage: string
+}) {
+  return buildTool({
+    name: options.name ?? 'RepairValidationTest',
+    description: async () => 'repair validation test',
+    prompt: async () => 'repair validation test',
+    inputSchema: z.object({ value: z.string() }),
+    validateInput: async () => ({
+      result: false,
+      message: options.validationMessage,
+      errorCode: 8,
+    }),
+    checkPermissions: async () => ({ behavior: 'allow' }),
+    call: async () => ({ data: 'ok' }),
+    mapToolResultToToolResultBlockParam: (content, toolUseID) => ({
+      type: 'tool_result',
+      content: String(content),
+      tool_use_id: toolUseID,
+    }),
+    renderToolUseMessage: () => null,
+    renderToolResultMessage: () => null,
+    renderToolUseErrorMessage: () => null,
+    maxResultSizeChars: 1000,
+  })
+}
+
 describe('runToolUse repair metadata', () => {
   test('adds schema repair issue for InputValidationError', async () => {
     const tool = repairTestTool({})
@@ -188,6 +216,30 @@ describe('runToolUse repair metadata', () => {
     expect(message.toolUseResult).toBe(
       'Error: No such tool available: MissingTool',
     )
+  })
+
+  test('adds FileEdit-specific repair hint for missing old_string validation failures', async () => {
+    const tool = validatingRepairTestTool({
+      name: 'Edit',
+      validationMessage:
+        'String to replace not found in file.\nString: v += 0.085 / max(dot(p - c1, p - c1), 0.006);',
+    })
+    const toolUse = {
+      type: 'tool_use',
+      caller: { type: 'direct' },
+      id: 'toolu_file_edit_validation',
+      name: 'Edit',
+      input: { value: 'ok' },
+    } satisfies ToolUseBlock
+
+    const message = await runSingleToolUse(toolUse, makeContext([tool]))
+    const issue = getRepairIssue(message)
+
+    expect(issue.kind).toBe('schema_error')
+    expect(issue.retryable).toBe(true)
+    expect(issue.message).toContain('String to replace not found')
+    expect(issue.repairHint).toContain('Do not retry the same old_string')
+    expect(issue.repairHint).toContain('rewrite the enclosing function/block')
   })
 
   test('adds runtime repair issue for tool exceptions', async () => {

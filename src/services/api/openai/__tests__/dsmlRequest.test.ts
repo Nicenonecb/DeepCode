@@ -63,7 +63,7 @@ describe('applyDSMLRequestGateway', () => {
     expect(result.messages[1]).toBe('user message')
   })
 
-  test('defaults DeepSeek V4 Pro on the official endpoint to DSML', () => {
+  test('defaults DeepSeek V4 Pro to native OpenAI tools unless DSML is explicitly enabled', () => {
     const result = applyDSMLRequestGateway({
       model: 'deepseek-v4-pro',
       baseURL: DEEPSEEK_DEFAULT_BASE_URL,
@@ -75,14 +75,17 @@ describe('applyDSMLRequestGateway', () => {
       createMetaMessage: content => content,
     })
 
-    expect(result.enabled).toBe(true)
+    expect(result.enabled).toBe(false)
     expect(result.decision).toMatchObject({
-      toolProtocol: 'dsml',
-      source: 'deepseek-profile',
+      toolProtocol: 'openai-tools',
+      source: 'fallback',
+      fallbackReason: 'explicit-opt-in-required',
       providerEvidence: 'official-deepseek',
       modelProfileId: 'deepseek-v4-pro',
     })
-    expect(result.tools).toEqual([])
+    expect(result.tools).toEqual([
+      { type: 'function', function: { name: 'Read' } },
+    ])
   })
 
   test('falls back to native OpenAI tools for unverified compatible endpoints', () => {

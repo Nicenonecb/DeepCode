@@ -133,7 +133,7 @@ describe('DSML OpenAI gateway integration', () => {
       ],
       nativeTools: [{ type: 'function', function: { name: 'Read' } }],
       nativeToolChoice: { type: 'auto' },
-      settings: { tagStyle: 'ascii' },
+      settings: { enabled: true, tagStyle: 'ascii' },
       createMetaMessage: content => content,
     })
 

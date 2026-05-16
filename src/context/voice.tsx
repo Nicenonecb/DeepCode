@@ -20,6 +20,7 @@ const DEFAULT_STATE: VoiceState = {
 type VoiceStore = Store<VoiceState>;
 
 const VoiceContext = createContext<VoiceStore | null>(null);
+const fallbackVoiceStore = createStore<VoiceState>(DEFAULT_STATE);
 
 type Props = {
   children: React.ReactNode;
@@ -34,10 +35,7 @@ export function VoiceProvider({ children }: Props): React.ReactNode {
 
 function useVoiceStore(): VoiceStore {
   const store = useContext(VoiceContext);
-  if (!store) {
-    throw new Error('useVoiceState must be used within a VoiceProvider');
-  }
-  return store;
+  return store ?? fallbackVoiceStore;
 }
 
 /**

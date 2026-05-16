@@ -22,7 +22,7 @@ export function hasDeepSeekEnv(): boolean {
 }
 
 export function hasDeepSeekConfig(): boolean {
-  return hasStoredDeepSeekConfig() || hasDeepSeekEnv()
+  return hasDeepSeekEnv() || hasStoredDeepSeekConfig()
 }
 
 export function hasOpenAICompatApiKey(): boolean {

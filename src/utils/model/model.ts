@@ -22,6 +22,8 @@ import { LIGHTNING_BOLT } from '../../constants/figures.js'
 import { isModelAllowed } from './modelAllowlist.js'
 import { type ModelAlias, isModelAlias } from './aliases.js'
 import { capitalize } from '../stringUtils.js'
+import { resolveOpenAICompatModel } from '../../services/api/openai/env.js'
+import { getDeepSeekModelProfile } from '../../services/deepseek/modelProfiles.js'
 import {
   CHATGPT_CODEX_DEFAULT_MODEL,
   CHATGPT_CODEX_FAST_MODEL,
@@ -428,6 +430,13 @@ function maskModelCodename(baseName: string): string {
 }
 
 export function renderModelName(model: ModelName): string {
+  const provider = getAPIProvider()
+  if (provider === 'openai') {
+    const openAIModel = resolveOpenAICompatModel(model)
+    const deepSeekProfile = getDeepSeekModelProfile(openAIModel)
+    return deepSeekProfile?.displayName ?? openAIModel
+  }
+
   const publicName = getPublicModelDisplayName(model)
   if (publicName) {
     return publicName

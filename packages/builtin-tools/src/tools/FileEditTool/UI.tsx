@@ -20,6 +20,7 @@ import { readEditContext } from 'src/utils/readEditContext.js';
 import { firstLineOf } from 'src/utils/stringUtils.js';
 import type { ThemeName } from 'src/utils/theme.js';
 import type { FileEditOutput } from './types.js';
+import { summarizeFileEditError } from './errorSummary.js';
 import { findActualString, getPatchForEdit, preserveQuoteStyle } from './utils.js';
 
 export function userFacingName(
@@ -178,7 +179,7 @@ export function renderToolUseErrorMessage(
     }
     return (
       <MessageResponse>
-        <Text color="error">Error editing file</Text>
+        <Text color="error">{summarizeFileEditError(errorMessage)}</Text>
       </MessageResponse>
     );
   }

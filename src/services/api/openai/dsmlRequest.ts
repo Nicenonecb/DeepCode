@@ -15,6 +15,7 @@ type DSMLToolSchema = Record<string, unknown>
 export type DSMLGatewayFallbackReason =
   | 'settings-disabled'
   | 'env-disabled'
+  | 'explicit-opt-in-required'
   | 'model-prefers-openai-tools'
   | 'provider-not-verified'
   | 'prompt-empty'
@@ -167,7 +168,32 @@ export function resolveDSMLGatewayDecision(params: {
     }
   }
 
-  if (profile?.toolProtocol.preferred !== 'dsml') {
+  if (profile?.toolProtocol.preferred === 'dsml') {
+    if (providerEvidence !== 'official-deepseek') {
+      return {
+        toolProtocol: 'openai-tools',
+        enabled: false,
+        source: 'fallback',
+        fallbackReason: 'provider-not-verified',
+        modelProfileId: profile.id,
+        providerEvidence,
+        preferredProtocol: profile.toolProtocol.preferred,
+        fallbackProtocols,
+      }
+    }
+    return {
+      toolProtocol: 'openai-tools',
+      enabled: false,
+      source: 'fallback',
+      fallbackReason: 'explicit-opt-in-required',
+      modelProfileId: profile?.id,
+      providerEvidence,
+      preferredProtocol: profile?.toolProtocol.preferred,
+      fallbackProtocols,
+    }
+  }
+
+  if (profile) {
     return {
       toolProtocol: 'openai-tools',
       enabled: false,
@@ -180,26 +206,12 @@ export function resolveDSMLGatewayDecision(params: {
     }
   }
 
-  if (providerEvidence !== 'official-deepseek') {
-    return {
-      toolProtocol: 'openai-tools',
-      enabled: false,
-      source: 'fallback',
-      fallbackReason: 'provider-not-verified',
-      modelProfileId: profile.id,
-      providerEvidence,
-      preferredProtocol: profile.toolProtocol.preferred,
-      fallbackProtocols,
-    }
-  }
-
   return {
-    toolProtocol: 'dsml',
-    enabled: true,
-    source: 'deepseek-profile',
-    modelProfileId: profile.id,
+    toolProtocol: 'openai-tools',
+    enabled: false,
+    source: 'fallback',
+    fallbackReason: 'provider-not-verified',
     providerEvidence,
-    preferredProtocol: profile.toolProtocol.preferred,
     fallbackProtocols,
   }
 }
