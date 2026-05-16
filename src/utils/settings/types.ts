@@ -233,6 +233,26 @@ export const AgenticSearchSettingsSchema = lazySchema(() =>
         .positive()
         .optional()
         .describe('Maximum Agentic Search evidence characters for live runs.'),
+      allowedDomains: z
+        .array(z.string())
+        .optional()
+        .describe('Optional domain allowlist for live Agentic Search.'),
+      blockedDomains: z
+        .array(z.string())
+        .optional()
+        .describe('Optional domain blocklist for live Agentic Search.'),
+      preferredSources: z
+        .array(
+          z.enum([
+            'web_search',
+            'web_fetch',
+            'mcp_search',
+            'local_search',
+            'bash_search',
+          ]),
+        )
+        .optional()
+        .describe('Optional source kinds preferred by the live planner.'),
       evidencePack: z
         .object({
           text: z

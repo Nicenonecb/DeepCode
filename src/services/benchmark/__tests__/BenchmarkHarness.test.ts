@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import {
   BenchmarkHarness,
+  agenticSearchBenchmarkExecutor,
   buildBenchmarkHarnessSummary,
   createDefaultBenchmarkVerifier,
   dryRunBenchmarkExecutor,
@@ -438,6 +439,59 @@ describe('BenchmarkHarness', () => {
       mode: 'rag_baseline',
       searchRounds: 0,
       citationCount: 2,
+    })
+  })
+
+  test('executes the agentic search A/B fixture with live-search metrics', async () => {
+    const fixture = JSON.parse(
+      await readFile('tests/benchmark/fixtures/agentic-search-ab.json', 'utf8'),
+    ) as {
+      id: string
+      dataset: BenchmarkTaskDataset
+      candidates: BenchmarkHarnessRequest['candidates']
+    }
+
+    const result = await new BenchmarkHarness({
+      executor: agenticSearchBenchmarkExecutor,
+      verifier: async () => ({
+        logs: [{ level: 'info', message: 'verification skipped in unit test' }],
+      }),
+    }).run({
+      id: fixture.id,
+      dataset: fixture.dataset,
+      candidates: fixture.candidates,
+      mode: 'execute',
+      maxTasks: 2,
+    })
+
+    expect(result.summary.mode).toBe('execute')
+    expect(result.summary.bestCandidateId).toBe('agentic-search')
+    const byCandidate = new Map(
+      result.candidates.map(candidate => [
+        candidate.candidate.id,
+        candidate.tasks,
+      ]),
+    )
+    expect(byCandidate.get('agentic-search')?.[0]).toMatchObject({
+      exitStatus: 'completed',
+      resolved: true,
+      context: {
+        agenticSearch: {
+          mode: 'agentic_search',
+          searchRounds: 3,
+          citationCount: 6,
+        },
+      },
+    })
+    expect(byCandidate.get('rag-baseline')?.[0]).toMatchObject({
+      exitStatus: 'completed',
+      resolved: false,
+      context: {
+        agenticSearch: {
+          mode: 'rag_baseline',
+          searchRounds: 0,
+        },
+      },
     })
   })
 })

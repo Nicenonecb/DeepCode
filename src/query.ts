@@ -113,7 +113,11 @@ import { applyToolResultBudget } from './utils/toolResultStorage.js'
 import { recordContentReplacement } from './utils/sessionStorage.js'
 import { handleStopHooks } from './query/stopHooks.js'
 import { buildQueryConfig } from './query/config.js'
-import { productionDeps, type QueryDeps } from './query/deps.js'
+import {
+  noopAgenticSearchLive,
+  productionDeps,
+  type QueryDeps,
+} from './query/deps.js'
 import type { Terminal, Continue } from './query/transitions.js'
 import {
   VerificationRunner,
@@ -140,7 +144,10 @@ import {
   updateWorkingMemoryForVerification,
   type WorkingMemorySettings,
 } from './services/workingMemory/index.js'
-import type { AgenticSearchEffort } from './services/agenticSearch/index.js'
+import type {
+  AgenticSearchEffort,
+  AgenticSearchLiveRun,
+} from './services/agenticSearch/index.js'
 import type { DSMLGatewaySettings } from './services/dsml/index.js'
 import {
   resolveDeepSeekRequestEffortProfile,
@@ -475,6 +482,15 @@ type AgenticSearchSettings = {
   mode?: 'off' | 'injected-pack' | 'live'
   effort?: AgenticSearchEffort
   maxEvidenceChars?: number
+  allowedDomains?: string[]
+  blockedDomains?: string[]
+  preferredSources?: (
+    | 'web_search'
+    | 'web_fetch'
+    | 'mcp_search'
+    | 'local_search'
+    | 'bash_search'
+  )[]
   evidencePack?: {
     text?: string
     metadata?: Record<string, unknown>
@@ -1108,11 +1124,20 @@ async function* queryLoop(
     } else {
       delete toolUseContext.options.contextWatermark
     }
+    const agenticSearchSettings = toolUseContext.getAppState().settings
+      .agenticSearch as AgenticSearchSettings | undefined
+    const liveAgenticSearch = await (
+      deps.agenticSearchLive ?? noopAgenticSearchLive
+    )({
+      messages: messagesWithContextPack,
+      settings: agenticSearchSettings,
+      toolUseContext,
+      canUseTool,
+    })
     const messagesWithAgenticSearch = buildAgenticSearchMessages(
       messagesWithContextPack,
-      toolUseContext.getAppState().settings.agenticSearch as
-        | AgenticSearchSettings
-        | undefined,
+      agenticSearchSettings,
+      liveAgenticSearch,
     )
     const messagesWithMetaContext = buildWorkingMemoryMessages(
       messagesWithAgenticSearch,
@@ -2532,20 +2557,26 @@ function logContextWatermark(snapshot: ContextWatermarkSnapshot): void {
 function buildAgenticSearchMessages(
   messages: Message[],
   settings: AgenticSearchSettings | undefined,
+  liveRun?: AgenticSearchLiveRun,
 ): Message[] {
-  if (!shouldInjectAgenticSearch(settings)) return messages
+  if (!shouldInjectAgenticSearch(settings, liveRun)) return messages
 
-  const evidenceText = settings?.evidencePack?.text?.trim()
+  const evidenceText = (
+    liveRun?.integration.text ?? settings?.evidencePack?.text
+  )?.trim()
   if (!evidenceText) return messages
 
   const boundedEvidence = truncateAgenticSearchEvidence(
     evidenceText,
     settings?.maxEvidenceChars,
   )
-  const metadata = settings?.evidencePack?.metadata
+  const metadata =
+    liveRun?.integration.metadata ?? settings?.evidencePack?.metadata
+  const mode = liveRun ? 'live' : (settings?.mode ?? 'injected-pack')
 
   logEvent('tengu_agentic_search_pack_injected', {
-    injected_pack_mode: (settings?.mode ?? 'injected-pack') === 'injected-pack',
+    injected_pack_mode: mode === 'injected-pack',
+    live_mode: mode === 'live',
     effort_fast: settings?.effort === 'fast',
     effort_balanced: settings?.effort === 'balanced',
     effort_deep: settings?.effort === 'deep',
@@ -2553,9 +2584,12 @@ function buildAgenticSearchMessages(
     truncated: boundedEvidence.length < evidenceText.length,
     citation_count: numericMetadata(metadata, 'citationCount'),
     cross_check_coverage: numericMetadata(metadata, 'crossCheckCoverage'),
+    search_rounds: liveRun?.metrics.rounds,
+    web_fetch_count: liveRun?.metrics.fetchCount,
+    source_evidence_count: liveRun?.metrics.sourceEvidenceCount,
   })
   logForDebugging(
-    `[AgenticSearch] injected evidence pack chars=${boundedEvidence.length} mode=${settings?.mode ?? 'injected-pack'}`,
+    `[AgenticSearch] injected evidence pack chars=${boundedEvidence.length} mode=${mode}`,
   )
 
   return [
@@ -2569,7 +2603,9 @@ function buildAgenticSearchMessages(
 
 function shouldInjectAgenticSearch(
   settings: AgenticSearchSettings | undefined,
+  liveRun?: AgenticSearchLiveRun,
 ): boolean {
+  if (liveRun) return true
   if (!settings?.enabled) return false
   if (settings.mode === 'off' || settings.mode === 'live') return false
   return settings.mode === undefined || settings.mode === 'injected-pack'

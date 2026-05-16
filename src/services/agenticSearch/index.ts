@@ -14,6 +14,7 @@ export {
   createWebSearchToolAdapter,
   normalizeWebFetchOutput,
 } from './WebToolAdapters.js'
+export { createAgenticSearchSourceRunner } from './SourceRunnerAdapters.js'
 export {
   extractAgenticSearchEvidence,
   summarizeCrossCheck,
@@ -22,6 +23,10 @@ export {
   createAgenticSearchEvidencePack,
   createAgenticSearchEvidencePackIntegration,
 } from './AgenticSearchEvidencePack.js'
+export {
+  runLiveAgenticSearchIfNeeded,
+  shouldRunLiveAgenticSearch,
+} from './AgenticSearchLive.js'
 export type {
   AgenticSearchBudget,
   AgenticSearchEffort,
@@ -58,3 +63,7 @@ export type {
   AgenticSearchWebSearchRequest,
   AgenticSearchWebSearchResponse,
 } from './types.js'
+export type {
+  AgenticSearchLiveRun,
+  AgenticSearchLiveSettings,
+} from './AgenticSearchLive.js'

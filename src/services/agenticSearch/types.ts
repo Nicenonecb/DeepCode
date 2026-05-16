@@ -315,6 +315,15 @@ export type AgenticSearchSourceResponse = {
     url?: string
     content: string
     durationMs?: number
+    metadata?: {
+      runner?: 'mcp_tool' | 'mcp_resource' | 'local_rg' | 'local_file' | 'bash'
+      serverName?: string
+      toolName?: string
+      command?: string
+      path?: string
+      readOnly?: boolean
+      permissionDelegated?: boolean
+    }
   }[]
 }
 

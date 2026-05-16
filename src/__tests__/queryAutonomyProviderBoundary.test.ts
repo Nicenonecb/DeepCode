@@ -736,6 +736,121 @@ describe('query autonomy/provider boundary', () => {
     expect(serializedInput).toContain('type=independent')
   })
 
+  test('runs live Agentic Search and injects the returned evidence pack before the model call', async () => {
+    const toolUseContext = createToolUseContext({
+      settings: {
+        agenticSearch: {
+          enabled: true,
+          mode: 'live',
+          effort: 'balanced',
+          maxEvidenceChars: 500,
+        },
+      },
+    })
+    const modelInputs: unknown[] = []
+    const liveRequests: unknown[] = []
+    const deps = {
+      uuid: () => 'query-chain-id',
+      microcompact: async (messages: unknown[]) => ({ messages }),
+      autocompact: async () => ({
+        compactionResult: undefined,
+        consecutiveFailures: 0,
+      }),
+      agenticSearchLive: async (input: unknown) => {
+        liveRequests.push(input)
+        return {
+          integration: {
+            target: 'query_loop',
+            text: [
+              '<agentic_search_evidence>',
+              '- [A1.1] type=primary source=https://docs.example.test :: Live primary docs support the claim.',
+              '- [A2.1] type=independent source=https://independent.example.test :: Live independent source confirms it.',
+              '</agentic_search_evidence>',
+            ].join('\n'),
+            metadata: {
+              planId: 'agentic-search-live-test',
+              effort: 'balanced',
+              task: 'verify latest API docs with citations',
+              packChars: 220,
+              budgetChars: 500,
+              citationCount: 2,
+              truncatedClaimCount: 0,
+              primaryClaimCount: 1,
+              independentClaimCount: 1,
+              conflictCount: 0,
+              crossCheckCoverage: 1,
+              estimatedInputTokens: 55,
+              estimatedCostUsd: 0.000011,
+              citationCompressionRatio: 1,
+              recommendedInjectionTarget: 'query_loop',
+            },
+            citations: [],
+          },
+          metrics: {
+            rounds: 2,
+            maxFetchConcurrency: 2,
+            searchCount: 2,
+            fetchCount: 2,
+            sourceEvidenceCount: 1,
+            failedSearchCount: 0,
+            failedFetchCount: 0,
+            failedSourceCount: 0,
+            privateUrlSkippedCount: 1,
+            uniqueUrlCount: 2,
+            evidenceChars: 300,
+            evidenceClaimCount: 2,
+            primaryClaimCount: 1,
+            independentClaimCount: 1,
+            conflictCount: 0,
+            crossCheckCoverage: 1,
+            citationCount: 2,
+            citationCompressionRatio: 1,
+            estimatedInputTokens: 55,
+            estimatedCostUsd: 0.000011,
+            comparisonMode: 'agentic_search',
+            durationMs: 12,
+          },
+          result: {},
+        }
+      },
+      callModel: async function* ({ messages }: { messages: unknown[] }) {
+        modelInputs.push(messages)
+        yield createTextAssistantMessage('live agentic evidence received.')
+      },
+    }
+
+    const generator = query({
+      messages: [
+        createUserMessage({
+          content: 'verify latest API docs with citations',
+        }),
+      ],
+      systemPrompt: asSystemPrompt([]),
+      userContext: {},
+      systemContext: {},
+      canUseTool: async (_tool, input) => ({
+        behavior: 'allow',
+        updatedInput: input,
+      }),
+      toolUseContext,
+      querySource: 'sdk',
+      maxTurns: 1,
+      deps: deps as never,
+    })
+
+    let next = await generator.next()
+    while (!next.done) {
+      next = await generator.next()
+    }
+
+    const serializedInput = JSON.stringify(modelInputs[0])
+    expect(next.value.reason).toBe('completed')
+    expect(liveRequests).toHaveLength(1)
+    expect(serializedInput).toContain('<agentic_search_evidence>')
+    expect(serializedInput).toContain('Live primary docs')
+    expect(serializedInput).toContain('type=independent')
+  })
+
   test('working memory injects checkpoint context before the model call', async () => {
     const toolUseContext = createToolUseContext({
       settings: {

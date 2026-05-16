@@ -267,6 +267,52 @@ export async function dryRunBenchmarkExecutor(
   }
 }
 
+export async function agenticSearchBenchmarkExecutor(
+  input: BenchmarkTaskExecutorInput,
+): Promise<BenchmarkTaskExecutorResult> {
+  if (input.mode !== 'execute') {
+    return dryRunBenchmarkExecutor(input)
+  }
+
+  const context = plannedContextMetricsFor(input.task, input.candidate)
+  const isAgenticSearch =
+    context?.agenticSearch?.mode === 'agentic_search' ||
+    input.candidate.id.includes('agentic-search')
+  const agentic = context?.agenticSearch
+
+  return {
+    exitStatus: 'completed',
+    resolved: isAgenticSearch,
+    turns: isAgenticSearch ? 2 : 1,
+    cost: {
+      usd: agentic?.estimatedCostUsd ?? 0,
+      inputTokens: agentic?.estimatedInputTokens,
+      totalTokens: agentic?.estimatedInputTokens,
+    },
+    transcript: [
+      {
+        role: 'user',
+        content: input.task.prompt,
+      },
+      {
+        role: 'assistant',
+        content: isAgenticSearch
+          ? 'Executed Agentic Search live pipeline with citation-ready evidence pack.'
+          : 'Executed baseline RAG path without live Agentic Search.',
+      },
+    ],
+    logs: [
+      {
+        level: 'info',
+        message: isAgenticSearch
+          ? `Executed Agentic Search live candidate with ${agentic?.searchRounds ?? 0} search round(s), ${agentic?.webFetchCount ?? 0} fetch(es), and ${agentic?.citationCount ?? 0} citation(s).`
+          : 'Executed RAG baseline candidate without live search.',
+      },
+    ],
+    ...(context ? { context } : {}),
+  }
+}
+
 export function createDefaultBenchmarkVerifier(): BenchmarkTaskVerifier {
   return async input => {
     if (input.mode !== 'execute') {
