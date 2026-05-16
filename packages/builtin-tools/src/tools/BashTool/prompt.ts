@@ -307,6 +307,12 @@ export function getSimplePrompt(): string {
     'Never skip hooks (--no-verify) or bypass signing (--no-gpg-sign, -c commit.gpgsign=false) unless the user has explicitly asked for it. If a hook fails, investigate and fix the underlying issue.',
   ]
 
+  const portabilitySubitems = [
+    'Assume this may be macOS/BSD userland unless you have verified otherwise; avoid GNU-only flags in shell snippets.',
+    "Do not use `cat -A` to reveal whitespace because BSD/macOS `cat` does not support it. Use `sed -n 'l' file` for escaped line output, or `cat -vet file` when `cat` is truly necessary.",
+    'Prefer the dedicated file read/edit tools for inspecting exact file contents instead of shell pipelines.',
+  ]
+
   const sleepSubitems = [
     'Do not sleep between commands that can run immediately — just run them.',
     ...(feature('MONITOR_TOOL')
@@ -336,6 +342,8 @@ export function getSimplePrompt(): string {
     multipleCommandsSubitems,
     'For git commands:',
     gitSubitems,
+    'For portable shell commands:',
+    portabilitySubitems,
     'Avoid unnecessary `sleep` commands:',
     sleepSubitems,
     ...(embedded

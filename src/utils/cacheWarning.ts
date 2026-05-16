@@ -25,6 +25,25 @@ interface CacheWarningState {
 const cacheWarningStateBySource = new Map<string, CacheWarningState>()
 
 const DEFAULT_CACHE_THRESHOLD = 80
+const CACHE_WARNING_ENV = 'DEEPCODE_SHOW_CACHE_WARNINGS'
+
+function isTruthyEnv(value: string | undefined): boolean {
+  if (!value) return false
+  return ['1', 'true', 'yes', 'on'].includes(value.toLowerCase())
+}
+
+/**
+ * Prompt-cache hit-rate warnings are diagnostic noise for normal sessions.
+ * Keep them available for explicit investigations without injecting a warning
+ * system message into every low-cache turn by default.
+ */
+export function shouldEnableCacheWarnings(): boolean {
+  const settings = getInitialSettings()
+  return (
+    settings.showCacheWarnings === true ||
+    isTruthyEnv(process.env[CACHE_WARNING_ENV])
+  )
+}
 
 /**
  * 从 settings.json 读取缓存阈值配置
@@ -70,6 +89,10 @@ export function shouldShowCacheWarning(
   querySource: string,
   threshold: number,
 ): CacheHitRateInfo | null {
+  if (!shouldEnableCacheWarnings()) {
+    return null
+  }
+
   const hitRate = calculateCacheHitRate(usage)
 
   // 无缓存数据

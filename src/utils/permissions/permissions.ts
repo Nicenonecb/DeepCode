@@ -80,7 +80,7 @@ import {
   clearClassifierChecking,
   setClassifierChecking,
 } from '../classifierApprovals.js'
-import { isInProtectedNamespace } from '../envUtils.js'
+import { isEnvTruthy, isInProtectedNamespace } from '../envUtils.js'
 import { executePermissionRequestHooks } from '../hooks.js'
 import {
   AUTO_REJECT_MESSAGE,
@@ -89,6 +89,7 @@ import {
   DONT_ASK_REJECT_MESSAGE,
 } from '../messages.js'
 import { calculateCostFromTokens } from '../modelCost.js'
+import { getAPIProvider } from '../model/providers.js'
 /* eslint-enable @typescript-eslint/no-require-imports */
 import { jsonStringify } from '../slowOperations.js'
 import {
@@ -105,6 +106,16 @@ import {
 } from './yoloClassifier.js'
 
 const CLASSIFIER_FAIL_CLOSED_REFRESH_MS = 30 * 60 * 1000 // 30 minutes
+const CLASSIFIER_FAIL_CLOSED_ENV = 'DEEPCODE_AUTO_MODE_CLASSIFIER_FAIL_CLOSED'
+
+function shouldFailClosedWhenAutoClassifierUnavailable(): boolean {
+  const override = process.env[CLASSIFIER_FAIL_CLOSED_ENV]
+  if (override !== undefined) {
+    return isEnvTruthy(override)
+  }
+
+  return getAPIProvider() === 'firstParty'
+}
 
 const PERMISSION_RULE_SOURCES = [
   ...SETTING_SOURCES,
@@ -849,7 +860,7 @@ export const hasPermissionsToUseTool: CanUseToolFn = async (
           if (
             getFeatureValue_CACHED_WITH_REFRESH(
               'tengu_iron_gate_closed',
-              true,
+              shouldFailClosedWhenAutoClassifierUnavailable(),
               CLASSIFIER_FAIL_CLOSED_REFRESH_MS,
             )
           ) {

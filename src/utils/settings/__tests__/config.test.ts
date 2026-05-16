@@ -39,6 +39,15 @@ describe('SettingsSchema', () => {
     expect(result.success).toBe(true)
   })
 
+  test('accepts cache warning controls', () => {
+    const result = SettingsSchema().safeParse({
+      cacheThreshold: 80,
+      showCacheWarnings: true,
+    })
+
+    expect(result.success).toBe(true)
+  })
+
   test('accepts task-aware model routing settings', () => {
     const result = SettingsSchema().safeParse({
       taskAwareModelRouting: {
