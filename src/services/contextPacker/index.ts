@@ -3,6 +3,7 @@ export {
   formatContextPackForPrompt,
   isContextPackerEnabled,
   resolveContextPackMaxChars,
+  shouldInjectContextPackForQuery,
   summarizeDiff,
 } from './ContextPacker.js'
 export {
@@ -32,6 +33,9 @@ export type {
   ContextPackSection,
   ContextPackSectionId,
   ContextPackSymbol,
+  ContextPackAutoTriggerReason,
+  ContextPackInjectionDecision,
+  ContextPackInjectionPolicyInput,
   ContextPackerSettings,
 } from './ContextPacker.js'
 export type { ContextWatermarkSnapshot } from './ContextWatermark.js'

@@ -1,8 +1,13 @@
-import type { ContextPack, ContextPackRuntimeBudget } from './ContextPacker.js'
+import type {
+  ContextPack,
+  ContextPackAutoTriggerReason,
+  ContextPackRuntimeBudget,
+} from './ContextPacker.js'
 
 export type ContextWatermarkSnapshot = {
   generatedAt: number
   source: string
+  triggerReason?: ContextPackAutoTriggerReason
   contextWatermark?: number
   maxContextTokens?: number
   packBudgetChars: number
@@ -23,14 +28,16 @@ export function buildContextWatermarkSnapshot(params: {
   pack: ContextPack
   runtimeBudget?: ContextPackRuntimeBudget
   agentContextCapTokens?: number
+  triggerReason?: ContextPackAutoTriggerReason
 }): ContextWatermarkSnapshot {
-  const { pack, runtimeBudget, agentContextCapTokens } = params
+  const { pack, runtimeBudget, agentContextCapTokens, triggerReason } = params
   const packUsagePercent =
     pack.maxChars > 0 ? Math.round((pack.totalChars / pack.maxChars) * 100) : 0
 
   return {
     generatedAt: pack.generatedAt,
     source: runtimeBudget?.source ?? 'settings',
+    ...(triggerReason === undefined ? {} : { triggerReason }),
     ...(runtimeBudget?.contextWatermark === undefined
       ? {}
       : { contextWatermark: runtimeBudget.contextWatermark }),

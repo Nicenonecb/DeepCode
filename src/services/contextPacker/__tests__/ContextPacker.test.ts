@@ -4,9 +4,11 @@ import {
   formatContextPackForPrompt,
   isContextPackerEnabled,
   resolveContextPackMaxChars,
+  shouldInjectContextPackForQuery,
   summarizeDiff,
 } from '../ContextPacker.js'
 import type { VerificationSummary } from '../../verification/index.js'
+import { createUserMessage } from '../../../utils/messages.js'
 
 describe('ContextPacker', () => {
   test('builds structured sections from task evidence', () => {
@@ -138,6 +140,20 @@ describe('ContextPacker', () => {
     expect(pack.sections.map(section => section.id)).toEqual(['task'])
   })
 
+  test('keeps verification text from prior query metadata', () => {
+    const pack = new ContextPacker().pack({
+      cwd: '/repo',
+      taskPrompt: 'Fix verification',
+      verificationText:
+        '<verification_result>\nstatus: failed\nsrc/index.ts(1,1): error\n</verification_result>',
+    })
+
+    expect(pack.sections.map(section => section.id)).toContain('verification')
+    expect(
+      pack.sections.find(section => section.id === 'verification')?.content,
+    ).toContain('status: failed')
+  })
+
   test('returns no sections when disabled', () => {
     const pack = new ContextPacker().pack({
       cwd: '/repo',
@@ -240,6 +256,79 @@ describe('ContextPacker', () => {
         },
       ),
     ).toBe(24_000)
+  })
+
+  test('auto-injects for DeepSeek V4 Pro high and max effort', () => {
+    const messages = [createUserMessage({ content: 'fix the parser' })]
+
+    expect(
+      shouldInjectContextPackForQuery({
+        messages,
+        model: 'deepseek-v4-pro',
+        effortValue: 'high',
+      }),
+    ).toEqual({ shouldInject: true, reason: 'deepseek-v4-pro-high' })
+
+    expect(
+      shouldInjectContextPackForQuery({
+        messages,
+        model: 'deepseek-v4-pro',
+        effortValue: 'max',
+      }),
+    ).toEqual({ shouldInject: true, reason: 'deepseek-v4-pro-max' })
+  })
+
+  test('does not auto-inject for ordinary short non-DeepSeek tasks', () => {
+    expect(
+      shouldInjectContextPackForQuery({
+        messages: [createUserMessage({ content: 'say hi' })],
+        model: 'claude-sonnet-4-5-20250929',
+      }),
+    ).toEqual({ shouldInject: false })
+  })
+
+  test('does not auto-inject for DeepSeek V4 Pro short tasks without an explicit high or max effort', () => {
+    expect(
+      shouldInjectContextPackForQuery({
+        messages: [createUserMessage({ content: 'say hi' })],
+        model: 'deepseek-v4-pro',
+      }),
+    ).toEqual({ shouldInject: false })
+  })
+
+  test('auto-injects for long prompts and tool-heavy chains', () => {
+    expect(
+      shouldInjectContextPackForQuery({
+        messages: [createUserMessage({ content: 'x'.repeat(1_201) })],
+        model: 'claude-sonnet-4-5-20250929',
+      }),
+    ).toEqual({ shouldInject: true, reason: 'long-task' })
+
+    expect(
+      shouldInjectContextPackForQuery({
+        messages: [
+          createUserMessage({
+            content: Array.from({ length: 6 }, (_, index) => ({
+              type: 'tool_result' as const,
+              tool_use_id: `toolu_${index}`,
+              content: `result ${index}`,
+            })),
+          }),
+        ],
+        model: 'claude-sonnet-4-5-20250929',
+      }),
+    ).toEqual({ shouldInject: true, reason: 'tool-chain' })
+  })
+
+  test('explicit disable wins over automatic triggers', () => {
+    expect(
+      shouldInjectContextPackForQuery({
+        messages: [createUserMessage({ content: 'x'.repeat(5_000) })],
+        settings: { enabled: false },
+        model: 'deepseek-v4-pro',
+        effortValue: 'max',
+      }),
+    ).toEqual({ shouldInject: false })
   })
 })
 

@@ -182,6 +182,7 @@ describe('formatContextWatermark', () => {
       formatContextWatermark({
         generatedAt: 123,
         source: 'deepseek-v4-pro:max',
+        triggerReason: 'deepseek-v4-pro-max',
         contextWatermark: 0.8,
         maxContextTokens: 800000,
         packBudgetChars: 2560000,
@@ -202,6 +203,7 @@ describe('formatContextWatermark', () => {
       formatContextWatermark({
         generatedAt: 123,
         source: 'deepseek-v4-pro:max',
+        triggerReason: 'context-watermark',
         packBudgetChars: 2560000,
         packChars: 2000000,
         packUsagePercent: 78,

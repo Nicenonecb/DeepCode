@@ -246,10 +246,14 @@ function createToolUseContext({
   isNonInteractiveSession = true,
   settings = {},
   workingMemory,
+  mainLoopModel = 'claude-sonnet-4-5-20250929',
+  effortValue,
 }: {
   isNonInteractiveSession?: boolean
   settings?: Record<string, unknown>
   workingMemory?: WorkingMemory
+  mainLoopModel?: string
+  effortValue?: unknown
 } = {}): any {
   let inProgressToolUseIds = new Set<string>()
   let responseLength = 0
@@ -262,7 +266,7 @@ function createToolUseContext({
       tools: [],
       clients: [],
     },
-    effortValue: undefined,
+    effortValue,
     advisorModel: undefined,
     sessionHooks: new Map(),
   }
@@ -271,7 +275,7 @@ function createToolUseContext({
     options: {
       commands: [],
       debug: false,
-      mainLoopModel: 'claude-sonnet-4-5-20250929',
+      mainLoopModel,
       tools: [],
       verbose: false,
       thinkingConfig: { type: 'disabled' },
@@ -667,6 +671,181 @@ describe('query autonomy/provider boundary', () => {
 
     expect(next.value.reason).toBe('completed')
     expect(JSON.stringify(modelInputs[0])).not.toContain('<context_pack>')
+  })
+
+  test('context packer skips ordinary short tasks without an automatic trigger', async () => {
+    await writeTempFile(
+      tempDir,
+      'package.json',
+      JSON.stringify({
+        type: 'module',
+        scripts: {
+          typecheck: 'bunx tsc --noEmit',
+        },
+      }),
+    )
+
+    const toolUseContext = createToolUseContext()
+    const modelInputs: unknown[] = []
+    const deps = {
+      uuid: () => 'query-chain-id',
+      microcompact: async (messages: unknown[]) => ({ messages }),
+      autocompact: async () => ({
+        compactionResult: undefined,
+        consecutiveFailures: 0,
+      }),
+      callModel: async function* ({ messages }: { messages: unknown[] }) {
+        modelInputs.push(messages)
+        yield createTextAssistantMessage('plain context received.')
+      },
+    }
+
+    const generator = query({
+      messages: [
+        createUserMessage({
+          content: 'say hi',
+        }),
+      ],
+      systemPrompt: asSystemPrompt([]),
+      userContext: {},
+      systemContext: {},
+      canUseTool: async (_tool, input) => ({
+        behavior: 'allow',
+        updatedInput: input,
+      }),
+      toolUseContext,
+      querySource: 'sdk',
+      maxTurns: 1,
+      deps: deps as never,
+    })
+
+    let next = await generator.next()
+    while (!next.done) {
+      next = await generator.next()
+    }
+
+    expect(next.value.reason).toBe('completed')
+    expect(JSON.stringify(modelInputs[0])).not.toContain('<context_pack>')
+    expect(toolUseContext.options.contextWatermark).toBeUndefined()
+  })
+
+  test('context packer auto-injects for DeepSeek V4 Pro high effort', async () => {
+    await writeTempFile(
+      tempDir,
+      'package.json',
+      JSON.stringify({
+        type: 'module',
+        scripts: {
+          typecheck: 'bunx tsc --noEmit',
+        },
+      }),
+    )
+
+    const toolUseContext = createToolUseContext({
+      mainLoopModel: 'deepseek-v4-pro',
+      effortValue: 'high',
+    })
+    const modelInputs: unknown[] = []
+    const deps = {
+      uuid: () => 'query-chain-id',
+      microcompact: async (messages: unknown[]) => ({ messages }),
+      autocompact: async () => ({
+        compactionResult: undefined,
+        consecutiveFailures: 0,
+      }),
+      callModel: async function* ({ messages }: { messages: unknown[] }) {
+        modelInputs.push(messages)
+        yield createTextAssistantMessage('packed context received.')
+      },
+    }
+
+    const generator = query({
+      messages: [
+        createUserMessage({
+          content: 'fix the DeepSeek context pack routing',
+        }),
+      ],
+      systemPrompt: asSystemPrompt([]),
+      userContext: {},
+      systemContext: {},
+      canUseTool: async (_tool, input) => ({
+        behavior: 'allow',
+        updatedInput: input,
+      }),
+      toolUseContext,
+      querySource: 'sdk',
+      maxTurns: 1,
+      deps: deps as never,
+    })
+
+    let next = await generator.next()
+    while (!next.done) {
+      next = await generator.next()
+    }
+
+    const serializedInput = JSON.stringify(modelInputs[0])
+    expect(next.value.reason).toBe('completed')
+    expect(serializedInput).toContain('<context_pack>')
+    expect(serializedInput).toContain('fix the DeepSeek context pack routing')
+    expect(toolUseContext.options.contextWatermark).toMatchObject({
+      source: 'deepseek-v4-pro:high',
+      triggerReason: 'deepseek-v4-pro-high',
+    })
+  })
+
+  test('context packer carries recent verification metadata into automatic packs', async () => {
+    const toolUseContext = createToolUseContext({
+      mainLoopModel: 'deepseek-v4-pro',
+      effortValue: 'max',
+    })
+    const modelInputs: unknown[] = []
+    const deps = {
+      uuid: () => 'query-chain-id',
+      microcompact: async (messages: unknown[]) => ({ messages }),
+      autocompact: async () => ({
+        compactionResult: undefined,
+        consecutiveFailures: 0,
+      }),
+      callModel: async function* ({ messages }: { messages: unknown[] }) {
+        modelInputs.push(messages)
+        yield createTextAssistantMessage('verification context received.')
+      },
+    }
+
+    const generator = query({
+      messages: [
+        createUserMessage({
+          content: 'fix the failure',
+        }),
+        createUserMessage({
+          content:
+            '<verification_result>\nstatus: failed\nissues:\n- Typecheck: src/index.ts(1,1): error TS2304\n</verification_result>',
+          isMeta: true,
+        }),
+      ],
+      systemPrompt: asSystemPrompt([]),
+      userContext: {},
+      systemContext: {},
+      canUseTool: async (_tool, input) => ({
+        behavior: 'allow',
+        updatedInput: input,
+      }),
+      toolUseContext,
+      querySource: 'sdk',
+      maxTurns: 1,
+      deps: deps as never,
+    })
+
+    let next = await generator.next()
+    while (!next.done) {
+      next = await generator.next()
+    }
+
+    const serializedInput = JSON.stringify(modelInputs[0])
+    expect(next.value.reason).toBe('completed')
+    expect(serializedInput).toContain('<context_pack>')
+    expect(serializedInput).toContain('<verification_result>')
+    expect(serializedInput).toContain('status: failed')
   })
 
   test('injects a configured Agentic Search evidence pack before the model call', async () => {

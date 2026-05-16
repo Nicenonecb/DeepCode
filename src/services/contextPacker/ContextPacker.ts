@@ -1,4 +1,9 @@
 import type { VerificationSummary } from '../verification/index.js'
+import type { Message } from '../../types/message.js'
+import { getEffectiveContextWindowSize } from '../compact/autoCompact.js'
+import { resolveDeepSeekRequestEffortProfile } from '../deepseek/modelProfiles.js'
+import type { DeepSeekEffortBudgetSettings } from '../deepseek/modelProfiles.js'
+import { tokenCountWithEstimation } from '../../utils/tokens.js'
 
 export type ContextPackSectionId =
   | 'task'
@@ -36,6 +41,11 @@ export type ContextPackerSettings = {
   budgetSource?: 'settings' | 'model-profile'
   charsPerToken?: number
   contextWatermark?: number
+  autoTrigger?: boolean
+  longTaskPromptChars?: number
+  longTaskMessageChars?: number
+  toolChainToolResultCount?: number
+  highWatermarkRatio?: number
   includeRepoMap?: boolean
   includeDiff?: boolean
   includeVerification?: boolean
@@ -52,6 +62,7 @@ export type ContextPackInput = {
   packageScripts?: Record<string, string>
   diff?: string
   verificationSummary?: VerificationSummary
+  verificationText?: string
   relatedFiles?: ContextPackFile[]
   recentFiles?: string[]
   testHints?: string[]
@@ -65,6 +76,29 @@ export type ContextPackRuntimeBudget = {
   maxContextTokens: number
   contextWatermark: number
   source: string
+}
+
+export type ContextPackAutoTriggerReason =
+  | 'explicit-settings'
+  | 'deepseek-v4-pro-high'
+  | 'deepseek-v4-pro-max'
+  | 'long-task'
+  | 'tool-chain'
+  | 'context-watermark'
+
+export type ContextPackInjectionDecision = {
+  shouldInject: boolean
+  reason?: ContextPackAutoTriggerReason
+}
+
+export type ContextPackInjectionPolicyInput = {
+  messages: Message[]
+  settings?: ContextPackerSettings
+  model: string
+  effortValue?: unknown
+  deepSeekEffortBudgets?: DeepSeekEffortBudgetSettings
+  contextWindowOverrideTokens?: number
+  agentId?: string
 }
 
 export type ContextPackFile = {
@@ -110,6 +144,10 @@ type DraftSection = Omit<ContextPackSection, 'charCount' | 'truncated'>
 
 const DEFAULT_MAX_CHARS = 24_000
 const DEFAULT_CHARS_PER_TOKEN = 4
+const DEFAULT_LONG_TASK_PROMPT_CHARS = 1_200
+const DEFAULT_LONG_TASK_MESSAGE_CHARS = 24_000
+const DEFAULT_TOOL_CHAIN_TOOL_RESULT_COUNT = 6
+const DEFAULT_HIGH_WATERMARK_RATIO = 0.75
 const TRUNCATION_MARKER = '\n...[context pack section truncated]...'
 const TIER_RANK: Record<ContextPackEvidenceTier, number> = {
   hot: 3,
@@ -143,6 +181,43 @@ export function isContextPackerEnabled(
   settings: ContextPackerSettings | undefined,
 ): boolean {
   return settings?.enabled !== false
+}
+
+export function shouldInjectContextPackForQuery(
+  input: ContextPackInjectionPolicyInput,
+): ContextPackInjectionDecision {
+  const { settings, messages } = input
+  if (settings?.enabled === false) return { shouldInject: false }
+  if (input.agentId) return { shouldInject: false }
+  if (settings?.enabled === true) {
+    return { shouldInject: true, reason: 'explicit-settings' }
+  }
+  if (settings?.autoTrigger === false) return { shouldInject: false }
+
+  if (isHighOrMaxEffort(input.effortValue)) {
+    const effortProfile = resolveDeepSeekRequestEffortProfile(
+      input.model,
+      input.effortValue,
+      input.deepSeekEffortBudgets,
+    )
+    if (effortProfile?.tier === 'max') {
+      return { shouldInject: true, reason: 'deepseek-v4-pro-max' }
+    }
+    if (effortProfile?.tier === 'high') {
+      return { shouldInject: true, reason: 'deepseek-v4-pro-high' }
+    }
+  }
+
+  if (isLongTask(messages, settings)) {
+    return { shouldInject: true, reason: 'long-task' }
+  }
+  if (isToolHeavy(messages, settings)) {
+    return { shouldInject: true, reason: 'tool-chain' }
+  }
+  if (isNearContextWatermark(input)) {
+    return { shouldInject: true, reason: 'context-watermark' }
+  }
+  return { shouldInject: false }
 }
 
 export function resolveContextPackMaxChars(
@@ -212,8 +287,13 @@ function buildDraftSections(
 
   const sections: DraftSection[] = []
 
-  if (settings.includeVerification !== false && input.verificationSummary) {
-    const content = formatVerificationSection(input.verificationSummary)
+  if (
+    settings.includeVerification !== false &&
+    (input.verificationSummary || input.verificationText?.trim())
+  ) {
+    const content = input.verificationSummary
+      ? formatVerificationSection(input.verificationSummary)
+      : input.verificationText?.trim()
     if (content) {
       sections.push({
         id: 'verification',
@@ -299,10 +379,149 @@ function buildDraftSections(
   return sections
 }
 
+function isLongTask(
+  messages: Message[],
+  settings: ContextPackerSettings | undefined,
+): boolean {
+  const latestPrompt = getLatestNonMetaUserPrompt(messages)
+  if (
+    latestPrompt.length >=
+    normalizePositiveInteger(
+      settings?.longTaskPromptChars,
+      DEFAULT_LONG_TASK_PROMPT_CHARS,
+    )
+  ) {
+    return true
+  }
+
+  return (
+    totalMessageContentChars(messages) >=
+    normalizePositiveInteger(
+      settings?.longTaskMessageChars,
+      DEFAULT_LONG_TASK_MESSAGE_CHARS,
+    )
+  )
+}
+
+function isHighOrMaxEffort(effortValue: unknown): boolean {
+  return (
+    effortValue === 'high' ||
+    effortValue === 'max' ||
+    effortValue === 'xhigh' ||
+    typeof effortValue === 'number'
+  )
+}
+
+function isToolHeavy(
+  messages: Message[],
+  settings: ContextPackerSettings | undefined,
+): boolean {
+  const threshold = normalizePositiveInteger(
+    settings?.toolChainToolResultCount,
+    DEFAULT_TOOL_CHAIN_TOOL_RESULT_COUNT,
+  )
+  return countToolResultBlocks(messages) >= threshold
+}
+
+function isNearContextWatermark(
+  input: ContextPackInjectionPolicyInput,
+): boolean {
+  const ratio = normalizeWatermark(
+    input.settings?.highWatermarkRatio ?? DEFAULT_HIGH_WATERMARK_RATIO,
+  )
+  const effectiveWindow = getEffectiveContextWindowSize(
+    input.model,
+    input.contextWindowOverrideTokens,
+  )
+  if (effectiveWindow <= 0) return false
+
+  return tokenCountWithEstimation(input.messages) >= effectiveWindow * ratio
+}
+
+function getLatestNonMetaUserPrompt(messages: Message[]): string {
+  for (let index = messages.length - 1; index >= 0; index--) {
+    const message = messages[index]
+    if (!message || message.type !== 'user' || message.isMeta) continue
+    return textFromMessageContent(message.message?.content).trim()
+  }
+  return ''
+}
+
+function totalMessageContentChars(messages: Message[]): number {
+  return messages.reduce(
+    (sum, message) =>
+      sum + textFromMessageContent(message.message?.content).length,
+    0,
+  )
+}
+
+function countToolResultBlocks(messages: Message[]): number {
+  let count = 0
+  for (const message of messages) {
+    const content = message.message?.content
+    if (!Array.isArray(content)) continue
+    count += content.filter(
+      block =>
+        block &&
+        typeof block === 'object' &&
+        'type' in block &&
+        block.type === 'tool_result',
+    ).length
+  }
+  return count
+}
+
+function textFromMessageContent(content: unknown): string {
+  if (typeof content === 'string') return content
+  if (!Array.isArray(content)) return ''
+
+  return content
+    .map(block => {
+      if (!block || typeof block !== 'object') return ''
+      if (!('type' in block)) return ''
+      if (block.type === 'text' && 'text' in block) {
+        return typeof block.text === 'string' ? block.text : ''
+      }
+      if (block.type === 'tool_result' && 'content' in block) {
+        return toolResultContentText(block.content)
+      }
+      return ''
+    })
+    .filter(Boolean)
+    .join('\n')
+}
+
+function toolResultContentText(content: unknown): string {
+  if (typeof content === 'string') return content
+  if (!Array.isArray(content)) return ''
+
+  return content
+    .map(item => {
+      if (!item || typeof item !== 'object') return ''
+      if (
+        'type' in item &&
+        item.type === 'text' &&
+        'text' in item &&
+        typeof item.text === 'string'
+      ) {
+        return item.text
+      }
+      return ''
+    })
+    .filter(Boolean)
+    .join('\n')
+}
+
 function normalizeCharsPerToken(value: unknown): number {
   return typeof value === 'number' && Number.isFinite(value) && value > 0
     ? value
     : DEFAULT_CHARS_PER_TOKEN
+}
+
+function normalizePositiveInteger(value: unknown, fallback: number): number {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0
+    ? Math.floor(value)
+    : fallback
 }
 
 function normalizeWatermark(value: unknown): number {
