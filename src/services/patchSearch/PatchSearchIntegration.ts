@@ -6,6 +6,7 @@ import {
 } from './PatchSearchRunner.js'
 import type {
   PatchSearchFooterStatus,
+  PatchSearchMode,
   PatchSearchRequest,
   PatchSearchResult,
 } from './types.js'
@@ -20,6 +21,19 @@ export type PatchSearchHighRiskContext = {
   runner?: Pick<PatchSearchRunner, 'run'>
   enabled?: boolean
   maxCandidates?: number
+  mode?: PatchSearchMode
+}
+
+export type PatchSearchTriggerReason =
+  | 'explicit_env'
+  | 'multiple_retryable_failures'
+  | 'high_risk_tool_failure'
+  | 'verification_failure'
+  | 'complex_repair_prompt'
+
+export type PatchSearchTriggerDecision = {
+  shouldTrigger: boolean
+  reasons: PatchSearchTriggerReason[]
 }
 
 export function createAppStatePatchSearchStatusSink(
@@ -36,11 +50,56 @@ export function createAppStatePatchSearchStatusSink(
 }
 
 export function shouldTriggerPatchSearchForHighRiskContext({
-  enabled = process.env.DEEPCODE_PATCH_SEARCH_AUTOTRIGGER === '1',
+  enabled,
+  prompt = '',
   repairIssues = [],
-}: Pick<PatchSearchHighRiskContext, 'enabled' | 'repairIssues'>): boolean {
-  if (!enabled) return false
-  return repairIssues.some(issue => issue.retryable)
+}: {
+  enabled?: boolean
+  prompt?: string
+  repairIssues?: ToolCallRepairIssue[]
+}): boolean {
+  return evaluatePatchSearchTrigger({
+    enabled,
+    prompt,
+    repairIssues,
+  }).shouldTrigger
+}
+
+export function evaluatePatchSearchTrigger({
+  enabled,
+  prompt = '',
+  repairIssues = [],
+}: {
+  enabled?: boolean
+  prompt?: string
+  repairIssues?: ToolCallRepairIssue[]
+}): PatchSearchTriggerDecision {
+  if (enabled === false) return { shouldTrigger: false, reasons: [] }
+
+  const retryableIssues = repairIssues.filter(issue => issue.retryable)
+  const reasons: PatchSearchTriggerReason[] = []
+
+  if (process.env.DEEPCODE_PATCH_SEARCH_AUTOTRIGGER === '1') {
+    reasons.push('explicit_env')
+  }
+  if (retryableIssues.length >= 2) {
+    reasons.push('multiple_retryable_failures')
+  }
+  if (retryableIssues.some(isHighRiskRepairIssue)) {
+    reasons.push('high_risk_tool_failure')
+  }
+  if (retryableIssues.some(isVerificationRepairIssue)) {
+    reasons.push('verification_failure')
+  }
+  if (isComplexRepairPrompt(prompt)) {
+    reasons.push('complex_repair_prompt')
+  }
+
+  return {
+    shouldTrigger:
+      retryableIssues.length > 0 && (enabled === true || reasons.length > 0),
+    reasons,
+  }
 }
 
 export async function runPatchSearchForHighRiskContext({
@@ -51,8 +110,10 @@ export async function runPatchSearchForHighRiskContext({
   runner,
   enabled,
   maxCandidates = 2,
+  mode,
 }: PatchSearchHighRiskContext): Promise<PatchSearchResult | undefined> {
-  if (!shouldTriggerPatchSearchForHighRiskContext({ enabled, repairIssues })) {
+  const trigger = evaluatePatchSearchTrigger({ enabled, prompt, repairIssues })
+  if (!trigger.shouldTrigger) {
     return undefined
   }
 
@@ -62,6 +123,8 @@ export async function runPatchSearchForHighRiskContext({
     prompt,
     repairIssues,
     maxCandidates,
+    mode,
+    triggerReasons: trigger.reasons,
   })
   const activeRunner =
     runner ??
@@ -78,36 +141,69 @@ export function createHighRiskPatchSearchRequest({
   prompt,
   repairIssues,
   maxCandidates,
+  mode,
+  triggerReasons,
 }: {
   source: PatchSearchTriggerSource
   prompt: string
   repairIssues: ToolCallRepairIssue[]
   maxCandidates: number
+  mode?: PatchSearchMode
+  triggerReasons?: PatchSearchTriggerReason[]
 }): PatchSearchRequest {
   return {
     id: `patch-search-${source}-${Date.now()}`,
-    prompt: buildPatchSearchPrompt(prompt, repairIssues),
+    prompt: buildPatchSearchPrompt(prompt, repairIssues, triggerReasons ?? []),
     maxCandidates,
-    mode: 'dry_run',
+    mode: mode ?? patchSearchModeFromEnv(),
     cleanupWorktrees: false,
+    executorCommand: process.env.DEEPCODE_PATCH_SEARCH_EXECUTOR_COMMAND,
     patchApplication: { mode: 'recommend' },
   }
+}
+
+function patchSearchModeFromEnv(): PatchSearchMode {
+  return process.env.DEEPCODE_PATCH_SEARCH_DRY_RUN === '1'
+    ? 'dry_run'
+    : 'execute'
 }
 
 function buildPatchSearchPrompt(
   prompt: string,
   repairIssues: ToolCallRepairIssue[],
+  triggerReasons: PatchSearchTriggerReason[],
 ): string {
   const issueLines = repairIssues.map(
     issue =>
       `- ${issue.toolName}: ${issue.message}${issue.repairHint ? ` (${issue.repairHint})` : ''}`,
   )
+  const triggerLines = triggerReasons.map(reason => `- ${reason}`)
   return [
     prompt,
     '',
     'High-risk repair context:',
+    ...(triggerLines.length > 0 ? ['Trigger reasons:', ...triggerLines] : []),
     ...issueLines,
     '',
     'Search for candidate patches that fix only the failed path.',
   ].join('\n')
+}
+
+function isHighRiskRepairIssue(issue: ToolCallRepairIssue): boolean {
+  return ['Bash', 'Agent', 'Task', 'Edit', 'MultiEdit', 'Write'].includes(
+    issue.toolName,
+  )
+}
+
+function isVerificationRepairIssue(issue: ToolCallRepairIssue): boolean {
+  const haystack = `${issue.toolName} ${issue.message} ${issue.repairHint}`
+  return /verify|verification|test|typecheck|tsc|lint|build|bun test|pytest|cargo test|go test|npm test|测试|验证|构建/i.test(
+    haystack,
+  )
+}
+
+function isComplexRepairPrompt(prompt: string): boolean {
+  return /complex|difficult|hard|high[- ]?risk|bug ?fix|debug|repair|refactor|migration|cross[- ]?cutting|multi[- ]?file|architecture|复杂|疑难|高风险|修复|调试|重构|迁移|多文件|架构/i.test(
+    prompt,
+  )
 }

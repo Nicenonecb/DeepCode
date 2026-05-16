@@ -386,6 +386,107 @@ describe('query autonomy/provider boundary', () => {
     expect(repairMessage).not.toContain('success-result')
   })
 
+  test('auto-starts Patch Search for complex retryable repair without the env gate', async () => {
+    const originalAutotrigger = process.env.DEEPCODE_PATCH_SEARCH_AUTOTRIGGER
+    delete process.env.DEEPCODE_PATCH_SEARCH_AUTOTRIGGER
+
+    try {
+      const toolUseContext = createToolUseContext()
+      const schemaTool = createRepairNeedsStringTool()
+      toolUseContext.options.tools = [schemaTool]
+
+      const patchSearchRequests: unknown[] = []
+      let callCount = 0
+      const deps = {
+        uuid: () => 'query-chain-id',
+        microcompact: async (messages: unknown[]) => ({ messages }),
+        autocompact: async () => ({
+          compactionResult: undefined,
+          consecutiveFailures: 0,
+        }),
+        patchSearchForHighRiskContext: async (context: unknown) => {
+          patchSearchRequests.push(context)
+          const setAppState = (
+            context as {
+              toolUseContext?: {
+                setAppState?: (updater: (state: any) => any) => void
+              }
+            }
+          ).toolUseContext?.setAppState
+          setAppState?.(state => ({
+            ...state,
+            patchSearchStatus: {
+              phase: 'completed',
+              requestId: 'patch-search-query-test',
+              candidateCount: 2,
+              runningCount: 0,
+              verifyingCount: 0,
+              failedCount: 0,
+              selectedCandidateId: 'candidate-1',
+              updatedAt: 123,
+            },
+          }))
+          return undefined
+        },
+        callModel: async function* () {
+          callCount += 1
+          yield callCount === 1
+            ? createSchemaRepairToolUseAssistantMessage('toolu_complex_repair')
+            : createTextAssistantMessage('patch search status observed')
+        },
+      }
+
+      const generator = query({
+        messages: [
+          createUserMessage({
+            content:
+              'debug and refactor this complex failing provider boundary',
+          }),
+        ],
+        systemPrompt: asSystemPrompt([]),
+        userContext: {},
+        systemContext: {},
+        canUseTool: async (_tool, input) => ({
+          behavior: 'allow',
+          updatedInput: input,
+        }),
+        toolUseContext,
+        querySource: 'sdk',
+        maxTurns: 3,
+        deps: deps as never,
+      })
+
+      let next = await generator.next()
+      while (!next.done) {
+        next = await generator.next()
+      }
+
+      expect(next.value.reason).toBe('completed')
+      expect(patchSearchRequests).toHaveLength(1)
+      expect(patchSearchRequests[0]).toMatchObject({
+        source: 'query',
+        prompt: 'debug and refactor this complex failing provider boundary',
+        repairIssues: [
+          {
+            toolUseId: 'toolu_complex_repair',
+            toolName: 'RepairNeedsString',
+            retryable: true,
+          },
+        ],
+      })
+      expect(toolUseContext.getAppState().patchSearchStatus).toMatchObject({
+        phase: 'completed',
+        selectedCandidateId: 'candidate-1',
+      })
+    } finally {
+      if (originalAutotrigger === undefined) {
+        delete process.env.DEEPCODE_PATCH_SEARCH_AUTOTRIGGER
+      } else {
+        process.env.DEEPCODE_PATCH_SEARCH_AUTOTRIGGER = originalAutotrigger
+      }
+    }
+  })
+
   test('stops feeding repair summary after the tool-name retry budget is exhausted', async () => {
     const toolUseContext = createToolUseContext()
     const schemaTool = createRepairNeedsStringTool()

@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import {
   createAppStatePatchSearchStatusSink,
+  evaluatePatchSearchTrigger,
   runPatchSearchForHighRiskContext,
   shouldTriggerPatchSearchForHighRiskContext,
 } from '../PatchSearchIntegration.js'
@@ -38,6 +39,47 @@ describe('PatchSearchIntegration', () => {
         repairIssues: [repairIssue({ retryable: true })],
       }),
     ).toBe(true)
+  })
+
+  test('auto-triggers for complex repairs without the legacy env gate', () => {
+    const originalAutotrigger = process.env.DEEPCODE_PATCH_SEARCH_AUTOTRIGGER
+    delete process.env.DEEPCODE_PATCH_SEARCH_AUTOTRIGGER
+
+    try {
+      expect(
+        evaluatePatchSearchTrigger({
+          prompt: 'debug and refactor the failing auth flow',
+          repairIssues: [repairIssue({ toolName: 'RepairNeedsString' })],
+        }),
+      ).toMatchObject({
+        shouldTrigger: true,
+        reasons: ['complex_repair_prompt'],
+      })
+      expect(
+        evaluatePatchSearchTrigger({
+          prompt: 'run the simple formatter',
+          repairIssues: [repairIssue({ toolName: 'RepairNeedsString' })],
+        }),
+      ).toMatchObject({
+        shouldTrigger: false,
+        reasons: [],
+      })
+      expect(
+        evaluatePatchSearchTrigger({
+          prompt: 'run one command',
+          repairIssues: [repairIssue({ toolName: 'Bash' })],
+        }),
+      ).toMatchObject({
+        shouldTrigger: true,
+        reasons: ['high_risk_tool_failure'],
+      })
+    } finally {
+      if (originalAutotrigger === undefined) {
+        delete process.env.DEEPCODE_PATCH_SEARCH_AUTOTRIGGER
+      } else {
+        process.env.DEEPCODE_PATCH_SEARCH_AUTOTRIGGER = originalAutotrigger
+      }
+    }
   })
 
   test('runs an injected query patch search runner and writes status updates', async () => {
@@ -80,6 +122,66 @@ describe('PatchSearchIntegration', () => {
       'running',
       'completed',
     ])
+  })
+
+  test('creates execute requests by default and reserves dry-run for explicit debug mode', async () => {
+    const originalDryRun = process.env.DEEPCODE_PATCH_SEARCH_DRY_RUN
+    const originalExecutor = process.env.DEEPCODE_PATCH_SEARCH_EXECUTOR_COMMAND
+    delete process.env.DEEPCODE_PATCH_SEARCH_DRY_RUN
+    process.env.DEEPCODE_PATCH_SEARCH_EXECUTOR_COMMAND = 'bun -e "true"'
+    const observedModes: Array<string | undefined> = []
+    const observedCommands: Array<unknown> = []
+
+    try {
+      await runPatchSearchForHighRiskContext({
+        source: 'query',
+        prompt: 'fix tool failure',
+        enabled: true,
+        repairIssues: [repairIssue({ retryable: true })],
+        toolUseContext: {
+          setAppState: () => {},
+        },
+        runner: {
+          run: async request => {
+            observedModes.push(request.mode)
+            observedCommands.push(request.executorCommand)
+            return resultFor('query-winner')
+          },
+        },
+      })
+
+      process.env.DEEPCODE_PATCH_SEARCH_DRY_RUN = '1'
+      await runPatchSearchForHighRiskContext({
+        source: 'query',
+        prompt: 'fix tool failure',
+        enabled: true,
+        repairIssues: [repairIssue({ retryable: true })],
+        toolUseContext: {
+          setAppState: () => {},
+        },
+        runner: {
+          run: async request => {
+            observedModes.push(request.mode)
+            observedCommands.push(request.executorCommand)
+            return resultFor('query-winner')
+          },
+        },
+      })
+    } finally {
+      if (originalDryRun === undefined) {
+        delete process.env.DEEPCODE_PATCH_SEARCH_DRY_RUN
+      } else {
+        process.env.DEEPCODE_PATCH_SEARCH_DRY_RUN = originalDryRun
+      }
+      if (originalExecutor === undefined) {
+        delete process.env.DEEPCODE_PATCH_SEARCH_EXECUTOR_COMMAND
+      } else {
+        process.env.DEEPCODE_PATCH_SEARCH_EXECUTOR_COMMAND = originalExecutor
+      }
+    }
+
+    expect(observedModes).toEqual(['execute', 'dry_run'])
+    expect(observedCommands).toEqual(['bun -e "true"', 'bun -e "true"'])
   })
 
   test('can use the same trigger bridge for agent high-risk failures', async () => {

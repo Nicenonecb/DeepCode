@@ -3,6 +3,7 @@ import { queryModelWithStreaming } from '../services/api/claude.js'
 import { autoCompactIfNeeded } from '../services/compact/autoCompact.js'
 import { microcompactMessages } from '../services/compact/microCompact.js'
 import { runLiveAgenticSearchIfNeeded } from '../services/agenticSearch/index.js'
+import { runPatchSearchForHighRiskContext } from '../services/patchSearch/PatchSearchIntegration.js'
 
 // -- deps
 
@@ -27,6 +28,7 @@ export type QueryDeps = {
   microcompact: typeof microcompactMessages
   autocompact: typeof autoCompactIfNeeded
   agenticSearchLive?: typeof runLiveAgenticSearchIfNeeded
+  patchSearchForHighRiskContext?: typeof runPatchSearchForHighRiskContext
 
   // -- platform
   uuid: () => string
@@ -38,6 +40,7 @@ export function productionDeps(): QueryDeps {
     microcompact: microcompactMessages,
     autocompact: autoCompactIfNeeded,
     agenticSearchLive: runLiveAgenticSearchIfNeeded,
+    patchSearchForHighRiskContext: runPatchSearchForHighRiskContext,
     uuid: randomUUID,
   }
 }
