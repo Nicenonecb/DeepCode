@@ -1,5 +1,7 @@
 import type { EffortLevel } from './effort.js'
+import { isEnvTruthy } from './envUtils.js'
 import { isEffortLevel } from './effort.js'
+import { getAPIProvider } from './model/providers.js'
 import { getInitialSettings } from './settings/settings.js'
 import {
   DEFAULT_TASK_AWARE_MODEL_ROUTING_CONFIG,
@@ -10,6 +12,7 @@ import {
 } from './taskAwareModelRouter.js'
 
 type TaskAwareRoutingSettings = {
+  modelType?: 'anthropic' | 'openai' | 'gemini' | 'grok'
   taskAwareModelRouting?: {
     enabled?: boolean
     routes?: Partial<
@@ -29,10 +32,15 @@ export function getTaskAwareModelRoutingConfig(
   settings: TaskAwareRoutingSettings = getInitialSettings(),
 ): TaskAwareModelRoutingConfig {
   const raw = settings.taskAwareModelRouting
-  if (!raw) return DEFAULT_TASK_AWARE_MODEL_ROUTING_CONFIG
+  if (!raw) {
+    return {
+      ...DEFAULT_TASK_AWARE_MODEL_ROUTING_CONFIG,
+      enabled: shouldEnableTaskAwareModelRouting(settings),
+    }
+  }
 
   return {
-    enabled: raw.enabled ?? DEFAULT_TASK_AWARE_MODEL_ROUTING_CONFIG.enabled,
+    enabled: raw.enabled ?? shouldEnableTaskAwareModelRouting(settings),
     routes: TASK_AWARE_ROUTE_KINDS.reduce(
       (routes, kind) => {
         routes[kind] = resolveRoute(kind, raw.routes?.[kind])
@@ -41,6 +49,20 @@ export function getTaskAwareModelRoutingConfig(
       {} as Record<TaskAwareRouteKind, TaskAwareModelRouteTarget>,
     ),
   }
+}
+
+export function shouldEnableTaskAwareModelRouting(
+  settings: TaskAwareRoutingSettings = getInitialSettings(),
+): boolean {
+  if (isEnvTruthy(process.env.CLAUDE_CODE_DISABLE_TASK_AWARE_MODEL_ROUTING)) {
+    return false
+  }
+
+  if (settings.taskAwareModelRouting?.enabled !== undefined) {
+    return settings.taskAwareModelRouting.enabled
+  }
+
+  return getAPIProvider(settings) === 'openai'
 }
 
 function resolveRoute(

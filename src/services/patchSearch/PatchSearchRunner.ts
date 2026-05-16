@@ -1,11 +1,15 @@
 import { join } from 'node:path'
 import {
+  AgenticSandboxSession,
   createAgenticSandboxVerificationExecutor,
   type AgenticSandboxTraceBundle,
   type AgenticSandboxTraceRef,
+  traceRefFromManifest,
 } from '../agenticSandbox/index.js'
 import { createSandboxTraceBundle } from '../benchmark/TaskDataset.js'
 import type { SpawnTeammateConfig } from '../../../packages/builtin-tools/src/tools/shared/spawnMultiAgent.js'
+import { parseArguments } from '../../utils/argumentSubstitution.js'
+import { gitExe } from '../../utils/git.js'
 import {
   createAgentWorktree,
   removeAgentWorktree,
@@ -31,6 +35,7 @@ import type {
   PatchCandidateFailure,
   PatchCandidateTrajectory,
   PatchCandidateWorktree,
+  PatchSearchExecutorCommand,
   PatchSearchFooterStatus,
   PatchSearchMode,
   PatchSearchRequest,
@@ -124,7 +129,7 @@ export class PatchSearchRunner {
   private readonly maxCandidates: number
 
   constructor(options: PatchSearchRunnerOptions = {}) {
-    this.executor = options.executor ?? dryRunCandidateExecutor
+    this.executor = options.executor ?? createDefaultCandidateExecutor()
     this.verifier = options.verifier ?? createDefaultCandidateVerifier()
     this.worktrees = options.worktrees ?? createDefaultWorktreeManager()
     this.applicator = options.applicator ?? createDefaultApplicationPlanner()
@@ -196,7 +201,7 @@ export class PatchSearchRunner {
       }
       const execution = await this.executor(trajectory, {
         request,
-        mode: request.mode ?? 'dry_run',
+        mode: request.mode ?? 'execute',
         spawnConfig: createSpawnConfig(trajectory),
       })
       logs.push(...(execution.logs ?? []))
@@ -308,7 +313,7 @@ export class PatchSearchRunner {
       this.emitStatus(createPatchSearchRunningStatus(request, 'verifying'))
       const verification = await this.verifier(trajectory, candidate, {
         request,
-        mode: request.mode ?? 'dry_run',
+        mode: request.mode ?? 'execute',
       })
       logs.push(...(verification.logs ?? []))
 
@@ -339,6 +344,144 @@ export class PatchSearchRunner {
 
   private emitStatus(status: PatchSearchFooterStatus): void {
     this.onStatus?.(status)
+  }
+}
+
+export function createDefaultCandidateExecutor(): PatchCandidateExecutor {
+  return async (trajectory, context) => {
+    if (context.mode === 'dry_run') {
+      return dryRunCandidateExecutor(trajectory, context)
+    }
+
+    const cwd = trajectory.worktree.path
+    if (!cwd) {
+      return {
+        ok: false,
+        failure: {
+          kind: 'worktree_create_failed',
+          message: 'Patch Search execute mode requires an isolated worktree.',
+          retryable: true,
+        },
+      }
+    }
+
+    const command = normalizeExecutorCommand(context.request.executorCommand)
+    if (!command) {
+      return {
+        ok: false,
+        failure: {
+          kind: 'agent_spawn_failed',
+          message:
+            'Patch Search execute mode requires patchSearch.executorCommand or DEEPCODE_PATCH_SEARCH_EXECUTOR_COMMAND.',
+          retryable: false,
+        },
+        logs: [
+          {
+            level: 'warning',
+            message:
+              'No Patch Search worker command configured; execute mode did not fall back to dry-run.',
+          },
+        ],
+      }
+    }
+
+    const sessionId = sanitizeSessionId(`patch-search-${trajectory.id}`)
+    const session = new AgenticSandboxSession({
+      id: sessionId,
+      cwd,
+      purpose: 'patch-search-executor',
+      substrate: 'local',
+      traceDir: join(cwd, '.deepcode', 'sandbox-traces', 'patch-search'),
+      resourceLimits: {
+        timeoutMs: command.timeoutMs,
+      },
+      metadata: {
+        patchSearchRequestId: context.request.id,
+        patchSearchCandidateId: trajectory.id,
+        patchSearchMode: context.mode,
+      },
+    })
+    await session.prepare()
+    const result = await session.runCommand({
+      command: command.command,
+      args: command.args,
+      cwd,
+      timeoutMs: command.timeoutMs,
+      env: {
+        PATCH_SEARCH_REQUEST_ID: context.request.id,
+        PATCH_SEARCH_CANDIDATE_ID: trajectory.id,
+        PATCH_SEARCH_CANDIDATE_INDEX: String(trajectory.index + 1),
+        PATCH_SEARCH_PROMPT: trajectory.prompt,
+        ...(command.env ?? {}),
+      },
+      description: 'Patch Search worker executor',
+    })
+    await session.close(result.status)
+    const trace = traceRefFromManifest(session.manifest())
+    const sandbox = createSandboxTraceBundle(sessionId, [trace])
+    const logs: PatchCandidateExecutionLog[] = [
+      {
+        level: result.status === 'completed' ? 'info' : 'error',
+        message: `Patch Search executor exited with status ${result.status}.`,
+      },
+      {
+        level: 'info',
+        message: `Sandbox trace recorded ${sandbox.manifestPaths.length} manifest(s) for ${trajectory.id}.`,
+      },
+    ]
+    if (result.stdout.trim()) {
+      logs.push({ level: 'info', message: result.stdout.trim() })
+    }
+    if (result.stderr.trim()) {
+      logs.push({ level: 'warning', message: result.stderr.trim() })
+    }
+
+    if (result.status !== 'completed') {
+      return {
+        ok: false,
+        failure: {
+          kind: 'executor_failed',
+          message:
+            result.error ??
+            result.stderr.trim() ??
+            `Patch Search executor exited with code ${result.exitCode ?? 'null'}.`,
+          retryable: true,
+          details: {
+            exitCode: result.exitCode ?? -1,
+            timedOut: result.status === 'timed_out',
+          },
+        },
+        logs,
+      }
+    }
+
+    const gitEvidence = await collectCandidateGitEvidence(cwd)
+    if (!gitEvidence.ok) {
+      return {
+        ok: false,
+        failure: gitEvidence.failure,
+        logs,
+      }
+    }
+
+    return {
+      ok: true,
+      candidate: {
+        id: trajectory.id,
+        label: `Candidate ${trajectory.index + 1}`,
+        worktreePath: cwd,
+        branchName: trajectory.worktree.branchName,
+        baseCommit: trajectory.worktree.baseCommit,
+        exitStatus: 'completed',
+        diffStats: gitEvidence.diffStats,
+        touchedFiles: gitEvidence.touchedFiles,
+        targetFiles: context.request.targetFiles,
+        riskFlags:
+          gitEvidence.diffStats.filesChanged === 0 ? ['empty_diff'] : undefined,
+        sandbox,
+      },
+      logs,
+    }
   }
 }
 
@@ -518,6 +661,164 @@ async function dryRunCandidateExecutor(
   }
 }
 
+async function collectCandidateGitEvidence(cwd: string): Promise<
+  | {
+      ok: true
+      diffStats: PatchCandidate['diffStats']
+      touchedFiles: NonNullable<PatchCandidate['touchedFiles']>
+    }
+  | {
+      ok: false
+      failure: PatchCandidateFailure
+    }
+> {
+  const [nameStatus, numstat] = await Promise.all([
+    runGit(cwd, ['diff', '--name-status', 'HEAD']),
+    runGit(cwd, ['diff', '--numstat', 'HEAD']),
+  ])
+
+  if (nameStatus.code !== 0) {
+    return {
+      ok: false,
+      failure: {
+        kind: 'diff_collection_failed',
+        message:
+          nameStatus.stderr.trim() ||
+          nameStatus.error ||
+          'Failed to collect candidate touched files.',
+        retryable: true,
+      },
+    }
+  }
+  if (numstat.code !== 0) {
+    return {
+      ok: false,
+      failure: {
+        kind: 'diff_collection_failed',
+        message:
+          numstat.stderr.trim() ||
+          numstat.error ||
+          'Failed to collect candidate diff stats.',
+        retryable: true,
+      },
+    }
+  }
+
+  const touchedFiles = parseNameStatus(nameStatus.stdout)
+  const stats = parseNumstat(numstat.stdout)
+  return {
+    ok: true,
+    diffStats: {
+      filesChanged: touchedFiles.length,
+      insertions: stats.insertions,
+      deletions: stats.deletions,
+    },
+    touchedFiles,
+  }
+}
+
+function normalizeExecutorCommand(
+  command: PatchSearchExecutorCommand | undefined,
+): {
+  command: string
+  args: string[]
+  timeoutMs?: number
+  env?: Record<string, string>
+} | null {
+  const configured =
+    command ?? process.env.DEEPCODE_PATCH_SEARCH_EXECUTOR_COMMAND
+  if (!configured) return null
+
+  if (typeof configured !== 'string') {
+    return {
+      command: configured.command,
+      args: configured.args ?? [],
+      ...(configured.timeoutMs ? { timeoutMs: configured.timeoutMs } : {}),
+      ...(configured.env ? { env: configured.env } : {}),
+    }
+  }
+
+  const tokens = parseArguments(configured)
+  const executable = tokens[0]
+  if (!executable) return null
+  return {
+    command: executable,
+    args: tokens.slice(1),
+  }
+}
+
+async function runGit(
+  cwd: string,
+  args: string[],
+): Promise<{ code: number; stdout: string; stderr: string; error?: string }> {
+  const proc = Bun.spawn([gitExe(), ...args], {
+    cwd,
+    stdin: 'ignore',
+    stdout: 'pipe',
+    stderr: 'pipe',
+  })
+  const [code, stdout, stderr] = await Promise.all([
+    proc.exited,
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+  ])
+  return { code, stdout, stderr }
+}
+
+function parseNameStatus(
+  stdout: string,
+): NonNullable<PatchCandidate['touchedFiles']> {
+  return stdout
+    .split(/\r?\n/)
+    .map(line => line.trim())
+    .filter(Boolean)
+    .map(line => {
+      const [rawStatus, firstPath, secondPath] = line.split(/\t+/)
+      const statusCode = rawStatus?.[0] ?? ''
+      return {
+        path: secondPath ?? firstPath ?? '',
+        status: statusFromNameStatus(statusCode),
+      }
+    })
+    .filter(file => file.path.length > 0)
+}
+
+function statusFromNameStatus(
+  status: string,
+): NonNullable<PatchCandidate['touchedFiles']>[number]['status'] {
+  if (status === 'A') return 'added'
+  if (status === 'M') return 'modified'
+  if (status === 'D') return 'deleted'
+  if (status === 'R') return 'renamed'
+  return 'unknown'
+}
+
+function parseNumstat(stdout: string): {
+  insertions: number
+  deletions: number
+} {
+  return stdout
+    .split(/\r?\n/)
+    .map(line => line.trim())
+    .filter(Boolean)
+    .reduce(
+      (sum, line) => {
+        const [rawInsertions, rawDeletions] = line.split(/\t+/)
+        return {
+          insertions: sum.insertions + parseStatNumber(rawInsertions),
+          deletions: sum.deletions + parseStatNumber(rawDeletions),
+        }
+      },
+      { insertions: 0, deletions: 0 },
+    )
+}
+
+function parseStatNumber(value: string | undefined): number {
+  if (!value || value === '-') return 0
+  const parsed = Number(value)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0
+}
+
 async function noopCandidateCleanup(): Promise<PatchCandidateCleanupResult> {
   return {
     ok: true,
@@ -533,7 +834,7 @@ function normalizeRequest(
   const maxCandidates = Math.min(requested, runnerMaxCandidates)
   return {
     ...request,
-    mode: request.mode ?? 'dry_run',
+    mode: request.mode ?? 'execute',
     cleanupWorktrees: request.cleanupWorktrees ?? false,
     maxCandidates,
   }

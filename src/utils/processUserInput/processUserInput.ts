@@ -607,10 +607,7 @@ async function processUserInputBase(
     ),
     imageMetadataTexts,
   )
-  if (feature('TASK_AWARE_MODEL_ROUTING')) {
-    return applyTaskAwareModelRoute(result, inputString, context)
-  }
-  return result
+  return applyTaskAwareModelRoute(result, inputString, context)
 }
 
 // Adds image metadata texts as isMeta message to result

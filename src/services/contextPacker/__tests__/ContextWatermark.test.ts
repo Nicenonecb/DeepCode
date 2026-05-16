@@ -15,12 +15,14 @@ describe('ContextWatermark', () => {
         contextWatermark: 0.8,
         source: 'deepseek-v4-pro:max',
       },
+      triggerReason: 'deepseek-v4-pro-max',
       agentContextCapTokens: 512_000,
     })
 
     expect(snapshot).toEqual({
       generatedAt: 123,
       source: 'deepseek-v4-pro:max',
+      triggerReason: 'deepseek-v4-pro-max',
       contextWatermark: 0.8,
       maxContextTokens: 800_000,
       packBudgetChars: 2_560_000,

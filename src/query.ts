@@ -131,11 +131,13 @@ import {
   formatContextPackForPrompt,
   ContextPacker,
   resolveContextPackMaxChars,
+  shouldInjectContextPackForQuery,
   buildContextWatermarkSnapshot,
   setLatestContextWatermarkSnapshot,
   type ContextPackerSettings,
   type ContextPackRuntimeBudget,
   type ContextWatermarkSnapshot,
+  type ContextPackAutoTriggerReason,
 } from './services/contextPacker/index.js'
 import {
   createWorkingMemoryPrompt,
@@ -155,7 +157,6 @@ import {
 } from './services/deepseek/modelProfiles.js'
 import type { InterleavedThinkingRetentionOptions } from '@ant/model-provider'
 import type { ToolCallRepairIssue } from './services/toolRepair/types.js'
-import { runPatchSearchForHighRiskContext } from './services/patchSearch/PatchSearchIntegration.js'
 import { getCwd } from './utils/cwd.js'
 import { feature } from 'bun:bundle'
 import {
@@ -2425,12 +2426,14 @@ async function* queryLoop(
       toolCallRepairIssues,
       toolCallRepairBudget,
     )
-    void runPatchSearchForHighRiskContext({
-      source: 'query',
-      prompt: getLatestUserPrompt(messagesForQuery) ?? 'Repair failed tools',
-      toolUseContext,
-      repairIssues: repairBudgetSelection.retryableIssues,
-    }).catch(logError)
+    void deps
+      .patchSearchForHighRiskContext?.({
+        source: 'query',
+        prompt: getLatestUserPrompt(messagesForQuery) ?? 'Repair failed tools',
+        toolUseContext,
+        repairIssues: repairBudgetSelection.retryableIssues,
+      })
+      .catch(logError)
     const toolCallRepairMetaMessage = buildToolCallRepairMetaMessage(
       toolUseBlocks,
       repairBudgetSelection.retryableIssues,
@@ -2473,7 +2476,15 @@ async function buildContextPackedMessages(
   messages: Message[]
   snapshot?: ContextWatermarkSnapshot
 }> {
-  if (!shouldInjectContextPack(toolUseContext, settings)) {
+  const decision = shouldInjectContextPack(
+    messages,
+    toolUseContext,
+    settings,
+    model,
+    effortValue,
+    deepSeekEffortBudgets,
+  )
+  if (!decision.shouldInject) {
     setLatestContextWatermarkSnapshot(null)
     delete toolUseContext.options.contextWatermark
     return { messages }
@@ -2491,6 +2502,7 @@ async function buildContextPackedMessages(
     })
     const contextPack = new ContextPacker().pack({
       ...contextPackInput,
+      verificationText: getLatestVerificationResult(messages),
       settings,
       maxChars: resolveContextPackMaxChars(settings, runtimeBudget),
     })
@@ -2510,6 +2522,7 @@ async function buildContextPackedMessages(
             agentContextCapTokens:
               toolUseContext.options.contextWindowOverrideTokens,
           }),
+      triggerReason: decision.reason,
     })
     setLatestContextWatermarkSnapshot(snapshot)
     logContextWatermark(snapshot)
@@ -2536,6 +2549,14 @@ async function buildContextPackedMessages(
 
 function logContextWatermark(snapshot: ContextWatermarkSnapshot): void {
   logEvent('tengu_context_watermark', {
+    trigger_explicit_settings: snapshot.triggerReason === 'explicit-settings',
+    trigger_deepseek_v4_pro_high:
+      snapshot.triggerReason === 'deepseek-v4-pro-high',
+    trigger_deepseek_v4_pro_max:
+      snapshot.triggerReason === 'deepseek-v4-pro-max',
+    trigger_long_task: snapshot.triggerReason === 'long-task',
+    trigger_tool_chain: snapshot.triggerReason === 'tool-chain',
+    trigger_context_watermark: snapshot.triggerReason === 'context-watermark',
     context_watermark: snapshot.contextWatermark,
     max_context_tokens: snapshot.maxContextTokens,
     pack_budget_chars: snapshot.packBudgetChars,
@@ -2550,7 +2571,7 @@ function logContextWatermark(snapshot: ContextWatermarkSnapshot): void {
     agent_context_cap_hit: snapshot.agentContextCapHit,
   })
   logForDebugging(
-    `[ContextPacker] watermark source=${snapshot.source} pack=${snapshot.packChars}/${snapshot.packBudgetChars} chars usage=${snapshot.packUsagePercent}% sections=${snapshot.sectionCount} truncated=${snapshot.truncatedSectionCount} agentCap=${snapshot.agentContextCapTokens ?? 'none'}`,
+    `[ContextPacker] watermark source=${snapshot.source} trigger=${snapshot.triggerReason ?? 'unknown'} pack=${snapshot.packChars}/${snapshot.packBudgetChars} chars usage=${snapshot.packUsagePercent}% sections=${snapshot.sectionCount} truncated=${snapshot.truncatedSectionCount} agentCap=${snapshot.agentContextCapTokens ?? 'none'}`,
   )
 }
 
@@ -2694,12 +2715,26 @@ function shouldInjectWorkingMemory(
 }
 
 function shouldInjectContextPack(
+  messages: Message[],
   toolUseContext: ToolUseContext,
   settings: ContextPackerSettings | undefined,
-): boolean {
-  if (settings?.enabled !== true) return false
-  if (toolUseContext.agentId) return false
-  return true
+  model: string,
+  effortValue: unknown,
+  deepSeekEffortBudgets: DeepSeekEffortBudgetSettings | undefined,
+): {
+  shouldInject: boolean
+  reason?: ContextPackAutoTriggerReason
+} {
+  return shouldInjectContextPackForQuery({
+    messages,
+    settings,
+    model,
+    effortValue,
+    deepSeekEffortBudgets,
+    contextWindowOverrideTokens:
+      toolUseContext.options.contextWindowOverrideTokens,
+    agentId: toolUseContext.agentId,
+  })
 }
 
 function getLatestUserPrompt(messages: Message[]): string | undefined {
@@ -2709,6 +2744,18 @@ function getLatestUserPrompt(messages: Message[]): string | undefined {
 
     const text = getUserMessageText(message)
     if (text?.trim()) return text.trim()
+  }
+
+  return undefined
+}
+
+function getLatestVerificationResult(messages: Message[]): string | undefined {
+  for (let index = messages.length - 1; index >= 0; index--) {
+    const message = messages[index]
+    if (!message || message.type !== 'user' || !message.isMeta) continue
+
+    const text = getUserMessageText(message)
+    if (text?.includes('<verification_result>')) return text.trim()
   }
 
   return undefined

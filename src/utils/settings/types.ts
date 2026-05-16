@@ -157,7 +157,13 @@ export const ContextPackerSettingsSchema = lazySchema(() =>
         .boolean()
         .optional()
         .describe(
-          'Whether ContextPacker injects task evidence into model input. Defaults to false at the query integration layer.',
+          'Whether ContextPacker injects task evidence into model input. Defaults to automatic triggers; false disables all injection.',
+        ),
+      autoTrigger: z
+        .boolean()
+        .optional()
+        .describe(
+          'Whether ContextPacker may auto-inject for DeepSeek high/max effort, long tasks, tool-heavy turns, or high context usage. Defaults to true.',
         ),
       maxChars: z
         .number()
@@ -186,6 +192,36 @@ export const ContextPackerSettingsSchema = lazySchema(() =>
         .describe(
           'Optional watermark override for model-profile ContextPacker budgeting.',
         ),
+      highWatermarkRatio: z
+        .number()
+        .positive()
+        .max(1)
+        .optional()
+        .describe(
+          'Context usage ratio that auto-triggers ContextPacker when estimated tokens approach the effective window.',
+        ),
+      longTaskPromptChars: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe(
+          'Latest user prompt character threshold that auto-triggers ContextPacker.',
+        ),
+      longTaskMessageChars: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe(
+          'Total visible message character threshold that auto-triggers ContextPacker.',
+        ),
+      toolChainToolResultCount: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('Tool result block count that auto-triggers ContextPacker.'),
       includeDiff: z
         .boolean()
         .optional()
@@ -728,7 +764,7 @@ export const SettingsSchema = lazySchema(() =>
             .boolean()
             .optional()
             .describe(
-              'Whether task-aware model routing is enabled when the TASK_AWARE_MODEL_ROUTING feature is available.',
+              'Whether task-aware model routing is enabled. Defaults to true for OpenAI-compatible and DeepSeek providers, and false otherwise. Set false or CLAUDE_CODE_DISABLE_TASK_AWARE_MODEL_ROUTING=1 to disable.',
             ),
           routes: z
             .object({

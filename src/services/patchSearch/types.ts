@@ -109,10 +109,20 @@ export type PatchSearchRequest = {
   maxCandidates: number
   mode?: PatchSearchMode
   cleanupWorktrees?: boolean
+  executorCommand?: PatchSearchExecutorCommand
   patchApplication?: PatchApplicationRequest
   targetFiles?: PatchSearchTargetFile[]
   verificationCommands?: string[]
 }
+
+export type PatchSearchExecutorCommand =
+  | string
+  | {
+      command: string
+      args?: string[]
+      timeoutMs?: number
+      env?: Record<string, string>
+    }
 
 export type PatchApplicationMode = 'recommend' | 'apply'
 

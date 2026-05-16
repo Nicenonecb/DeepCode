@@ -246,10 +246,14 @@ function createToolUseContext({
   isNonInteractiveSession = true,
   settings = {},
   workingMemory,
+  mainLoopModel = 'claude-sonnet-4-5-20250929',
+  effortValue,
 }: {
   isNonInteractiveSession?: boolean
   settings?: Record<string, unknown>
   workingMemory?: WorkingMemory
+  mainLoopModel?: string
+  effortValue?: unknown
 } = {}): any {
   let inProgressToolUseIds = new Set<string>()
   let responseLength = 0
@@ -262,7 +266,7 @@ function createToolUseContext({
       tools: [],
       clients: [],
     },
-    effortValue: undefined,
+    effortValue,
     advisorModel: undefined,
     sessionHooks: new Map(),
   }
@@ -271,7 +275,7 @@ function createToolUseContext({
     options: {
       commands: [],
       debug: false,
-      mainLoopModel: 'claude-sonnet-4-5-20250929',
+      mainLoopModel,
       tools: [],
       verbose: false,
       thinkingConfig: { type: 'disabled' },
@@ -380,6 +384,107 @@ describe('query autonomy/provider boundary', () => {
 
     expect(repairMessage).toContain('RepairNeedsString')
     expect(repairMessage).not.toContain('success-result')
+  })
+
+  test('auto-starts Patch Search for complex retryable repair without the env gate', async () => {
+    const originalAutotrigger = process.env.DEEPCODE_PATCH_SEARCH_AUTOTRIGGER
+    delete process.env.DEEPCODE_PATCH_SEARCH_AUTOTRIGGER
+
+    try {
+      const toolUseContext = createToolUseContext()
+      const schemaTool = createRepairNeedsStringTool()
+      toolUseContext.options.tools = [schemaTool]
+
+      const patchSearchRequests: unknown[] = []
+      let callCount = 0
+      const deps = {
+        uuid: () => 'query-chain-id',
+        microcompact: async (messages: unknown[]) => ({ messages }),
+        autocompact: async () => ({
+          compactionResult: undefined,
+          consecutiveFailures: 0,
+        }),
+        patchSearchForHighRiskContext: async (context: unknown) => {
+          patchSearchRequests.push(context)
+          const setAppState = (
+            context as {
+              toolUseContext?: {
+                setAppState?: (updater: (state: any) => any) => void
+              }
+            }
+          ).toolUseContext?.setAppState
+          setAppState?.(state => ({
+            ...state,
+            patchSearchStatus: {
+              phase: 'completed',
+              requestId: 'patch-search-query-test',
+              candidateCount: 2,
+              runningCount: 0,
+              verifyingCount: 0,
+              failedCount: 0,
+              selectedCandidateId: 'candidate-1',
+              updatedAt: 123,
+            },
+          }))
+          return undefined
+        },
+        callModel: async function* () {
+          callCount += 1
+          yield callCount === 1
+            ? createSchemaRepairToolUseAssistantMessage('toolu_complex_repair')
+            : createTextAssistantMessage('patch search status observed')
+        },
+      }
+
+      const generator = query({
+        messages: [
+          createUserMessage({
+            content:
+              'debug and refactor this complex failing provider boundary',
+          }),
+        ],
+        systemPrompt: asSystemPrompt([]),
+        userContext: {},
+        systemContext: {},
+        canUseTool: async (_tool, input) => ({
+          behavior: 'allow',
+          updatedInput: input,
+        }),
+        toolUseContext,
+        querySource: 'sdk',
+        maxTurns: 3,
+        deps: deps as never,
+      })
+
+      let next = await generator.next()
+      while (!next.done) {
+        next = await generator.next()
+      }
+
+      expect(next.value.reason).toBe('completed')
+      expect(patchSearchRequests).toHaveLength(1)
+      expect(patchSearchRequests[0]).toMatchObject({
+        source: 'query',
+        prompt: 'debug and refactor this complex failing provider boundary',
+        repairIssues: [
+          {
+            toolUseId: 'toolu_complex_repair',
+            toolName: 'RepairNeedsString',
+            retryable: true,
+          },
+        ],
+      })
+      expect(toolUseContext.getAppState().patchSearchStatus).toMatchObject({
+        phase: 'completed',
+        selectedCandidateId: 'candidate-1',
+      })
+    } finally {
+      if (originalAutotrigger === undefined) {
+        delete process.env.DEEPCODE_PATCH_SEARCH_AUTOTRIGGER
+      } else {
+        process.env.DEEPCODE_PATCH_SEARCH_AUTOTRIGGER = originalAutotrigger
+      }
+    }
   })
 
   test('stops feeding repair summary after the tool-name retry budget is exhausted', async () => {
@@ -667,6 +772,181 @@ describe('query autonomy/provider boundary', () => {
 
     expect(next.value.reason).toBe('completed')
     expect(JSON.stringify(modelInputs[0])).not.toContain('<context_pack>')
+  })
+
+  test('context packer skips ordinary short tasks without an automatic trigger', async () => {
+    await writeTempFile(
+      tempDir,
+      'package.json',
+      JSON.stringify({
+        type: 'module',
+        scripts: {
+          typecheck: 'bunx tsc --noEmit',
+        },
+      }),
+    )
+
+    const toolUseContext = createToolUseContext()
+    const modelInputs: unknown[] = []
+    const deps = {
+      uuid: () => 'query-chain-id',
+      microcompact: async (messages: unknown[]) => ({ messages }),
+      autocompact: async () => ({
+        compactionResult: undefined,
+        consecutiveFailures: 0,
+      }),
+      callModel: async function* ({ messages }: { messages: unknown[] }) {
+        modelInputs.push(messages)
+        yield createTextAssistantMessage('plain context received.')
+      },
+    }
+
+    const generator = query({
+      messages: [
+        createUserMessage({
+          content: 'say hi',
+        }),
+      ],
+      systemPrompt: asSystemPrompt([]),
+      userContext: {},
+      systemContext: {},
+      canUseTool: async (_tool, input) => ({
+        behavior: 'allow',
+        updatedInput: input,
+      }),
+      toolUseContext,
+      querySource: 'sdk',
+      maxTurns: 1,
+      deps: deps as never,
+    })
+
+    let next = await generator.next()
+    while (!next.done) {
+      next = await generator.next()
+    }
+
+    expect(next.value.reason).toBe('completed')
+    expect(JSON.stringify(modelInputs[0])).not.toContain('<context_pack>')
+    expect(toolUseContext.options.contextWatermark).toBeUndefined()
+  })
+
+  test('context packer auto-injects for DeepSeek V4 Pro high effort', async () => {
+    await writeTempFile(
+      tempDir,
+      'package.json',
+      JSON.stringify({
+        type: 'module',
+        scripts: {
+          typecheck: 'bunx tsc --noEmit',
+        },
+      }),
+    )
+
+    const toolUseContext = createToolUseContext({
+      mainLoopModel: 'deepseek-v4-pro',
+      effortValue: 'high',
+    })
+    const modelInputs: unknown[] = []
+    const deps = {
+      uuid: () => 'query-chain-id',
+      microcompact: async (messages: unknown[]) => ({ messages }),
+      autocompact: async () => ({
+        compactionResult: undefined,
+        consecutiveFailures: 0,
+      }),
+      callModel: async function* ({ messages }: { messages: unknown[] }) {
+        modelInputs.push(messages)
+        yield createTextAssistantMessage('packed context received.')
+      },
+    }
+
+    const generator = query({
+      messages: [
+        createUserMessage({
+          content: 'fix the DeepSeek context pack routing',
+        }),
+      ],
+      systemPrompt: asSystemPrompt([]),
+      userContext: {},
+      systemContext: {},
+      canUseTool: async (_tool, input) => ({
+        behavior: 'allow',
+        updatedInput: input,
+      }),
+      toolUseContext,
+      querySource: 'sdk',
+      maxTurns: 1,
+      deps: deps as never,
+    })
+
+    let next = await generator.next()
+    while (!next.done) {
+      next = await generator.next()
+    }
+
+    const serializedInput = JSON.stringify(modelInputs[0])
+    expect(next.value.reason).toBe('completed')
+    expect(serializedInput).toContain('<context_pack>')
+    expect(serializedInput).toContain('fix the DeepSeek context pack routing')
+    expect(toolUseContext.options.contextWatermark).toMatchObject({
+      source: 'deepseek-v4-pro:high',
+      triggerReason: 'deepseek-v4-pro-high',
+    })
+  })
+
+  test('context packer carries recent verification metadata into automatic packs', async () => {
+    const toolUseContext = createToolUseContext({
+      mainLoopModel: 'deepseek-v4-pro',
+      effortValue: 'max',
+    })
+    const modelInputs: unknown[] = []
+    const deps = {
+      uuid: () => 'query-chain-id',
+      microcompact: async (messages: unknown[]) => ({ messages }),
+      autocompact: async () => ({
+        compactionResult: undefined,
+        consecutiveFailures: 0,
+      }),
+      callModel: async function* ({ messages }: { messages: unknown[] }) {
+        modelInputs.push(messages)
+        yield createTextAssistantMessage('verification context received.')
+      },
+    }
+
+    const generator = query({
+      messages: [
+        createUserMessage({
+          content: 'fix the failure',
+        }),
+        createUserMessage({
+          content:
+            '<verification_result>\nstatus: failed\nissues:\n- Typecheck: src/index.ts(1,1): error TS2304\n</verification_result>',
+          isMeta: true,
+        }),
+      ],
+      systemPrompt: asSystemPrompt([]),
+      userContext: {},
+      systemContext: {},
+      canUseTool: async (_tool, input) => ({
+        behavior: 'allow',
+        updatedInput: input,
+      }),
+      toolUseContext,
+      querySource: 'sdk',
+      maxTurns: 1,
+      deps: deps as never,
+    })
+
+    let next = await generator.next()
+    while (!next.done) {
+      next = await generator.next()
+    }
+
+    const serializedInput = JSON.stringify(modelInputs[0])
+    expect(next.value.reason).toBe('completed')
+    expect(serializedInput).toContain('<context_pack>')
+    expect(serializedInput).toContain('<verification_result>')
+    expect(serializedInput).toContain('status: failed')
   })
 
   test('injects a configured Agentic Search evidence pack before the model call', async () => {

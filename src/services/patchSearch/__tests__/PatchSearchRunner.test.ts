@@ -1,7 +1,9 @@
 import { describe, expect, test } from 'bun:test'
-import { mkdtemp, readFile } from 'node:fs/promises'
+import { mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
 import {
   createDefaultCandidateVerifier,
   createSpawnConfig,
@@ -13,6 +15,8 @@ import {
 import type { PatchCandidateWorktree, PatchSearchRequest } from '../types.js'
 import type { VerificationSummary } from '../../verification/index.js'
 import type { PatchSearchFooterStatus } from '../types.js'
+
+const execFileAsync = promisify(execFile)
 
 describe('PatchSearchRunner', () => {
   test('plans dry-run candidates without creating worktrees or spawning agents', async () => {
@@ -27,7 +31,9 @@ describe('PatchSearchRunner', () => {
       },
     })
 
-    const result = await runner.run(request({ maxCandidates: 2 }))
+    const result = await runner.run(
+      request({ mode: 'dry_run', maxCandidates: 2 }),
+    )
 
     expect(createCalls).toBe(0)
     expect(result.candidates).toHaveLength(2)
@@ -65,6 +71,7 @@ describe('PatchSearchRunner', () => {
     const result = await runner.run(
       request({
         id: 'patch search! runner',
+        mode: 'dry_run',
         prompt: 'fix the query loop',
         maxCandidates: 5,
       }),
@@ -344,6 +351,104 @@ describe('PatchSearchRunner', () => {
     })
   })
 
+  test('default execute executor runs worker command and records diff evidence with sandbox manifest', async () => {
+    const cwd = await createGitFixture()
+    const runner = new PatchSearchRunner({
+      worktrees: {
+        create: async trajectory => ({
+          slug: trajectory.worktree.slug,
+          path: cwd,
+          branchName: `worktree-${trajectory.worktree.slug}`,
+          baseCommit: await git(cwd, ['rev-parse', 'HEAD']),
+          gitRoot: cwd,
+        }),
+        cleanup: async () => ({ ok: true }),
+      },
+      verifier: async () => ({
+        summary: verificationSummary({
+          status: 'passed',
+          total: 1,
+          passed: 1,
+          failed: 0,
+          timedOut: 0,
+        }),
+      }),
+      applicator: async () => ({
+        status: 'recommended',
+        mode: 'recommend',
+        patchSize: 0,
+        applied: false,
+        message: 'ok',
+        commands: [],
+        issues: [],
+        dirtyFiles: [],
+        conflictingFiles: [],
+      }),
+    })
+
+    const result = await runner.run(
+      request({
+        mode: 'execute',
+        maxCandidates: 1,
+        executorCommand: {
+          command: 'bun',
+          args: [
+            '-e',
+            "await Bun.write('src/query.ts', `${await Bun.file('src/query.ts').text()}patched\\n`);",
+          ],
+        },
+      }),
+    )
+
+    const candidate = result.candidates[0]?.candidate
+    expect(candidate?.exitStatus).toBe('completed')
+    expect(candidate?.touchedFiles).toEqual([
+      { path: 'src/query.ts', status: 'modified' },
+    ])
+    expect(candidate?.diffStats).toEqual({
+      filesChanged: 1,
+      insertions: 1,
+      deletions: 0,
+    })
+    expect(candidate?.sandbox).toMatchObject({
+      commandCount: 1,
+      policyViolationCount: 0,
+    })
+    const manifestPath = candidate?.sandbox?.manifestPaths[0] ?? ''
+    const manifest = JSON.parse(await readFile(manifestPath, 'utf8')) as {
+      purpose: string
+      metadata: Record<string, string>
+    }
+    expect(manifest).toMatchObject({
+      purpose: 'patch-search-executor',
+      metadata: {
+        patchSearchRequestId: 'patch-search-test',
+        patchSearchCandidateId: 'patch-search-test-candidate-1',
+      },
+    })
+  })
+
+  test('execute mode fails structurally when no worker command is configured', async () => {
+    const runner = new PatchSearchRunner({
+      worktrees: fakeWorktrees(),
+      verifier: async () => {
+        throw new Error('should not verify failed executor candidates')
+      },
+    })
+
+    const result = await runner.run(
+      request({ mode: 'execute', maxCandidates: 1 }),
+    )
+
+    expect(result.candidates[0]?.candidate.failure).toMatchObject({
+      kind: 'agent_spawn_failed',
+      retryable: false,
+    })
+    expect(
+      result.candidates[0]?.candidate.executionLogs?.[0]?.message,
+    ).toContain('No Patch Search worker command configured')
+  })
+
   test('keeps structured failed candidates when worktree creation or execution fails', async () => {
     const executor: PatchCandidateExecutor = async trajectory => {
       if (trajectory.index === 1) {
@@ -480,4 +585,25 @@ function verificationSummary(
     results: [],
     ...overrides,
   }
+}
+
+async function createGitFixture(): Promise<string> {
+  const cwd = await mkdtemp(join(tmpdir(), 'patch-search-executor-'))
+  await execFileAsync('git', ['init'], { cwd })
+  await execFileAsync('git', ['config', 'user.email', 'test@example.com'], {
+    cwd,
+  })
+  await execFileAsync('git', ['config', 'user.name', 'Patch Search Test'], {
+    cwd,
+  })
+  await execFileAsync('mkdir', ['-p', 'src'], { cwd })
+  await writeFile(join(cwd, 'src', 'query.ts'), 'export const value = 1\n')
+  await execFileAsync('git', ['add', '.'], { cwd })
+  await execFileAsync('git', ['commit', '-m', 'initial'], { cwd })
+  return cwd
+}
+
+async function git(cwd: string, args: string[]): Promise<string> {
+  const { stdout } = await execFileAsync('git', args, { cwd })
+  return stdout.trim()
 }
