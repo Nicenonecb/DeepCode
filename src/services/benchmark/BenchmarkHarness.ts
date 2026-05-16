@@ -237,7 +237,7 @@ export function buildBenchmarkHarnessSummary(
 export async function dryRunBenchmarkExecutor(
   input: BenchmarkTaskExecutorInput,
 ): Promise<BenchmarkTaskExecutorResult> {
-  const context = plannedContextMetricsFor(input.task)
+  const context = plannedContextMetricsFor(input.task, input.candidate)
   return {
     exitStatus: 'planned',
     resolved: false,
@@ -367,6 +367,9 @@ function normalizeCandidate(
     ...(candidate.cwd ? { cwd: candidate.cwd } : {}),
     ...(candidate.prompt ? { prompt: candidate.prompt } : {}),
     ...(candidate.env ? { env: sortStringRecord(candidate.env) } : {}),
+    ...(candidate.contextExpectations
+      ? { contextExpectations: candidate.contextExpectations }
+      : {}),
   }
 }
 
@@ -567,8 +570,10 @@ function sortStringRecord(
 
 function plannedContextMetricsFor(
   task: BenchmarkTaskFixture,
+  candidate?: BenchmarkCandidateCommand,
 ): BenchmarkContextMetrics | undefined {
-  const expectations = task.contextExpectations
+  const expectations =
+    candidate?.contextExpectations ?? task.contextExpectations
   if (!expectations) return undefined
 
   return {
@@ -587,6 +592,9 @@ function plannedContextMetricsFor(
     ...(expectations.expectedEvidenceTiers
       ? { evidenceTiers: expectations.expectedEvidenceTiers }
       : {}),
+    ...(expectations.agenticSearch
+      ? { agenticSearch: expectations.agenticSearch }
+      : {}),
   }
 }
 
@@ -603,6 +611,9 @@ function contextSummary(context: BenchmarkContextMetrics): string {
   }
   if (context.truncatedSections !== undefined) {
     parts.push(`${Math.trunc(context.truncatedSections)} truncated sections`)
+  }
+  if (context.agenticSearch?.mode) {
+    parts.push(`${context.agenticSearch.mode} search`)
   }
   return parts.length > 0 ? parts.join(', ') : 'no context metrics'
 }

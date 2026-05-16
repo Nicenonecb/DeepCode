@@ -669,6 +669,73 @@ describe('query autonomy/provider boundary', () => {
     expect(JSON.stringify(modelInputs[0])).not.toContain('<context_pack>')
   })
 
+  test('injects a configured Agentic Search evidence pack before the model call', async () => {
+    const toolUseContext = createToolUseContext({
+      settings: {
+        agenticSearch: {
+          enabled: true,
+          mode: 'injected-pack',
+          maxEvidenceChars: 400,
+          evidencePack: {
+            text: [
+              '<agentic_search_evidence>',
+              '- [A1.1] type=primary source=https://docs.example.test :: Primary docs support the claim.',
+              '- [A2.1] type=independent source=https://news.example.test :: Independent source confirms it.',
+              '</agentic_search_evidence>',
+            ].join('\n'),
+            metadata: {
+              citationCount: 2,
+              crossCheckCoverage: 1,
+            },
+          },
+        },
+      },
+    })
+    const modelInputs: unknown[] = []
+    const deps = {
+      uuid: () => 'query-chain-id',
+      microcompact: async (messages: unknown[]) => ({ messages }),
+      autocompact: async () => ({
+        compactionResult: undefined,
+        consecutiveFailures: 0,
+      }),
+      callModel: async function* ({ messages }: { messages: unknown[] }) {
+        modelInputs.push(messages)
+        yield createTextAssistantMessage('agentic evidence received.')
+      },
+    }
+
+    const generator = query({
+      messages: [
+        createUserMessage({
+          content: 'verify this claim with citations',
+        }),
+      ],
+      systemPrompt: asSystemPrompt([]),
+      userContext: {},
+      systemContext: {},
+      canUseTool: async (_tool, input) => ({
+        behavior: 'allow',
+        updatedInput: input,
+      }),
+      toolUseContext,
+      querySource: 'sdk',
+      maxTurns: 1,
+      deps: deps as never,
+    })
+
+    let next = await generator.next()
+    while (!next.done) {
+      next = await generator.next()
+    }
+
+    const serializedInput = JSON.stringify(modelInputs[0])
+    expect(next.value.reason).toBe('completed')
+    expect(serializedInput).toContain('<agentic_search_evidence>')
+    expect(serializedInput).toContain('type=primary')
+    expect(serializedInput).toContain('type=independent')
+  })
+
   test('working memory injects checkpoint context before the model call', async () => {
     const toolUseContext = createToolUseContext({
       settings: {

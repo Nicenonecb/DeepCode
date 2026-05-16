@@ -123,6 +123,13 @@ export function normalizeBenchmarkTaskFixture(
                     Math.trunc(fixture.contextExpectations.minPackChars),
                   ),
                 }),
+            ...(fixture.contextExpectations.agenticSearch
+              ? {
+                  agenticSearch: normalizeAgenticSearchMetrics(
+                    fixture.contextExpectations.agenticSearch,
+                  ),
+                }
+              : {}),
           },
         }
       : {}),
@@ -292,6 +299,86 @@ export function normalizeContextMetrics(
     ...(context.evidenceTiers
       ? { evidenceTiers: normalizeEvidenceTiers(context.evidenceTiers) }
       : {}),
+    ...(context.agenticSearch
+      ? { agenticSearch: normalizeAgenticSearchMetrics(context.agenticSearch) }
+      : {}),
+  }
+}
+
+export function normalizeAgenticSearchMetrics(
+  metrics: NonNullable<BenchmarkContextMetrics['agenticSearch']>,
+): NonNullable<BenchmarkContextMetrics['agenticSearch']> {
+  return {
+    ...(metrics.mode ? { mode: metrics.mode } : {}),
+    ...(metrics.searchRounds === undefined
+      ? {}
+      : { searchRounds: nonNegativeInteger(metrics.searchRounds) }),
+    ...(metrics.maxFetchConcurrency === undefined
+      ? {}
+      : {
+          maxFetchConcurrency: nonNegativeInteger(metrics.maxFetchConcurrency),
+        }),
+    ...(metrics.webSearchCount === undefined
+      ? {}
+      : { webSearchCount: nonNegativeInteger(metrics.webSearchCount) }),
+    ...(metrics.webFetchCount === undefined
+      ? {}
+      : { webFetchCount: nonNegativeInteger(metrics.webFetchCount) }),
+    ...(metrics.sourceEvidenceCount === undefined
+      ? {}
+      : {
+          sourceEvidenceCount: nonNegativeInteger(metrics.sourceEvidenceCount),
+        }),
+    ...(metrics.privateUrlSkippedCount === undefined
+      ? {}
+      : {
+          privateUrlSkippedCount: nonNegativeInteger(
+            metrics.privateUrlSkippedCount,
+          ),
+        }),
+    ...(metrics.evidenceClaimCount === undefined
+      ? {}
+      : { evidenceClaimCount: nonNegativeInteger(metrics.evidenceClaimCount) }),
+    ...(metrics.primaryClaimCount === undefined
+      ? {}
+      : { primaryClaimCount: nonNegativeInteger(metrics.primaryClaimCount) }),
+    ...(metrics.independentClaimCount === undefined
+      ? {}
+      : {
+          independentClaimCount: nonNegativeInteger(
+            metrics.independentClaimCount,
+          ),
+        }),
+    ...(metrics.conflictCount === undefined
+      ? {}
+      : { conflictCount: nonNegativeInteger(metrics.conflictCount) }),
+    ...(metrics.crossCheckCoverage === undefined
+      ? {}
+      : { crossCheckCoverage: roundMetric(metrics.crossCheckCoverage) }),
+    ...(metrics.citationCount === undefined
+      ? {}
+      : { citationCount: nonNegativeInteger(metrics.citationCount) }),
+    ...(metrics.citationCompressionRatio === undefined
+      ? {}
+      : {
+          citationCompressionRatio: roundMetric(
+            metrics.citationCompressionRatio,
+          ),
+        }),
+    ...(metrics.estimatedInputTokens === undefined
+      ? {}
+      : {
+          estimatedInputTokens: nonNegativeInteger(
+            metrics.estimatedInputTokens,
+          ),
+        }),
+    ...(metrics.estimatedCostUsd === undefined
+      ? {}
+      : {
+          estimatedCostUsd: roundCurrency(
+            Math.max(0, metrics.estimatedCostUsd),
+          ),
+        }),
   }
 }
 
@@ -447,6 +534,10 @@ function normalizeSandboxTraceRefs(
 
 function uniqueSorted(values: string[]): string[] {
   return [...new Set(values)].sort()
+}
+
+function nonNegativeInteger(value: number): number {
+  return Math.max(0, Math.trunc(value))
 }
 
 function assertUniqueTaskIds(tasks: BenchmarkTaskFixture[]): void {

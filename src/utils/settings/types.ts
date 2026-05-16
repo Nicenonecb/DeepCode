@@ -206,6 +206,51 @@ export const ContextPackerSettingsSchema = lazySchema(() =>
     .passthrough(),
 )
 
+export const AgenticSearchSettingsSchema = lazySchema(() =>
+  z
+    .object({
+      enabled: z
+        .boolean()
+        .optional()
+        .describe(
+          'Whether Agentic Search evidence injection is enabled. Defaults to false until live adapters are configured.',
+        ),
+      mode: z
+        .enum(['off', 'injected-pack', 'live'])
+        .optional()
+        .describe(
+          'Runtime mode. injected-pack only injects a precomputed evidencePack; live is reserved for real WebSearch/WebFetch/MCP adapters.',
+        ),
+      effort: z
+        .enum(['fast', 'balanced', 'deep'])
+        .optional()
+        .describe(
+          'Default Agentic Search effort for live runs when no task-specific effort is provided.',
+        ),
+      maxEvidenceChars: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('Maximum Agentic Search evidence characters for live runs.'),
+      evidencePack: z
+        .object({
+          text: z
+            .string()
+            .optional()
+            .describe(
+              'Precomputed citation-ready Agentic Search evidence pack to inject before the model call.',
+            ),
+          metadata: z.record(z.string(), z.unknown()).optional(),
+        })
+        .optional()
+        .describe(
+          'Precomputed evidence pack used by injected-pack mode and tests.',
+        ),
+    })
+    .passthrough(),
+)
+
 export const WorkingMemorySettingsSchema = lazySchema(() =>
   z
     .object({
@@ -689,6 +734,11 @@ export const SettingsSchema = lazySchema(() =>
         .optional()
         .describe(
           'Configure task-scoped ContextPacker evidence injection into model input.',
+        ),
+      agenticSearch: AgenticSearchSettingsSchema()
+        .optional()
+        .describe(
+          'Configure Agentic Search evidence injection and future live search runtime.',
         ),
       workingMemory: WorkingMemorySettingsSchema()
         .optional()

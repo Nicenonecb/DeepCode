@@ -105,58 +105,6 @@
       font: 700 14px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
     }
 
-    .scoreboard {
-      position: relative;
-      padding: 26px;
-      color: #f7f3ec;
-      background: var(--deep);
-      box-shadow: var(--shadow);
-      overflow: hidden;
-    }
-
-    .scoreboard::after {
-      content: "";
-      position: absolute;
-      inset: auto -10% -18% 34%;
-      height: 48%;
-      background: repeating-linear-gradient(135deg, rgba(255,255,255,.08) 0 10px, transparent 10px 20px);
-      transform: rotate(-2deg);
-    }
-
-    .scoreboard h2 {
-      position: relative;
-      margin: 0 0 20px;
-      font-size: 28px;
-      line-height: 1.15;
-    }
-
-    .score-grid {
-      position: relative;
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
-      z-index: 1;
-    }
-
-    .metric {
-      padding: 18px;
-      border: 1px solid rgba(255,255,255,.18);
-      background: rgba(255,255,255,.06);
-    }
-
-    .metric strong {
-      display: block;
-      font-size: 34px;
-      line-height: 1;
-    }
-
-    .metric span {
-      display: block;
-      margin-top: 8px;
-      color: rgba(247,243,236,.76);
-      font: 600 13px/1.35 ui-monospace, SFMono-Regular, Menlo, monospace;
-    }
-
     nav {
       position: sticky;
       top: 0;
@@ -507,7 +455,6 @@
       }
       header { min-height: auto; }
       .grid { grid-template-columns: 1fr; }
-      .score-grid { grid-template-columns: 1fr; }
       .wide-table {
         display: block;
         overflow-x: auto;
@@ -520,8 +467,8 @@
     <header class="fade">
       <div>
         <div class="eyebrow">DeepCode Progress Board</div>
-        <h1>DeepCode 进度看板：实现差距和下一步。</h1>
-        <p class="lead">DeepCode 已有 coding agent 底盘，但还不是 DeepSeek V4 Pro 原生系统。要赢其他 CLI / agent，核心是模型画像、验证闭环、上下文工程、工具协议、多轨迹修复和 V4 原生推理预算。</p>
+        <h1>DeepCode 进度看板：实现差距</h1>
+        <p class="lead">就是说要做 DeepCode。</p>
         <div class="verdict">
           <span class="pill">结论：底盘已具备</span>
           <span class="pill">短板：V4 原生策略仍不足</span>
@@ -531,15 +478,6 @@
           <span class="pill">版本：0.0.1</span>
         </div>
       </div>
-      <aside class="scoreboard">
-        <h2>当前判断</h2>
-        <div class="score-grid">
-          <div class="metric"><strong>20</strong><span>项底层能力已具备</span></div>
-          <div class="metric"><strong>10</strong><span>项 V4 原生缺口待补</span></div>
-          <div class="metric"><strong>4</strong><span>项应优先开工</span></div>
-          <div class="metric"><strong>3/12</strong><span>项开源删减已同步状态</span></div>
-        </div>
-      </aside>
     </header>
 
     <nav class="report-switch" aria-label="报告导航">
@@ -673,16 +611,19 @@
             <tr class="done-row"><td colspan="3"><details class="feature-details" open><summary><span class="feature-title"><span class="status-chip done">DONE</span><strong>生产级 Agentic Sandbox / DSec</strong></span><span class="feature-note">STEP 1-5 已完成：统一 session API、container/fallback substrate、镜像缓存与环境恢复、强资源配额策略、Benchmark/PatchSearch/AgentTool 产品接入都已落地。</span><span class="feature-next">剩余增强：接入真实 Terminal-Bench/SWE-Pro 大语料、真实 DeepSeek API executor、microVM/fullVM substrate 实现和 CI 趋势看板。</span></summary><div class="feature-steps"><ol class="step-list"><li><div><span class="status-chip done">STEP 1 DONE</span><strong>统一 session API 与命令轨迹</strong></div><p>新增 `AgenticSandboxSession`、`AgenticSandboxSubstrate`、`LocalAgenticSandboxSubstrate` 和 `createAgenticSandboxVerificationExecutor`：每个 session 记录 substrate、cwd、resource limits、metadata、命令开始/结束时间、stdout/stderr 截断状态、exit code、timeout/error 状态，并写出 `.sandbox.json` manifest，作为后续可重放恢复和 benchmark 证据的稳定契约。</p></li><li><div><span class="status-chip done">STEP 2 DONE</span><strong>container / microVM / fullVM substrate</strong></div><p>新增 substrate registry 和 `DockerAgenticSandboxSubstrate`：container 路径可通过 `docker run --rm` 挂载 workspace，按 cache image、CPU、内存、network disabled 和 env 构造命令；同时新增 `UnavailableAgenticSandboxSubstrate` 和 `fallbackPolicy=fail|fallback-to-local`，microVM/fullVM 现在有明确 fail/fallback 契约，不再假装已实现完整 VM。</p></li><li><div><span class="status-chip done">STEP 3 DONE</span><strong>镜像缓存与环境恢复</strong></div><p>新增 `EnvironmentCache`：支持显式 cache key 或根据 `package.json` / lockfile 派生 workspace cache key；Docker substrate 支持 `warm=true` 时 `docker pull` 和 warm commands；session prepare 会写 workspace snapshot，close 会生成 `.replay.sh` replay plan，并把 cache / snapshot / replay 写入 manifest。</p></li><li><div><span class="status-chip done">STEP 4 DONE</span><strong>强资源配额与命令策略</strong></div><p>新增 `CommandPolicy`：maxCommands 超限返回结构化 policy failure；local substrate 对 CPU/内存/磁盘/network 限制 fail-closed，不再静默降级；Docker container substrate 映射 `--cpus`、`--memory`、`--storage-opt size`、`--network none` 和 allowlist env，并把 policy violations 写入 manifest。</p></li><li><div><span class="status-chip done">STEP 5 DONE</span><strong>Benchmark 与产品接入</strong></div><p>BenchmarkHarness 和 PatchSearch 默认 verifier 现在会用 sandbox executor 运行验证命令，并把 sandbox session id、manifest/replay/snapshot paths、command count、policy violations 写入任务报告和候选摘要；PatchSearch 传给 AgentTool 的 spawn config、team file、in-process/pane backend、analytics/logging 也会携带 sandbox session id 和 trace manifest。新增 `agentic-sandbox-stability.json`，以 Terminal-Bench/SWE-Pro 风格覆盖稳定性、成本、步数和回归率证据。</p></li></ol></div></details></td></tr>
             <tr><td><span class="status-chip next">NEXT</span><br>大规模真实 agent benchmark</td><td>BenchmarkHarness 是骨架，当前 fixture 是 smoke/dry-run。</td><td><strong>缺任务语料和真实 executor。</strong>需要 SWE-Verified/Terminal-Bench/MCP/Toolathlon 风格数据、500 step 长任务、F2P/P2F/JUnit 指标和成本/成功率趋势。</td></tr>
             <tr><td><span class="status-chip next">NEXT</span><br>Generative Reward Model / hard-to-verify 评估</td><td>VerificationRunner 适合 typecheck/lint/test，可解析失败并回灌。</td><td><strong>缺 rubric judge。</strong>论文强调难验证任务用生成式评估/打分；DeepCode 还需要 LLM-as-judge、成对比较、事实性/实用性 rubrics 和人工复核接口。</td></tr>
-            <tr><td><span class="status-chip next">NEXT</span><br>Agentic Search</td><td>WebSearch/WebFetch、MCP、Python/Bash 能组合使用。</td><td><strong>缺搜索编排器。</strong>还没有 thinking budget 下的多轮搜索、并行 fetch、候选答案交叉验证、引用证据压缩和 RAG/Agentic Search A/B。</td></tr>
+            <tr class="done-row"><td colspan="3"><details class="feature-details" open><summary><span class="feature-title"><span class="status-chip done">DONE</span><strong>Agentic Search</strong></span><span class="feature-note">STEP 1-6 已完成：搜索计划、并行 WebSearch/WebFetch、MCP/local/Bash source runner、证据抽取、citation pack、执行结果 metadata、指标和 A/B benchmark fixture 都已落地。</span><span class="feature-next">剩余增强：把 evidence pack 接入真实 QueryEngine 自动注入路径和线上 provider 搜索执行，继续用真实任务比较 RAG vs Agentic Search 成功率/成本。</span></summary><div class="feature-steps"><ol class="step-list"><li><div><span class="status-chip done">STEP 1 DONE</span><strong>搜索编排类型与计划器</strong></div><p>新增 `src/services/agenticSearch/types.ts`、`AgenticSearchPlanner.ts`、`index.ts` 和单测；定义 fast / balanced / deep effort budget、intent 分类、source plan、证据要求、cross-check 策略、round / fetch 限额和 metrics/debug summary。此步只产出可验收计划契约，不假装已经执行真实网络搜索。</p></li><li><div><span class="status-chip done">STEP 2 DONE</span><strong>并行 WebSearch / WebFetch executor</strong></div><p>新增 `AgenticSearchExecutor.ts`：按 plan round 顺序执行 WebSearch，去重候选 URL，再按 `maxParallelFetches`、`maxFetches`、`contextMaxCharacters` 并行 WebFetch；输出 search hits、fetched evidence、失败原因、耗时、证据字数和执行 metrics。executor 使用可注入 adapter，后续可接真实工具运行上下文。</p></li><li><div><span class="status-chip done">STEP 3 DONE</span><strong>MCP / local / Bash source selection</strong></div><p>Planner 现在会为 MCP/private、本地 repo 和 Bash/Python/command 场景规划 `mcp_search`、`local_search`、`bash_search`；executor 通过统一 `sourceRunner` 收集 collected evidence。WebFetch 会识别 GitHub/Jira/Confluence/Notion/Google Docs/Slack/Linear/internal/local 等认证或私有 URL，跳过直接抓取并记录 `private_url_skipped`，要求走 MCP/local source runner。</p></li><li><div><span class="status-chip done">STEP 4 DONE</span><strong>证据抽取与交叉验证</strong></div><p>`AgenticSearchEvidence.ts` 从 fetch/source 内容抽取 claim、date、source type、citation snippet、polarity、support strength 和 conflict group；summary 明确区分 primary source、independent cross-check、private/local evidence，并计算 cross-check coverage。executor 现在把 `evidenceExtraction` 作为执行结果一等字段返回。</p></li><li><div><span class="status-chip done">STEP 5 DONE</span><strong>RAG 压缩与 Query / Agent 接入契约</strong></div><p>`AgenticSearchEvidencePack.ts` 按 effort budget 生成 citation-ready `<agentic_search_evidence>` pack，保留 citation id、source URL、primary/independent 优先级、conflict group 和 metadata；metadata 暴露 pack chars、budget、citation count、truncation、estimated tokens/cost、citation compression ratio 和 recommended injection target。新增 `createAgenticSearchEvidencePackIntegration()`，给 ContextPacker / Query loop / agent task metadata 共用同一份 text、metadata 和 citations。</p></li><li><div><span class="status-chip done">STEP 6 DONE</span><strong>指标、UI 与 A/B benchmark</strong></div><p>Agentic Search metrics 现在记录 search rounds、max fetch concurrency、web search/fetch count、source evidence、private URL skips、claim/citation/conflict/cross-check/compression/cost 和 comparison mode；Benchmark context metrics / Reporter JSON+Markdown 同步展示这些字段。新增 `tests/benchmark/fixtures/agentic-search-ab.json` 和 `benchmark:agentic-search` / `benchmark:agentic-search:json`，可 dry-run 对比 RAG baseline vs Agentic Search。</p></li></ol></div></details></td></tr>
+            <tr class="done-row"><td colspan="3"><details class="feature-details" open><summary><span class="feature-title"><span class="status-chip next">IN PROGRESS</span><strong>Agentic Search Runtime 接入</strong></span><span class="feature-note">不能一次可靠写完；已拆成 4 步。STEP 1-2 已完成：Query evidence-pack 注入骨架和真实 WebSearch/WebFetch adapter 均已落地。</span><span class="feature-next">下一步接 MCP/local/Bash source runner，然后把 live trigger 接入 Query 并跑真实 execute benchmark。</span></summary><div class="feature-steps"><ol class="step-list"><li><div><span class="status-chip done">STEP 1 DONE</span><strong>Query 注入骨架与开关</strong></div><p>新增 `agenticSearch` settings schema：`enabled`、`mode: off|injected-pack|live`、`effort`、`maxEvidenceChars` 和预计算 `evidencePack`。`query.ts` 现在只在 `enabled + injected-pack` 时把 `<agentic_search_evidence>` 作为 meta user message 注入模型请求，并记录 pack chars、citation count、cross-check coverage；`live` 模式暂不执行，避免没有权限和 adapter 时突然联网。</p></li><li><div><span class="status-chip done">STEP 2 DONE</span><strong>WebSearch / WebFetch adapter</strong></div><p>新增 `src/services/agenticSearch/WebToolAdapters.ts`：`createWebSearchToolAdapter()` 复用 WebSearch adapter factory，传递 allowed/blocked domains、num results、livecrawl、search type、context max characters 和 abort signal；`createWebFetchToolAdapter()` 复用真实 `WebFetchTool` 的 schema、validate、preapproved host、permission rule 和 call 流程，默认 deny 未授权 ask，允许后续 live mode 显式 delegate 权限。输出统一转成 `AgenticSearchExecutorAdapters`，保留 executor 的并发预算、私有 URL skip 和失败结构。</p></li><li><div><span class="status-chip todo">STEP 3 TODO</span><strong>MCP / local / Bash source runner</strong></div><p>实现 `sourceRunner`：MCP 用已连接 server 的搜索/资源能力，本地用 `rg` / 文件摘要，Bash 只允许受控只读命令或显式权限命令；把私有证据和本地实现证据纳入 extraction。</p></li><li><div><span class="status-chip todo">STEP 4 TODO</span><strong>Live Query 触发与 execute benchmark</strong></div><p>在 Query loop 中用 `shouldUseAgenticSearch()` 和 settings 控制 live run，按 effort/thinking budget 限制注入量；新增 execute 版 benchmark 和状态/日志指标，比较 RAG baseline vs Agentic Search 的真实成功率、成本、步数和引用质量。</p></li></ol></div></details></td></tr>
             <tr><td><span class="status-chip opt">OPT</span><br>模型内部架构能力</td><td>CSA/HCA、mHC、MoE、MTP、FP4、MegaMoE 属于 DeepSeek 模型/服务端能力，CLI 只能通过 API 继承。</td><td><strong>若要本地 serving 才需要补。</strong>当前项目不覆盖 inference engine、KV cache、FP4 QAT、MoE kernel；作为 API agent 可标“依赖 DeepSeek 服务端”。</td></tr>
           </tbody>
         </table>
         <div class="grid" style="margin-top:16px">
-          <article class="item done"><span class="tag">本轮目标</span><h3>Agentic Sandbox STEP 5</h3><p>完成 Benchmark 与产品接入：PatchSearch、BenchmarkHarness、AgentTool 长任务默认带 sandbox session id 和 trace manifest。</p></article>
-          <article class="item done"><span class="tag">已完成改动</span><h3>Trace 证据闭环</h3><p>新增 `AgenticSandboxTraceRef/Bundle`；Benchmark/PatchSearch 默认 verifier 收集 manifest、replay、snapshot、command count、policy violations；Reporter JSON/Markdown 增加 Sandbox 字段；AgentTool spawn/team/analytics 保留 sandbox session 和 manifest。</p></article>
-          <article class="item done"><span class="tag">验证</span><h3>测试矩阵</h3><p>`bun test src/services/agenticSandbox/__tests__/AgenticSandboxSession.test.ts src/services/benchmark/__tests__/BenchmarkHarness.test.ts src/services/benchmark/__tests__/Reporter.test.ts src/services/patchSearch/__tests__/PatchSearchRunner.test.ts src/services/patchSearch/__tests__/CandidateEvaluator.test.ts`：36 pass。`bunx tsc --noEmit`：通过。</p></article>
-          <article class="item opt"><span class="tag">影响文件</span><h3>主要改动</h3><p>`src/services/agenticSandbox/`、`src/services/benchmark/`、`src/services/patchSearch/`、`packages/builtin-tools/src/tools/shared/spawnMultiAgent.ts`、`src/utils/swarm/`、`src/services/analytics/metadata.ts`、`src/services/api/logging.ts`、`tests/benchmark/fixtures/agentic-sandbox-stability.json` 和本看板。</p></article>
-          <article class="item rewrite"><span class="tag">剩余风险</span><h3>后续验收</h3><p>当前已具备默认 trace 接入和本地可回放证据；仍需真实 DeepSeek API executor、Terminal-Bench/SWE-Pro 大语料、长时间容器/microVM 压测、CI artifacts 和成本/回归趋势看板。</p></article>
+          <article class="item opt"><span class="tag">本轮判断</span><h3>不能一次性完成</h3><p>真实 runtime 接入横跨 Query loop、工具权限、WebSearch/WebFetch adapter、MCP/local source runner 和真实 benchmark；如果一轮全写，风险是绕过权限或只能跑假路径。</p></article>
+          <article class="item done"><span class="tag">本轮目标</span><h3>Runtime STEP 2</h3><p>把真实 WebSearchTool / WebFetchTool 包成 `AgenticSearchExecutorAdapters`，让 Agentic Search executor 能用同一套 adapter 接公开网页搜索和抓取。</p></article>
+          <article class="item done"><span class="tag">已完成改动</span><h3>Web Tool Adapters</h3><p>新增 `WebToolAdapters.ts` 和 `WebToolAdapters.test.ts`；WebSearch 复用底层 adapter factory，WebFetch 复用真实工具 schema、validation、preapproved host、permission rule 和 call 流程；默认不弹交互权限，未授权 URL fail-closed，后续 live mode 可显式 delegate。</p></article>
+          <article class="item done"><span class="tag">验证命令</span><h3>Adapter / 类型 / 格式</h3><p>`bun test src/services/agenticSearch/__tests__/WebToolAdapters.test.ts src/services/agenticSearch/__tests__/AgenticSearchExecutor.test.ts`：10 pass。`bunx tsc --noEmit`：通过。`bunx biome check src/services/agenticSearch/WebToolAdapters.ts src/services/agenticSearch/__tests__/WebToolAdapters.test.ts`：通过。`git diff --check`：通过。</p></article>
+          <article class="item opt"><span class="tag">主要影响文件</span><h3>Agentic Search Runtime</h3><p>`src/services/agenticSearch/WebToolAdapters.ts`、`src/services/agenticSearch/index.ts`、`src/services/agenticSearch/__tests__/WebToolAdapters.test.ts`、`deepcode-deepseek-gap.html`。</p></article>
+          <article class="item rewrite"><span class="tag">剩余风险</span><h3>Live trigger 未接</h3><p>STEP 2 让 executor 能调用真实 WebSearch/WebFetch adapter，但 Query 还不会自动 live run；MCP/local/Bash source runner、live trigger、权限交互策略和 execute benchmark 仍需后续。</p></article>
+          <article class="item missing"><span class="tag">建议下一步</span><h3>Source runner</h3><p>实现 STEP 3：把 MCP/local/Bash source runner 接到 `AgenticSearchExecutor`，让私有 URL skip 后能转去 MCP 或本地证据，而不是只记录失败。</p></article>
         </div>
       </section>
 
@@ -703,7 +644,7 @@
             <tr><td><span class="status-chip todo">TODO</span><br>Remote / Bridge / ACP 云控制</td><td>`src/remote/`、`src/bridge/`、`src/services/acp/`、`packages/remote-control-server/` 依赖 token、WebSocket、HTTPS、远程会话。</td><td><strong>默认移除或禁用。</strong>本地开源 CLI 不需要远程控制和 HTTPS 验证。</td></tr>
             <tr><td><span class="status-chip todo">TODO</span><br>Remote Agent Task</td><td>`src/tasks/RemoteAgentTask/` 处理云端/远程 agent。</td><td><strong>删除主路径。</strong>保留 local/background/worktree agent 即可。</td></tr>
             <tr><td><span class="status-chip todo">TODO</span><br>MCP OAuth / HTTP auth</td><td>MCP 远程 server 的 OAuth、浏览器认证、token 存储。</td><td><strong>先关掉。</strong>保留 stdio MCP；HTTP/SSE/OAuth MCP 做插件或高级功能。</td></tr>
-            <tr><td><span class="status-chip todo">TODO</span><br>Analytics / GrowthBook / Sentry</td><td>遥测、远程 feature flag、错误上报、版本门控。</td><td><strong>删除或 no-op。</strong>开源版不应依赖远程开关；feature flag 用本地配置文件。</td></tr>
+            <tr><td><span class="status-chip todo">TODO</span><br>Analytics / GrowthBook / Sentry</td><td>2026-05-16 静态审计确认：`src/entrypoints/init.ts` 启动初始化 1P event logging；`src/services/analytics/` 含 GrowthBook、1P event logger、Datadog sink；`src/utils/sentry.ts` 在 `SENTRY_DSN` 存在时启用；`src/components/Feedback*` 可提交反馈/transcript 到 Anthropic endpoint。</td><td><strong>删除或默认 no-op。</strong>当前未发现典型病毒/木马持久化，但这里确实是用户行为分析和远程开关风险面；开源版应默认关闭，保留 `DISABLE_TELEMETRY` / `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` 之类开关，并补启动无外联回归测试。</td></tr>
             <tr><td><span class="status-chip todo">TODO</span><br>Auto updater / version gate</td><td>自动更新、服务端版本配置、包完整性/发布渠道判断。</td><td><strong>删除。</strong>开源版交给 npm/bun/github release，不做官方客户端校验。</td></tr>
             <tr><td><span class="status-chip todo">TODO</span><br>反篡改 / 官方环境判断</td><td>类似 `USER_TYPE === "ant"`、homespace、first-party URL、bundle integrity、内部 beta 能力。</td><td><strong>重写为开源能力开关。</strong>不判断用户是不是官方/是否篡改；只判断本地配置是否启用。</td></tr>
           </tbody>

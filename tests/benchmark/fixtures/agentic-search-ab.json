@@ -1,0 +1,147 @@
+{
+  "id": "agentic-search-ab",
+  "dataset": {
+    "id": "agentic-search-ab",
+    "name": "Agentic Search A/B",
+    "description": "Dry-run fixture comparing regular RAG against Agentic Search evidence extraction and cross-check coverage.",
+    "version": "2026-05-16",
+    "tasks": [
+      {
+        "id": "provider-doc-cross-check",
+        "title": "Provider docs cross-check",
+        "prompt": "Verify a provider tool-calling claim using primary docs and independent cross-check evidence.",
+        "category": "docs",
+        "difficulty": "medium",
+        "tags": ["agentic-search", "cross-check", "provider-docs"],
+        "expectedOutcome": {
+          "summary": "Answer cites primary docs and an independent source, and flags conflicts."
+        },
+        "contextExpectations": {
+          "minPromptTokens": 120000,
+          "minPackChars": 24000,
+          "expectedSectionHits": ["agentic:primary", "agentic:independent"],
+          "expectedEvidenceTiers": ["hot", "warm"],
+          "maxTruncatedSections": 1,
+          "agenticSearch": {
+            "mode": "agentic_search",
+            "searchRounds": 3,
+            "maxFetchConcurrency": 4,
+            "webSearchCount": 3,
+            "webFetchCount": 4,
+            "sourceEvidenceCount": 1,
+            "privateUrlSkippedCount": 1,
+            "evidenceClaimCount": 8,
+            "primaryClaimCount": 3,
+            "independentClaimCount": 3,
+            "conflictCount": 1,
+            "crossCheckCoverage": 0.75,
+            "citationCount": 6,
+            "citationCompressionRatio": 0.32,
+            "estimatedInputTokens": 6000,
+            "estimatedCostUsd": 0.004
+          }
+        }
+      },
+      {
+        "id": "rag-baseline-doc-summary",
+        "title": "RAG baseline doc summary",
+        "prompt": "Summarize the same provider claim using regular RAG context only.",
+        "category": "docs",
+        "difficulty": "medium",
+        "tags": ["rag-baseline", "provider-docs"],
+        "expectedOutcome": {
+          "summary": "Answer cites available context but does not guarantee independent cross-check coverage."
+        },
+        "contextExpectations": {
+          "minPromptTokens": 80000,
+          "minPackChars": 18000,
+          "expectedSectionHits": ["rag:context"],
+          "expectedEvidenceTiers": ["hot"],
+          "maxTruncatedSections": 2,
+          "agenticSearch": {
+            "mode": "rag_baseline",
+            "searchRounds": 0,
+            "maxFetchConcurrency": 0,
+            "webSearchCount": 0,
+            "webFetchCount": 0,
+            "sourceEvidenceCount": 0,
+            "privateUrlSkippedCount": 0,
+            "evidenceClaimCount": 3,
+            "primaryClaimCount": 1,
+            "independentClaimCount": 0,
+            "conflictCount": 0,
+            "crossCheckCoverage": 0.33,
+            "citationCount": 2,
+            "citationCompressionRatio": 0.22,
+            "estimatedInputTokens": 4500,
+            "estimatedCostUsd": 0.002
+          }
+        }
+      }
+    ]
+  },
+  "candidates": [
+    {
+      "id": "rag-baseline",
+      "label": "RAG baseline",
+      "kind": "agent",
+      "prompt": "Use existing context pack only.",
+      "contextExpectations": {
+        "minPromptTokens": 80000,
+        "minPackChars": 18000,
+        "expectedSectionHits": ["rag:context"],
+        "expectedEvidenceTiers": ["hot"],
+        "maxTruncatedSections": 2,
+        "agenticSearch": {
+          "mode": "rag_baseline",
+          "searchRounds": 0,
+          "maxFetchConcurrency": 0,
+          "webSearchCount": 0,
+          "webFetchCount": 0,
+          "sourceEvidenceCount": 0,
+          "privateUrlSkippedCount": 0,
+          "evidenceClaimCount": 3,
+          "primaryClaimCount": 1,
+          "independentClaimCount": 0,
+          "conflictCount": 0,
+          "crossCheckCoverage": 0.33,
+          "citationCount": 2,
+          "citationCompressionRatio": 0.22,
+          "estimatedInputTokens": 4500,
+          "estimatedCostUsd": 0.002
+        }
+      }
+    },
+    {
+      "id": "agentic-search",
+      "label": "Agentic Search",
+      "kind": "agent",
+      "prompt": "Use Agentic Search planner, executor, extractor, and citation pack.",
+      "contextExpectations": {
+        "minPromptTokens": 120000,
+        "minPackChars": 24000,
+        "expectedSectionHits": ["agentic:primary", "agentic:independent"],
+        "expectedEvidenceTiers": ["hot", "warm"],
+        "maxTruncatedSections": 1,
+        "agenticSearch": {
+          "mode": "agentic_search",
+          "searchRounds": 3,
+          "maxFetchConcurrency": 4,
+          "webSearchCount": 3,
+          "webFetchCount": 4,
+          "sourceEvidenceCount": 1,
+          "privateUrlSkippedCount": 1,
+          "evidenceClaimCount": 8,
+          "primaryClaimCount": 3,
+          "independentClaimCount": 3,
+          "conflictCount": 1,
+          "crossCheckCoverage": 0.75,
+          "citationCount": 6,
+          "citationCompressionRatio": 0.32,
+          "estimatedInputTokens": 6000,
+          "estimatedCostUsd": 0.004
+        }
+      }
+    }
+  ]
+}

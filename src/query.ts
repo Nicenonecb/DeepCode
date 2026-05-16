@@ -140,6 +140,7 @@ import {
   updateWorkingMemoryForVerification,
   type WorkingMemorySettings,
 } from './services/workingMemory/index.js'
+import type { AgenticSearchEffort } from './services/agenticSearch/index.js'
 import type { DSMLGatewaySettings } from './services/dsml/index.js'
 import {
   resolveDeepSeekRequestEffortProfile,
@@ -467,6 +468,17 @@ type State = {
   // Why the previous iteration continued. Undefined on first iteration.
   // Lets tests assert recovery paths fired without inspecting message contents.
   transition: Continue | undefined
+}
+
+type AgenticSearchSettings = {
+  enabled?: boolean
+  mode?: 'off' | 'injected-pack' | 'live'
+  effort?: AgenticSearchEffort
+  maxEvidenceChars?: number
+  evidencePack?: {
+    text?: string
+    metadata?: Record<string, unknown>
+  }
 }
 
 export async function* query(
@@ -1096,8 +1108,14 @@ async function* queryLoop(
     } else {
       delete toolUseContext.options.contextWatermark
     }
-    const messagesWithMetaContext = buildWorkingMemoryMessages(
+    const messagesWithAgenticSearch = buildAgenticSearchMessages(
       messagesWithContextPack,
+      toolUseContext.getAppState().settings.agenticSearch as
+        | AgenticSearchSettings
+        | undefined,
+    )
+    const messagesWithMetaContext = buildWorkingMemoryMessages(
+      messagesWithAgenticSearch,
       toolUseContext,
       toolUseContext.getAppState().settings.workingMemory,
     )
@@ -2509,6 +2527,71 @@ function logContextWatermark(snapshot: ContextWatermarkSnapshot): void {
   logForDebugging(
     `[ContextPacker] watermark source=${snapshot.source} pack=${snapshot.packChars}/${snapshot.packBudgetChars} chars usage=${snapshot.packUsagePercent}% sections=${snapshot.sectionCount} truncated=${snapshot.truncatedSectionCount} agentCap=${snapshot.agentContextCapTokens ?? 'none'}`,
   )
+}
+
+function buildAgenticSearchMessages(
+  messages: Message[],
+  settings: AgenticSearchSettings | undefined,
+): Message[] {
+  if (!shouldInjectAgenticSearch(settings)) return messages
+
+  const evidenceText = settings?.evidencePack?.text?.trim()
+  if (!evidenceText) return messages
+
+  const boundedEvidence = truncateAgenticSearchEvidence(
+    evidenceText,
+    settings?.maxEvidenceChars,
+  )
+  const metadata = settings?.evidencePack?.metadata
+
+  logEvent('tengu_agentic_search_pack_injected', {
+    injected_pack_mode: (settings?.mode ?? 'injected-pack') === 'injected-pack',
+    effort_fast: settings?.effort === 'fast',
+    effort_balanced: settings?.effort === 'balanced',
+    effort_deep: settings?.effort === 'deep',
+    pack_chars: boundedEvidence.length,
+    truncated: boundedEvidence.length < evidenceText.length,
+    citation_count: numericMetadata(metadata, 'citationCount'),
+    cross_check_coverage: numericMetadata(metadata, 'crossCheckCoverage'),
+  })
+  logForDebugging(
+    `[AgenticSearch] injected evidence pack chars=${boundedEvidence.length} mode=${settings?.mode ?? 'injected-pack'}`,
+  )
+
+  return [
+    ...messages,
+    createUserMessage({
+      content: boundedEvidence,
+      isMeta: true,
+    }),
+  ]
+}
+
+function shouldInjectAgenticSearch(
+  settings: AgenticSearchSettings | undefined,
+): boolean {
+  if (!settings?.enabled) return false
+  if (settings.mode === 'off' || settings.mode === 'live') return false
+  return settings.mode === undefined || settings.mode === 'injected-pack'
+}
+
+function truncateAgenticSearchEvidence(
+  evidenceText: string,
+  maxEvidenceChars: number | undefined,
+): string {
+  if (!maxEvidenceChars || evidenceText.length <= maxEvidenceChars) {
+    return evidenceText
+  }
+  const marker = '\n...[agentic search evidence truncated]...'
+  return `${evidenceText.slice(0, Math.max(0, maxEvidenceChars - marker.length))}${marker}`
+}
+
+function numericMetadata(
+  metadata: Record<string, unknown> | undefined,
+  key: string,
+): number | undefined {
+  const value = metadata?.[key]
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined
 }
 
 function resolveContextPackRuntimeBudget(

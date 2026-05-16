@@ -41,6 +41,22 @@ describe('Benchmark Reporter', () => {
               sectionHits: ['hot:task', 'warm:related_files'],
               truncatedSections: 1,
               evidenceTiers: ['hot', 'warm'],
+              agenticSearchMode: 'agentic_search',
+              searchRounds: 3,
+              maxFetchConcurrency: 4,
+              webSearchCount: 3,
+              webFetchCount: 4,
+              sourceEvidenceCount: 1,
+              privateUrlSkippedCount: 1,
+              evidenceClaimCount: 8,
+              primaryClaimCount: 3,
+              independentClaimCount: 3,
+              conflictCount: 1,
+              crossCheckCoverage: 0.75,
+              citationCount: 6,
+              citationCompressionRatio: 0.32,
+              estimatedInputTokens: 6000,
+              estimatedCostUsd: 0.004,
               costUsd: 0.01,
               turns: 2,
               regressionCount: 0,
@@ -99,7 +115,7 @@ describe('Benchmark Reporter', () => {
       markdown.indexOf('| cli-slow |'),
     )
     expect(markdown).toContain(
-      '| task-a | completed | yes | 100% | 320000 prompt tok, 900000/2560000 chars, 2 sections, 1 trunc, hot/warm | benchmark-report-agent-good-task-a, 1 manifest, 2 cmd | $0.010000 | 2 | 0 | 1497.95 |',
+      '| task-a | completed | yes | 100% | 320000 prompt tok, 900000/2560000 chars, 2 sections, 1 trunc, hot/warm, agentic_search, 3 search rounds, 4 fetch parallel, 6 citations, 75% cross-check | benchmark-report-agent-good-task-a, 1 manifest, 2 cmd | $0.010000 | 2 | 0 | 1497.95 |',
     )
   })
 })
@@ -135,6 +151,24 @@ async function benchmarkResult() {
             sectionHits: ['hot:task', 'warm:related_files'],
             truncatedSections: 1,
             evidenceTiers: ['hot', 'warm'],
+            agenticSearch: {
+              mode: 'agentic_search',
+              searchRounds: 3,
+              maxFetchConcurrency: 4,
+              webSearchCount: 3,
+              webFetchCount: 4,
+              sourceEvidenceCount: 1,
+              privateUrlSkippedCount: 1,
+              evidenceClaimCount: 8,
+              primaryClaimCount: 3,
+              independentClaimCount: 3,
+              conflictCount: 1,
+              crossCheckCoverage: 0.75,
+              citationCount: 6,
+              citationCompressionRatio: 0.32,
+              estimatedInputTokens: 6000,
+              estimatedCostUsd: 0.004,
+            },
           }
         : {
             promptTokens: 240000,

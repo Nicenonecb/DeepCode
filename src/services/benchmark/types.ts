@@ -36,6 +36,26 @@ export type BenchmarkContextExpectation = {
   expectedEvidenceTiers?: BenchmarkContextEvidenceTier[]
   maxTruncatedSections?: number
   minPackChars?: number
+  agenticSearch?: BenchmarkAgenticSearchMetrics
+}
+
+export type BenchmarkAgenticSearchMetrics = {
+  mode?: 'rag_baseline' | 'agentic_search'
+  searchRounds?: number
+  maxFetchConcurrency?: number
+  webSearchCount?: number
+  webFetchCount?: number
+  sourceEvidenceCount?: number
+  privateUrlSkippedCount?: number
+  evidenceClaimCount?: number
+  primaryClaimCount?: number
+  independentClaimCount?: number
+  conflictCount?: number
+  crossCheckCoverage?: number
+  citationCount?: number
+  citationCompressionRatio?: number
+  estimatedInputTokens?: number
+  estimatedCostUsd?: number
 }
 
 export type BenchmarkTaskFixture = {
@@ -75,6 +95,7 @@ export type BenchmarkCandidateCommand = {
   cwd?: string
   prompt?: string
   env?: Record<string, string>
+  contextExpectations?: BenchmarkContextExpectation
 }
 
 export type BenchmarkTaskExitStatus =
@@ -145,6 +166,7 @@ export type BenchmarkContextMetrics = {
   sectionHits?: string[]
   truncatedSections?: number
   evidenceTiers?: BenchmarkContextEvidenceTier[]
+  agenticSearch?: BenchmarkAgenticSearchMetrics
 }
 
 export type BenchmarkTaskRun = {

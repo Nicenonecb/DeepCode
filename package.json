@@ -67,6 +67,8 @@
     "benchmark:deepseek-effort:json": "bun run scripts/benchmark.ts --fixture tests/benchmark/fixtures/deepseek-effort-smoke.json --format json --max-tasks 3",
     "benchmark:deepseek-long-context": "bun run scripts/benchmark.ts --fixture tests/benchmark/fixtures/deepseek-long-context.json --format markdown --max-tasks 4",
     "benchmark:deepseek-long-context:json": "bun run scripts/benchmark.ts --fixture tests/benchmark/fixtures/deepseek-long-context.json --format json --max-tasks 4",
+    "benchmark:agentic-search": "bun run scripts/benchmark.ts --fixture tests/benchmark/fixtures/agentic-search-ab.json --format markdown --max-tasks 3",
+    "benchmark:agentic-search:json": "bun run scripts/benchmark.ts --fixture tests/benchmark/fixtures/agentic-search-ab.json --format json --max-tasks 3",
     "health": "bun run scripts/health-check.ts",
     "postinstall": "node scripts/postinstall.cjs",
     "docs:dev": "npx mintlify dev",
