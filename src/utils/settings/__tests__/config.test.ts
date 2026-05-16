@@ -132,6 +132,26 @@ describe('SettingsSchema', () => {
     expect(result.success).toBe(true)
   })
 
+  test('accepts agentic search settings', () => {
+    const result = SettingsSchema().safeParse({
+      agenticSearch: {
+        enabled: true,
+        mode: 'injected-pack',
+        effort: 'deep',
+        maxEvidenceChars: 24_000,
+        evidencePack: {
+          text: '<agentic_search_evidence>primary docs</agentic_search_evidence>',
+          metadata: {
+            citationCount: 2,
+            crossCheckCoverage: 1,
+          },
+        },
+      },
+    })
+
+    expect(result.success).toBe(true)
+  })
+
   test('accepts permissions block with allow rules', () => {
     const result = SettingsSchema().safeParse({
       permissions: { allow: ['Bash(npm install)'] },

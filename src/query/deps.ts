@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto'
 import { queryModelWithStreaming } from '../services/api/claude.js'
 import { autoCompactIfNeeded } from '../services/compact/autoCompact.js'
 import { microcompactMessages } from '../services/compact/microCompact.js'
+import { runLiveAgenticSearchIfNeeded } from '../services/agenticSearch/index.js'
 
 // -- deps
 
@@ -25,6 +26,7 @@ export type QueryDeps = {
   // -- compaction
   microcompact: typeof microcompactMessages
   autocompact: typeof autoCompactIfNeeded
+  agenticSearchLive?: typeof runLiveAgenticSearchIfNeeded
 
   // -- platform
   uuid: () => string
@@ -35,6 +37,10 @@ export function productionDeps(): QueryDeps {
     callModel: queryModelWithStreaming,
     microcompact: microcompactMessages,
     autocompact: autoCompactIfNeeded,
+    agenticSearchLive: runLiveAgenticSearchIfNeeded,
     uuid: randomUUID,
   }
 }
+
+export const noopAgenticSearchLive: typeof runLiveAgenticSearchIfNeeded =
+  async () => undefined

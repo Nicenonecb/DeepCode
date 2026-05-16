@@ -113,7 +113,11 @@ import { applyToolResultBudget } from './utils/toolResultStorage.js'
 import { recordContentReplacement } from './utils/sessionStorage.js'
 import { handleStopHooks } from './query/stopHooks.js'
 import { buildQueryConfig } from './query/config.js'
-import { productionDeps, type QueryDeps } from './query/deps.js'
+import {
+  noopAgenticSearchLive,
+  productionDeps,
+  type QueryDeps,
+} from './query/deps.js'
 import type { Terminal, Continue } from './query/transitions.js'
 import {
   VerificationRunner,
@@ -140,6 +144,10 @@ import {
   updateWorkingMemoryForVerification,
   type WorkingMemorySettings,
 } from './services/workingMemory/index.js'
+import type {
+  AgenticSearchEffort,
+  AgenticSearchLiveRun,
+} from './services/agenticSearch/index.js'
 import type { DSMLGatewaySettings } from './services/dsml/index.js'
 import {
   resolveDeepSeekRequestEffortProfile,
@@ -467,6 +475,26 @@ type State = {
   // Why the previous iteration continued. Undefined on first iteration.
   // Lets tests assert recovery paths fired without inspecting message contents.
   transition: Continue | undefined
+}
+
+type AgenticSearchSettings = {
+  enabled?: boolean
+  mode?: 'off' | 'injected-pack' | 'live'
+  effort?: AgenticSearchEffort
+  maxEvidenceChars?: number
+  allowedDomains?: string[]
+  blockedDomains?: string[]
+  preferredSources?: (
+    | 'web_search'
+    | 'web_fetch'
+    | 'mcp_search'
+    | 'local_search'
+    | 'bash_search'
+  )[]
+  evidencePack?: {
+    text?: string
+    metadata?: Record<string, unknown>
+  }
 }
 
 export async function* query(
@@ -1096,8 +1124,23 @@ async function* queryLoop(
     } else {
       delete toolUseContext.options.contextWatermark
     }
-    const messagesWithMetaContext = buildWorkingMemoryMessages(
+    const agenticSearchSettings = toolUseContext.getAppState().settings
+      .agenticSearch as AgenticSearchSettings | undefined
+    const liveAgenticSearch = await (
+      deps.agenticSearchLive ?? noopAgenticSearchLive
+    )({
+      messages: messagesWithContextPack,
+      settings: agenticSearchSettings,
+      toolUseContext,
+      canUseTool,
+    })
+    const messagesWithAgenticSearch = buildAgenticSearchMessages(
       messagesWithContextPack,
+      agenticSearchSettings,
+      liveAgenticSearch,
+    )
+    const messagesWithMetaContext = buildWorkingMemoryMessages(
+      messagesWithAgenticSearch,
       toolUseContext,
       toolUseContext.getAppState().settings.workingMemory,
     )
@@ -2509,6 +2552,82 @@ function logContextWatermark(snapshot: ContextWatermarkSnapshot): void {
   logForDebugging(
     `[ContextPacker] watermark source=${snapshot.source} pack=${snapshot.packChars}/${snapshot.packBudgetChars} chars usage=${snapshot.packUsagePercent}% sections=${snapshot.sectionCount} truncated=${snapshot.truncatedSectionCount} agentCap=${snapshot.agentContextCapTokens ?? 'none'}`,
   )
+}
+
+function buildAgenticSearchMessages(
+  messages: Message[],
+  settings: AgenticSearchSettings | undefined,
+  liveRun?: AgenticSearchLiveRun,
+): Message[] {
+  if (!shouldInjectAgenticSearch(settings, liveRun)) return messages
+
+  const evidenceText = (
+    liveRun?.integration.text ?? settings?.evidencePack?.text
+  )?.trim()
+  if (!evidenceText) return messages
+
+  const boundedEvidence = truncateAgenticSearchEvidence(
+    evidenceText,
+    settings?.maxEvidenceChars,
+  )
+  const metadata =
+    liveRun?.integration.metadata ?? settings?.evidencePack?.metadata
+  const mode = liveRun ? 'live' : (settings?.mode ?? 'injected-pack')
+
+  logEvent('tengu_agentic_search_pack_injected', {
+    injected_pack_mode: mode === 'injected-pack',
+    live_mode: mode === 'live',
+    effort_fast: settings?.effort === 'fast',
+    effort_balanced: settings?.effort === 'balanced',
+    effort_deep: settings?.effort === 'deep',
+    pack_chars: boundedEvidence.length,
+    truncated: boundedEvidence.length < evidenceText.length,
+    citation_count: numericMetadata(metadata, 'citationCount'),
+    cross_check_coverage: numericMetadata(metadata, 'crossCheckCoverage'),
+    search_rounds: liveRun?.metrics.rounds,
+    web_fetch_count: liveRun?.metrics.fetchCount,
+    source_evidence_count: liveRun?.metrics.sourceEvidenceCount,
+  })
+  logForDebugging(
+    `[AgenticSearch] injected evidence pack chars=${boundedEvidence.length} mode=${mode}`,
+  )
+
+  return [
+    ...messages,
+    createUserMessage({
+      content: boundedEvidence,
+      isMeta: true,
+    }),
+  ]
+}
+
+function shouldInjectAgenticSearch(
+  settings: AgenticSearchSettings | undefined,
+  liveRun?: AgenticSearchLiveRun,
+): boolean {
+  if (liveRun) return true
+  if (!settings?.enabled) return false
+  if (settings.mode === 'off' || settings.mode === 'live') return false
+  return settings.mode === undefined || settings.mode === 'injected-pack'
+}
+
+function truncateAgenticSearchEvidence(
+  evidenceText: string,
+  maxEvidenceChars: number | undefined,
+): string {
+  if (!maxEvidenceChars || evidenceText.length <= maxEvidenceChars) {
+    return evidenceText
+  }
+  const marker = '\n...[agentic search evidence truncated]...'
+  return `${evidenceText.slice(0, Math.max(0, maxEvidenceChars - marker.length))}${marker}`
+}
+
+function numericMetadata(
+  metadata: Record<string, unknown> | undefined,
+  key: string,
+): number | undefined {
+  const value = metadata?.[key]
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined
 }
 
 function resolveContextPackRuntimeBudget(

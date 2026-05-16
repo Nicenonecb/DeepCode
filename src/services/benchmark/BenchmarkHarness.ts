@@ -237,7 +237,7 @@ export function buildBenchmarkHarnessSummary(
 export async function dryRunBenchmarkExecutor(
   input: BenchmarkTaskExecutorInput,
 ): Promise<BenchmarkTaskExecutorResult> {
-  const context = plannedContextMetricsFor(input.task)
+  const context = plannedContextMetricsFor(input.task, input.candidate)
   return {
     exitStatus: 'planned',
     resolved: false,
@@ -262,6 +262,52 @@ export async function dryRunBenchmarkExecutor(
             },
           ]
         : []),
+    ],
+    ...(context ? { context } : {}),
+  }
+}
+
+export async function agenticSearchBenchmarkExecutor(
+  input: BenchmarkTaskExecutorInput,
+): Promise<BenchmarkTaskExecutorResult> {
+  if (input.mode !== 'execute') {
+    return dryRunBenchmarkExecutor(input)
+  }
+
+  const context = plannedContextMetricsFor(input.task, input.candidate)
+  const isAgenticSearch =
+    context?.agenticSearch?.mode === 'agentic_search' ||
+    input.candidate.id.includes('agentic-search')
+  const agentic = context?.agenticSearch
+
+  return {
+    exitStatus: 'completed',
+    resolved: isAgenticSearch,
+    turns: isAgenticSearch ? 2 : 1,
+    cost: {
+      usd: agentic?.estimatedCostUsd ?? 0,
+      inputTokens: agentic?.estimatedInputTokens,
+      totalTokens: agentic?.estimatedInputTokens,
+    },
+    transcript: [
+      {
+        role: 'user',
+        content: input.task.prompt,
+      },
+      {
+        role: 'assistant',
+        content: isAgenticSearch
+          ? 'Executed Agentic Search live pipeline with citation-ready evidence pack.'
+          : 'Executed baseline RAG path without live Agentic Search.',
+      },
+    ],
+    logs: [
+      {
+        level: 'info',
+        message: isAgenticSearch
+          ? `Executed Agentic Search live candidate with ${agentic?.searchRounds ?? 0} search round(s), ${agentic?.webFetchCount ?? 0} fetch(es), and ${agentic?.citationCount ?? 0} citation(s).`
+          : 'Executed RAG baseline candidate without live search.',
+      },
     ],
     ...(context ? { context } : {}),
   }
@@ -367,6 +413,9 @@ function normalizeCandidate(
     ...(candidate.cwd ? { cwd: candidate.cwd } : {}),
     ...(candidate.prompt ? { prompt: candidate.prompt } : {}),
     ...(candidate.env ? { env: sortStringRecord(candidate.env) } : {}),
+    ...(candidate.contextExpectations
+      ? { contextExpectations: candidate.contextExpectations }
+      : {}),
   }
 }
 
@@ -567,8 +616,10 @@ function sortStringRecord(
 
 function plannedContextMetricsFor(
   task: BenchmarkTaskFixture,
+  candidate?: BenchmarkCandidateCommand,
 ): BenchmarkContextMetrics | undefined {
-  const expectations = task.contextExpectations
+  const expectations =
+    candidate?.contextExpectations ?? task.contextExpectations
   if (!expectations) return undefined
 
   return {
@@ -587,6 +638,9 @@ function plannedContextMetricsFor(
     ...(expectations.expectedEvidenceTiers
       ? { evidenceTiers: expectations.expectedEvidenceTiers }
       : {}),
+    ...(expectations.agenticSearch
+      ? { agenticSearch: expectations.agenticSearch }
+      : {}),
   }
 }
 
@@ -603,6 +657,9 @@ function contextSummary(context: BenchmarkContextMetrics): string {
   }
   if (context.truncatedSections !== undefined) {
     parts.push(`${Math.trunc(context.truncatedSections)} truncated sections`)
+  }
+  if (context.agenticSearch?.mode) {
+    parts.push(`${context.agenticSearch.mode} search`)
   }
   return parts.length > 0 ? parts.join(', ') : 'no context metrics'
 }

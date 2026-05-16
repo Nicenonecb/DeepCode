@@ -15,6 +15,22 @@ export type BenchmarkReportTask = {
   sectionHits?: string[]
   truncatedSections?: number
   evidenceTiers?: string[]
+  agenticSearchMode?: string
+  searchRounds?: number
+  maxFetchConcurrency?: number
+  webSearchCount?: number
+  webFetchCount?: number
+  sourceEvidenceCount?: number
+  privateUrlSkippedCount?: number
+  evidenceClaimCount?: number
+  primaryClaimCount?: number
+  independentClaimCount?: number
+  conflictCount?: number
+  crossCheckCoverage?: number
+  citationCount?: number
+  citationCompressionRatio?: number
+  estimatedInputTokens?: number
+  estimatedCostUsd?: number
   costUsd: number
   turns: number
   regressionCount: number
@@ -174,6 +190,73 @@ function taskReport(task: BenchmarkTaskSummary): BenchmarkReportTask {
     ...(task.context.evidenceTiers
       ? { evidenceTiers: task.context.evidenceTiers }
       : {}),
+    ...(task.context.agenticSearch?.mode
+      ? { agenticSearchMode: task.context.agenticSearch.mode }
+      : {}),
+    ...(task.context.agenticSearch?.searchRounds === undefined
+      ? {}
+      : { searchRounds: task.context.agenticSearch.searchRounds }),
+    ...(task.context.agenticSearch?.maxFetchConcurrency === undefined
+      ? {}
+      : {
+          maxFetchConcurrency: task.context.agenticSearch.maxFetchConcurrency,
+        }),
+    ...(task.context.agenticSearch?.webSearchCount === undefined
+      ? {}
+      : { webSearchCount: task.context.agenticSearch.webSearchCount }),
+    ...(task.context.agenticSearch?.webFetchCount === undefined
+      ? {}
+      : { webFetchCount: task.context.agenticSearch.webFetchCount }),
+    ...(task.context.agenticSearch?.sourceEvidenceCount === undefined
+      ? {}
+      : {
+          sourceEvidenceCount: task.context.agenticSearch.sourceEvidenceCount,
+        }),
+    ...(task.context.agenticSearch?.privateUrlSkippedCount === undefined
+      ? {}
+      : {
+          privateUrlSkippedCount:
+            task.context.agenticSearch.privateUrlSkippedCount,
+        }),
+    ...(task.context.agenticSearch?.evidenceClaimCount === undefined
+      ? {}
+      : {
+          evidenceClaimCount: task.context.agenticSearch.evidenceClaimCount,
+        }),
+    ...(task.context.agenticSearch?.primaryClaimCount === undefined
+      ? {}
+      : { primaryClaimCount: task.context.agenticSearch.primaryClaimCount }),
+    ...(task.context.agenticSearch?.independentClaimCount === undefined
+      ? {}
+      : {
+          independentClaimCount:
+            task.context.agenticSearch.independentClaimCount,
+        }),
+    ...(task.context.agenticSearch?.conflictCount === undefined
+      ? {}
+      : { conflictCount: task.context.agenticSearch.conflictCount }),
+    ...(task.context.agenticSearch?.crossCheckCoverage === undefined
+      ? {}
+      : {
+          crossCheckCoverage: task.context.agenticSearch.crossCheckCoverage,
+        }),
+    ...(task.context.agenticSearch?.citationCount === undefined
+      ? {}
+      : { citationCount: task.context.agenticSearch.citationCount }),
+    ...(task.context.agenticSearch?.citationCompressionRatio === undefined
+      ? {}
+      : {
+          citationCompressionRatio:
+            task.context.agenticSearch.citationCompressionRatio,
+        }),
+    ...(task.context.agenticSearch?.estimatedInputTokens === undefined
+      ? {}
+      : {
+          estimatedInputTokens: task.context.agenticSearch.estimatedInputTokens,
+        }),
+    ...(task.context.agenticSearch?.estimatedCostUsd === undefined
+      ? {}
+      : { estimatedCostUsd: task.context.agenticSearch.estimatedCostUsd }),
     costUsd: task.cost.usd,
     turns: task.turns,
     regressionCount: task.regressionCount,
@@ -214,6 +297,21 @@ function contextSummary(task: BenchmarkReportTask): string {
   }
   if (task.evidenceTiers?.length) {
     parts.push(task.evidenceTiers.join('/'))
+  }
+  if (task.agenticSearchMode) {
+    parts.push(task.agenticSearchMode)
+  }
+  if (task.searchRounds !== undefined) {
+    parts.push(`${task.searchRounds} search rounds`)
+  }
+  if (task.maxFetchConcurrency !== undefined) {
+    parts.push(`${task.maxFetchConcurrency} fetch parallel`)
+  }
+  if (task.citationCount !== undefined) {
+    parts.push(`${task.citationCount} citations`)
+  }
+  if (task.crossCheckCoverage !== undefined) {
+    parts.push(`${percent(task.crossCheckCoverage)} cross-check`)
   }
   return parts.length > 0 ? parts.join(', ') : 'n/a'
 }

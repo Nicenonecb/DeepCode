@@ -2,7 +2,10 @@
 
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
-import { BenchmarkHarness } from '../src/services/benchmark/BenchmarkHarness.js'
+import {
+  BenchmarkHarness,
+  agenticSearchBenchmarkExecutor,
+} from '../src/services/benchmark/BenchmarkHarness.js'
 import {
   formatBenchmarkJsonReport,
   formatBenchmarkMarkdownReport,
@@ -49,7 +52,9 @@ async function main(): Promise<void> {
       : {}),
   }
 
-  const result = await new BenchmarkHarness().run(request)
+  const result = await new BenchmarkHarness({
+    executor: selectExecutor(request.id),
+  }).run(request)
   const output =
     options.format === 'json'
       ? formatBenchmarkJsonReport(result)
@@ -62,6 +67,15 @@ async function main(): Promise<void> {
   } else {
     process.stdout.write(output)
   }
+}
+
+function selectExecutor(
+  requestId: string,
+): ConstructorParameters<typeof BenchmarkHarness>[0]['executor'] {
+  if (requestId.includes('agentic-search')) {
+    return agenticSearchBenchmarkExecutor
+  }
+  return undefined
 }
 
 function parseArgs(args: string[]): BenchmarkCliOptions {
