@@ -55,6 +55,11 @@ import {
   parseSlashCommandToolsFromFrontmatter,
 } from '../utils/markdownConfigLoader.js'
 import { parseUserSpecifiedModel } from '../utils/model/model.js'
+import {
+  legacyProjectConfigPath,
+  projectConfigPath,
+  projectConfigRelativePath,
+} from '../utils/projectConfigDir.js'
 import { executeShellCommandsInPrompt } from '../utils/promptShellExecution.js'
 import type { SettingSource } from '../utils/settings/constants.js'
 import { isSettingSourceEnabled } from '../utils/settings/constants.js'
@@ -85,7 +90,7 @@ export function getSkillsPath(
     case 'userSettings':
       return join(getClaudeConfigHomeDir(), dir)
     case 'projectSettings':
-      return `.claude/${dir}`
+      return projectConfigRelativePath(dir)
     case 'plugin':
       return 'plugin'
     default:
@@ -663,12 +668,16 @@ export const getSkillDirCommands = memoize(
         return []
       }
       const additionalSkillsNested = await Promise.all(
-        additionalDirs.map(dir =>
+        additionalDirs.flatMap(dir => [
           loadSkillsFromSkillsDir(
-            join(dir, '.claude', 'skills'),
+            projectConfigPath(dir, 'skills'),
             'projectSettings',
           ),
-        ),
+          loadSkillsFromSkillsDir(
+            legacyProjectConfigPath(dir, 'skills'),
+            'projectSettings',
+          ),
+        ]),
       )
       // No dedup needed — explicit dirs, user controls uniqueness.
       return additionalSkillsNested.flat().map(s => s.skill)
@@ -698,12 +707,16 @@ export const getSkillDirCommands = memoize(
         : Promise.resolve([]),
       projectSettingsEnabled
         ? Promise.all(
-            additionalDirs.map(dir =>
+            additionalDirs.flatMap(dir => [
               loadSkillsFromSkillsDir(
-                join(dir, '.claude', 'skills'),
+                projectConfigPath(dir, 'skills'),
                 'projectSettings',
               ),
-            ),
+              loadSkillsFromSkillsDir(
+                legacyProjectConfigPath(dir, 'skills'),
+                'projectSettings',
+              ),
+            ]),
           )
         : Promise.resolve([]),
       // Legacy commands-as-skills goes through markdownConfigLoader with
@@ -874,12 +887,16 @@ export async function discoverSkillDirsForPaths(
     // CWD-level skills are already loaded at startup, so we only discover nested ones
     // Use prefix+separator check to avoid matching /project-backup when cwd is /project
     while (currentDir.startsWith(resolvedCwd + pathSep)) {
-      const skillDir = join(currentDir, '.claude', 'skills')
+      const skillDirs = [
+        projectConfigPath(currentDir, 'skills'),
+        legacyProjectConfigPath(currentDir, 'skills'),
+      ]
 
       // Skip if we've already checked this path (hit or miss) — avoids
       // repeating the same failed stat on every Read/Write/Edit call when
       // the directory doesn't exist (the common case).
-      if (!dynamicSkillDirs.has(skillDir)) {
+      for (const skillDir of skillDirs) {
+        if (dynamicSkillDirs.has(skillDir)) continue
         dynamicSkillDirs.add(skillDir)
         try {
           await fs.stat(skillDir)

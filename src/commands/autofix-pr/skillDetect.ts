@@ -4,6 +4,8 @@ import { join } from 'node:path'
 export function detectAutofixSkills(cwd: string): string[] {
   const candidates = [
     'AUTOFIX.md',
+    '.deep/skills/autofix.md',
+    '.deep/skills/autofix-pr/SKILL.md',
     '.claude/skills/autofix.md',
     '.claude/skills/autofix-pr/SKILL.md',
   ]

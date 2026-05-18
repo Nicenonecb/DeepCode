@@ -6,9 +6,12 @@
  * on top so that user/project/local/flag/policy sources all override.
  */
 
-import { join } from 'path'
 import type { z } from 'zod/v4'
 import { getAdditionalDirectoriesForClaudeMd } from '../../bootstrap/state.js'
+import {
+  legacyProjectConfigPath,
+  projectConfigPath,
+} from '../projectConfigDir.js'
 import { parseSettingsFile } from '../settings/settings.js'
 import type {
   ExtraKnownMarketplaceSchema,
@@ -37,11 +40,16 @@ export function getAddDirEnabledPlugins(): NonNullable<
   const result: NonNullable<SettingsJson['enabledPlugins']> = {}
   for (const dir of getAdditionalDirectoriesForClaudeMd()) {
     for (const file of SETTINGS_FILES) {
-      const { settings } = parseSettingsFile(join(dir, '.claude', file))
-      if (!settings?.enabledPlugins) {
-        continue
+      for (const settingsPath of [
+        legacyProjectConfigPath(dir, file),
+        projectConfigPath(dir, file),
+      ]) {
+        const { settings } = parseSettingsFile(settingsPath)
+        if (!settings?.enabledPlugins) {
+          continue
+        }
+        Object.assign(result, settings.enabledPlugins)
       }
-      Object.assign(result, settings.enabledPlugins)
     }
   }
   return result
@@ -60,11 +68,16 @@ export function getAddDirExtraMarketplaces(): Record<
   const result: Record<string, ExtraKnownMarketplace> = {}
   for (const dir of getAdditionalDirectoriesForClaudeMd()) {
     for (const file of SETTINGS_FILES) {
-      const { settings } = parseSettingsFile(join(dir, '.claude', file))
-      if (!settings?.extraKnownMarketplaces) {
-        continue
+      for (const settingsPath of [
+        legacyProjectConfigPath(dir, file),
+        projectConfigPath(dir, file),
+      ]) {
+        const { settings } = parseSettingsFile(settingsPath)
+        if (!settings?.extraKnownMarketplaces) {
+          continue
+        }
+        Object.assign(result, settings.extraKnownMarketplaces)
       }
-      Object.assign(result, settings.extraKnownMarketplaces)
     }
   }
   return result

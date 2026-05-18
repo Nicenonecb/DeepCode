@@ -2,6 +2,7 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
+import { projectConfigPath } from '../../utils/projectConfigDir.js'
 import { clearCommandsCache } from '../../commands.js'
 import type { Instinct } from './instinctParser.js'
 import { normalizeSkillName } from './learningPolicy.js'
@@ -76,7 +77,7 @@ export function getLearnedAgentPath(
 ): string {
   if (options?.outputRoot) return options.outputRoot
   if (scope === 'project') {
-    return join(options?.cwd ?? process.cwd(), '.claude', 'agents')
+    return projectConfigPath(options?.cwd ?? process.cwd(), 'agents')
   }
   return options?.globalAgentsDir ?? join(getClaudeConfigHomeDir(), 'agents')
 }

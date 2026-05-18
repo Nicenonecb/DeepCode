@@ -1,5 +1,6 @@
 import { mkdir, writeFile } from 'fs/promises'
 import { join, resolve } from 'path'
+import { AUTONOMY_DIR } from './autonomyAuthority.js'
 import { lock } from './lockfile.js'
 
 const persistenceLocks = new Map<string, Promise<void>>()
@@ -45,7 +46,7 @@ export async function withAutonomyPersistenceLock<T>(
   fn: () => Promise<T>,
 ): Promise<T> {
   const key = resolve(rootDir)
-  const lockPath = join(key, '.claude', 'autonomy', '.lock')
+  const lockPath = join(key, AUTONOMY_DIR, '.lock')
   const previous = persistenceLocks.get(key) ?? Promise.resolve()
 
   let release!: () => void
@@ -57,7 +58,7 @@ export async function withAutonomyPersistenceLock<T>(
 
   await previous
   try {
-    await mkdir(join(key, '.claude', 'autonomy'), { recursive: true })
+    await mkdir(join(key, AUTONOMY_DIR), { recursive: true })
     await writeFile(lockPath, '', { flag: 'a' })
     const unlock = await lock(lockPath, {
       lockfilePath: `${lockPath}.lock`,

@@ -27,6 +27,10 @@ import {
   extractTextContent,
 } from '../messages.js'
 import { getSmallFastModel } from '../model/model.js'
+import {
+  legacyProjectConfigPath,
+  projectConfigPath,
+} from '../projectConfigDir.js'
 import { jsonParse } from '../slowOperations.js'
 import { asSystemPrompt } from '../systemPromptType.js'
 import {
@@ -208,18 +212,28 @@ export async function applySkillImprovement(
 ): Promise<void> {
   if (!skillName) return
 
-  const { join } = await import('path')
   const fs = await import('fs/promises')
 
-  // Skills live at .claude/skills/<name>/SKILL.md relative to CWD
-  const filePath = join(getCwd(), '.claude', 'skills', skillName, 'SKILL.md')
-
-  let currentContent: string
-  try {
-    currentContent = await fs.readFile(filePath, 'utf-8')
-  } catch {
+  let currentContent = ''
+  let filePath = ''
+  const candidates = [
+    projectConfigPath(getCwd(), 'skills', skillName, 'SKILL.md'),
+    legacyProjectConfigPath(getCwd(), 'skills', skillName, 'SKILL.md'),
+  ]
+  for (const candidate of candidates) {
+    try {
+      currentContent = await fs.readFile(candidate, 'utf-8')
+      filePath = candidate
+      break
+    } catch {
+      // Try the next project config location.
+    }
+  }
+  if (!filePath) {
     logError(
-      new Error(`Failed to read skill file for improvement: ${filePath}`),
+      new Error(
+        `Failed to read skill file for improvement: ${candidates.join(', ')}`,
+      ),
     )
     return
   }

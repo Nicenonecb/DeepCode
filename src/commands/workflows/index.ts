@@ -8,7 +8,7 @@ const call: LocalCommandCall = async (_args, _context) => {
     return {
       type: 'text',
       value:
-        'No workflows found. Add workflow files to .claude/workflows/ (YAML or Markdown).',
+        'No workflows found. Add workflow files to .deep/workflows/ (YAML or Markdown).',
     }
   }
   const list = commands

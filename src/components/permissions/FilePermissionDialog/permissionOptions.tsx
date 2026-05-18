@@ -6,21 +6,22 @@ import { Text } from '@anthropic/ink';
 import { getShortcutDisplay } from '../../../keybindings/shortcutFormat.js';
 import type { ToolPermissionContext } from '../../../Tool.js';
 import { expandPath, getDirectoryForPath } from '../../../utils/path.js';
+import { PROJECT_CONFIG_DIR_NAME } from '../../../utils/projectConfigDir.js';
 import { normalizeCaseForComparison, pathInAllowedWorkingPath } from '../../../utils/permissions/filesystem.js';
 import type { OptionWithDescription } from '../../CustomSelect/select.js';
 /**
- * Check if a path is within the project's .claude/ folder.
- * This is used to determine whether to show the special ".claude folder" permission option.
+ * Check if a path is within the project's .deep/ folder.
+ * This is used to determine whether to show the special ".deep folder" permission option.
  */
 export function isInClaudeFolder(filePath: string): boolean {
   const absolutePath = expandPath(filePath);
-  const claudeFolderPath = expandPath(`${getOriginalCwd()}/.claude`);
+  const claudeFolderPath = expandPath(`${getOriginalCwd()}/${PROJECT_CONFIG_DIR_NAME}`);
 
-  // Check if the path is within the project's .claude folder
+  // Check if the path is within the project's .deep folder
   const normalizedAbsolutePath = normalizeCaseForComparison(absolutePath);
   const normalizedClaudeFolderPath = normalizeCaseForComparison(claudeFolderPath);
 
-  // Path must start with the .claude folder path (and be inside it, not just the folder itself)
+  // Path must start with the .deep folder path (and be inside it, not just the folder itself)
   return (
     normalizedAbsolutePath.startsWith(normalizedClaudeFolderPath + sep.toLowerCase()) ||
     // Also match case where sep is / on posix systems
@@ -98,17 +99,17 @@ export function getFilePermissionOptions({
 
   const inAllowedPath = pathInAllowedWorkingPath(filePath, toolPermissionContext);
 
-  // Check if this is a .claude/ folder path (project or global)
+  // Check if this is a .deep/ project folder or global ~/.claude/ folder path
   const inClaudeFolder = isInClaudeFolder(filePath);
   const inGlobalClaudeFolder = isInGlobalClaudeFolder(filePath);
 
-  // Option 2: For .claude/ folder, show special option instead of generic session option
+  // Option 2: For config folders, show special option instead of generic session option
   // Note: Session-level options are always shown since they only affect in-memory state,
   // not persisted settings. The allowManagedPermissionRulesOnly setting only restricts
   // persisted permission rules.
   if ((inClaudeFolder || inGlobalClaudeFolder) && operationType !== 'read') {
     options.push({
-      label: 'Yes, allow edits to .claude/ config for this session',
+      label: `Yes, allow edits to ${inGlobalClaudeFolder ? '~/.claude' : '.deep'}/ config for this session`,
       value: 'yes-claude-folder',
       option: {
         type: 'accept-session',

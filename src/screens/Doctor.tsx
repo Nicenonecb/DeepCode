@@ -7,6 +7,7 @@ import { getModelMaxOutputTokens } from 'src/utils/context.js';
 import { getClaudeConfigHomeDir } from 'src/utils/envUtils.js';
 import type { SettingSource } from 'src/utils/settings/constants.js';
 import { getOriginalCwd } from '../bootstrap/state.js';
+import { projectConfigPath } from '../utils/projectConfigDir.js';
 import type { CommandResultDisplay } from '../commands.js';
 import { Pane } from '@anthropic/ink';
 import { PressEnterToContinue } from '../components/PressEnterToContinue.js';
@@ -132,7 +133,7 @@ export function Doctor({ onDone }: Props): React.ReactNode {
 
     void (async () => {
       const userAgentsDir = join(getClaudeConfigHomeDir(), 'agents');
-      const projectAgentsDir = join(getOriginalCwd(), '.claude', 'agents');
+      const projectAgentsDir = projectConfigPath(getOriginalCwd(), 'agents');
 
       const { activeAgents, allAgents, failedFiles } = agentDefinitions;
 

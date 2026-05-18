@@ -1974,7 +1974,7 @@ export function REPL({
     setMessages(prev => [
       ...prev,
       createSystemMessage(
-        `Worktree creation took ${secs}s. For large repos, set \`worktree.sparsePaths\` in .claude/settings.json to check out only the directories you need — e.g. \`{"worktree": {"sparsePaths": ["src", "packages/foo"]}}\`.`,
+        `Worktree creation took ${secs}s. For large repos, set \`worktree.sparsePaths\` in .deep/settings.json to check out only the directories you need — e.g. \`{"worktree": {"sparsePaths": ["src", "packages/foo"]}}\`.`,
         'info',
       ),
     ]);
@@ -4981,7 +4981,7 @@ export function REPL({
   usePipeIpc({ store, handleIncomingPrompt });
   const { routeToSelectedPipes } = usePipeRouter({ store, setAppState, addNotification });
 
-  // Scheduled tasks from .claude/scheduled_tasks.json (CronCreate/Delete/List)
+  // Scheduled tasks from .deep/scheduled_tasks.json (CronCreate/Delete/List)
   if (feature('AGENT_TRIGGERS')) {
     // Assistant mode bypasses the isLoading gate (the proactive tick →
     // Sleep → tick loop would otherwise starve the scheduler).

@@ -30,6 +30,7 @@ import {
 } from '../path.js'
 import { getPlanSlug, getPlansDirectory } from '../plans.js'
 import { getPlatform } from '../platform.js'
+import { PROJECT_CONFIG_DIR_NAME } from '../projectConfigDir.js'
 import { getProjectDir } from '../sessionStorage.js'
 import { SETTING_SOURCES } from '../settings/constants.js'
 import {
@@ -106,8 +107,10 @@ export function getClaudeSkillScope(
 
   const bases = [
     {
-      dir: expandPath(join(getOriginalCwd(), '.claude', 'skills')),
-      prefix: '/.claude/skills/',
+      dir: expandPath(
+        join(getOriginalCwd(), PROJECT_CONFIG_DIR_NAME, 'skills'),
+      ),
+      prefix: `/${PROJECT_CONFIG_DIR_NAME}/skills/`,
     },
     {
       dir: expandPath(join(homedir(), '.claude', 'skills')),
@@ -209,7 +212,13 @@ export function isClaudeSettingsPath(filePath: string): boolean {
   // Use platform separator so endsWith checks work on both Unix (/) and Windows (\)
   if (
     normalizedPath.endsWith(`${sep}.claude${sep}settings.json`) ||
-    normalizedPath.endsWith(`${sep}.claude${sep}settings.local.json`)
+    normalizedPath.endsWith(`${sep}.claude${sep}settings.local.json`) ||
+    normalizedPath.endsWith(
+      `${sep}${PROJECT_CONFIG_DIR_NAME}${sep}settings.json`,
+    ) ||
+    normalizedPath.endsWith(
+      `${sep}${PROJECT_CONFIG_DIR_NAME}${sep}settings.local.json`,
+    )
   ) {
     // Include .claude/settings.json even for other projects
     return true
@@ -227,12 +236,16 @@ function isClaudeConfigFilePath(filePath: string): boolean {
     return true
   }
 
-  // Check if file is within .claude/commands or .claude/agents directories
+  // Check if file is within .deep/commands or .deep/agents directories
   // using proper path segment validation (not string matching with includes())
   // pathInWorkingPath now handles case-insensitive comparison to prevent bypasses
-  const commandsDir = join(getOriginalCwd(), '.claude', 'commands')
-  const agentsDir = join(getOriginalCwd(), '.claude', 'agents')
-  const skillsDir = join(getOriginalCwd(), '.claude', 'skills')
+  const commandsDir = join(
+    getOriginalCwd(),
+    PROJECT_CONFIG_DIR_NAME,
+    'commands',
+  )
+  const agentsDir = join(getOriginalCwd(), PROJECT_CONFIG_DIR_NAME, 'agents')
+  const skillsDir = join(getOriginalCwd(), PROJECT_CONFIG_DIR_NAME, 'skills')
 
   return (
     pathInWorkingPath(filePath, commandsDir) ||
@@ -1585,16 +1598,18 @@ export function checkEditableInternalPath(
     }
   }
 
-  // .claude/launch.json — desktop preview config (dev server command + port).
+  // .deep/launch.json — desktop preview config (dev server command + port).
   // The desktop's preview_start MCP tool instructs Claude to create/update
   // this file as part of the preview workflow. Without this carve-out the
-  // .claude/ DANGEROUS_DIRECTORIES check prompts for it, which in SDK mode
+  // .deep/ DANGEROUS_DIRECTORIES check prompts for it, which in SDK mode
   // cascades: user clicks "Always allow" → setMode:acceptEdits suggestion
   // applied → silent downgrade from auto mode. Matches the project-level
-  // .claude/ only (not ~/.claude/) since launch.json is per-project.
+  // .deep/ only (not ~/.claude/) since launch.json is per-project.
   if (
     normalizeCaseForComparison(normalizedPath) ===
-    normalizeCaseForComparison(join(getOriginalCwd(), '.claude', 'launch.json'))
+    normalizeCaseForComparison(
+      join(getOriginalCwd(), PROJECT_CONFIG_DIR_NAME, 'launch.json'),
+    )
   ) {
     return {
       behavior: 'allow',

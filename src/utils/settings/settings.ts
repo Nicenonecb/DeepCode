@@ -21,6 +21,10 @@ import { addFileGlobRuleToGitignore } from '../git/gitignore.js'
 import { safeParseJSON } from '../json.js'
 import { logError } from '../log.js'
 import { getPlatform } from '../platform.js'
+import {
+  legacyProjectConfigRelativePath,
+  projectConfigRelativePath,
+} from '../projectConfigDir.js'
 import { clone, jsonStringify } from '../slowOperations.js'
 import { profileCheckpoint } from '../startupProfiler.js'
 import {
@@ -300,9 +304,20 @@ export function getRelativeSettingsFilePathForSource(
 ): string {
   switch (source) {
     case 'projectSettings':
-      return join('.claude', 'settings.json')
+      return projectConfigRelativePath('settings.json')
     case 'localSettings':
-      return join('.claude', 'settings.local.json')
+      return projectConfigRelativePath('settings.local.json')
+  }
+}
+
+function getLegacyRelativeSettingsFilePathForSource(
+  source: 'projectSettings' | 'localSettings',
+): string {
+  switch (source) {
+    case 'projectSettings':
+      return legacyProjectConfigRelativePath('settings.json')
+    case 'localSettings':
+      return legacyProjectConfigRelativePath('settings.local.json')
   }
 }
 
@@ -344,7 +359,19 @@ function getSettingsForSourceUncached(
     return null
   }
 
-  const settingsFilePath = getSettingsFilePathForSource(source)
+  let settingsFilePath = getSettingsFilePathForSource(source)
+  if (source === 'projectSettings' || source === 'localSettings') {
+    const fs = getFsImplementation()
+    if (settingsFilePath && !fs.existsSync(settingsFilePath)) {
+      const legacyPath = join(
+        getSettingsRootPathForSource(source),
+        getLegacyRelativeSettingsFilePathForSource(source),
+      )
+      if (fs.existsSync(legacyPath)) {
+        settingsFilePath = legacyPath
+      }
+    }
+  }
   const { settings: fileSettings } = settingsFilePath
     ? parseSettingsFile(settingsFilePath)
     : { settings: null }

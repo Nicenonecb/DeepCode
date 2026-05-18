@@ -4,50 +4,46 @@ import { env } from '../../utils/env.js';
 
 export type ClawdPose =
   | 'default'
-  | 'arms-up' // both arms raised (used during jump)
-  | 'look-left' // both pupils shifted left
-  | 'look-right'; // both pupils shifted right
+  | 'arms-up' // tail lifted (used during jump)
+  | 'look-left' // blowhole shifted left
+  | 'look-right'; // blowhole shifted right
 
 type Props = {
   pose?: ClawdPose;
 };
 
 // Standard-terminal pose fragments. Each row is split into segments so we can
-// vary only the parts that change (eyes, arms) while keeping the body/bg spans
-// stable. All poses end up 9 cols wide.
-//
-// arms-up: the row-2 arm shapes (▝▜ / ▛▘) move to row 1 as their
-// bottom-heavy mirrors (▗▟ / ▙▖) — same silhouette, one row higher.
-//
-// look-* use top-quadrant eye chars (▙/▟) so both eyes change from the
-// default (▛/▜, bottom pupils) — otherwise only one eye would appear to move.
+// vary only the parts that change while keeping the body/bg spans stable. All
+// poses end up 11 cols wide.
 type Segments = {
-  /** row 1 left (no bg): optional raised arm + side */
+  /** row 1 left (no bg): tail + body side */
   r1L: string;
-  /** row 1 eyes (with bg): left-eye, forehead, right-eye */
-  r1E: string;
-  /** row 1 right (no bg): side + optional raised arm */
+  /** row 1 body (with bg): whale back */
+  r1B: string;
+  /** row 1 right (no bg): tail/body side */
   r1R: string;
-  /** row 2 left (no bg): arm + body curve */
+  /** row 2 left (no bg): lower body curve */
   r2L: string;
-  /** row 2 right (no bg): body curve + arm */
+  /** row 2 right (no bg): lower body curve */
   r2R: string;
+  /** row 3 center: fin/feet */
+  r3: string;
 };
 
 const POSES: Record<ClawdPose, Segments> = {
-  default: { r1L: ' ▐', r1E: '▛███▜', r1R: '▌', r2L: '▝▜', r2R: '▛▘' },
-  'look-left': { r1L: ' ▐', r1E: '▟███▟', r1R: '▌', r2L: '▝▜', r2R: '▛▘' },
-  'look-right': { r1L: ' ▐', r1E: '▙███▙', r1R: '▌', r2L: '▝▜', r2R: '▛▘' },
-  'arms-up': { r1L: '▗▟', r1E: '▛███▜', r1R: '▙▖', r2L: ' ▜', r2R: '▛ ' },
+  default: { r1L: '▗▖  ▗', r1B: '████', r1R: '▄▖', r2L: '▝▜', r2R: '██▛▘', r3: '  ▝▀▘ ▝▀▘  ' },
+  'look-left': { r1L: '▗▖▝ ▗', r1B: '████', r1R: '▄▖', r2L: '▝▜', r2R: '██▛▘', r3: '  ▝▀▘ ▝▀▘  ' },
+  'look-right': { r1L: '▗▖  ▗', r1B: '████', r1R: '▄▘', r2L: '▝▜', r2R: '██▛▘', r3: '  ▝▀▘ ▝▀▘  ' },
+  'arms-up': { r1L: '▗▟  ▗', r1B: '████', r1R: '▄▖', r2L: ' ▜', r2R: '██▛ ', r3: '  ▝▀▘ ▝▀▘  ' },
 };
 
-// Apple Terminal uses a bg-fill trick (see below), so only eye poses make
-// sense. Arm poses fall back to default.
+// Apple Terminal uses a bg-fill trick (see below), so only blowhole poses make
+// sense. Tail poses fall back to default.
 const APPLE_EYES: Record<ClawdPose, string> = {
-  default: ' ▗   ▖ ',
-  'look-left': ' ▘   ▘ ',
-  'look-right': ' ▝   ▝ ',
-  'arms-up': ' ▗   ▖ ',
+  default: '  ▗    ',
+  'look-left': ' ▝     ',
+  'look-right': '   ▘   ',
+  'arms-up': '  ▗    ',
 };
 
 export function Clawd({ pose = 'default' }: Props = {}): React.ReactNode {
@@ -60,7 +56,7 @@ export function Clawd({ pose = 'default' }: Props = {}): React.ReactNode {
       <Text>
         <Text color="clawd_body">{p.r1L}</Text>
         <Text color="clawd_body" backgroundColor="clawd_background">
-          {p.r1E}
+          {p.r1B}
         </Text>
         <Text color="clawd_body">{p.r1R}</Text>
       </Text>
@@ -71,9 +67,7 @@ export function Clawd({ pose = 'default' }: Props = {}): React.ReactNode {
         </Text>
         <Text color="clawd_body">{p.r2R}</Text>
       </Text>
-      <Text color="clawd_body">
-        {'  '}▘▘ ▝▝{'  '}
-      </Text>
+      <Text color="clawd_body">{p.r3}</Text>
     </Box>
   );
 }
@@ -85,14 +79,18 @@ function AppleTerminalClawd({ pose }: { pose: ClawdPose }): React.ReactNode {
   return (
     <Box flexDirection="column" alignItems="center">
       <Text>
-        <Text color="clawd_body">▗</Text>
+        <Text color="clawd_body">▗▖▗</Text>
         <Text color="clawd_background" backgroundColor="clawd_body">
           {APPLE_EYES[pose]}
         </Text>
         <Text color="clawd_body">▖</Text>
       </Text>
-      <Text backgroundColor="clawd_body">{' '.repeat(7)}</Text>
-      <Text color="clawd_body">▘▘ ▝▝</Text>
+      <Text>
+        <Text color="clawd_body">▝▜</Text>
+        <Text backgroundColor="clawd_body">{' '.repeat(5)}</Text>
+        <Text color="clawd_body">██▛▘</Text>
+      </Text>
+      <Text color="clawd_body"> ▝▀▘ ▝▀▘ </Text>
     </Box>
   );
 }

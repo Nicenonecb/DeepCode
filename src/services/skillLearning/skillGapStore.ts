@@ -8,6 +8,7 @@ import {
   getProjectStorageDir,
   resolveProjectContext,
 } from './projectContext.js'
+import { projectConfigPath } from '../../utils/projectConfigDir.js'
 import { generateSkillDraft, writeLearnedSkill } from './skillGenerator.js'
 import type {
   InstinctDomain,
@@ -248,8 +249,7 @@ async function writeSkillGapDraft(
 ): Promise<SkillGapMaterialization> {
   const instinct = createGapInstinct(gap, 'pending')
   const draftsRoot = join(
-    project.projectRoot ?? project.cwd,
-    '.claude',
+    projectConfigPath(project.projectRoot ?? project.cwd),
     'skills',
     '.drafts',
   )

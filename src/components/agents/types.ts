@@ -1,8 +1,9 @@
 import type { SettingSource } from 'src/utils/settings/constants.js'
 import type { AgentDefinition } from '@deepcode/builtin-tools/tools/AgentTool/loadAgentsDir.js'
+import { PROJECT_CONFIG_DIR_NAME } from 'src/utils/projectConfigDir.js'
 
 export const AGENT_PATHS = {
-  FOLDER_NAME: '.claude',
+  FOLDER_NAME: PROJECT_CONFIG_DIR_NAME,
   AGENTS_DIR: 'agents',
 } as const
 

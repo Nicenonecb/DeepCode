@@ -19,6 +19,10 @@ import { registerCleanup } from '../cleanupRegistry.js'
 import { logForDebugging } from '../debug.js'
 import { getFsImplementation } from '../fsOperations.js'
 import { executeConfigChangeHooks, hasBlockingResult } from '../hooks.js'
+import {
+  legacyProjectConfigPath,
+  projectConfigPath,
+} from '../projectConfigDir.js'
 import { createSignal } from '../signal.js'
 
 /**
@@ -194,7 +198,7 @@ async function getWatchablePaths(): Promise<string[]> {
     }
   }
 
-  // Project skills directory (.claude/skills)
+  // Project skills directory (.deep/skills)
   const projectSkillsPath = getSkillsPath('projectSettings', 'skills')
   if (projectSkillsPath) {
     try {
@@ -207,7 +211,7 @@ async function getWatchablePaths(): Promise<string[]> {
     }
   }
 
-  // Project commands directory (.claude/commands)
+  // Project commands directory (.deep/commands)
   const projectCommandsPath = getSkillsPath('projectSettings', 'commands')
   if (projectCommandsPath) {
     try {
@@ -222,12 +226,17 @@ async function getWatchablePaths(): Promise<string[]> {
 
   // Additional directories (--add-dir) skills
   for (const dir of getAdditionalDirectoriesForClaudeMd()) {
-    const additionalSkillsPath = platformPath.join(dir, '.claude', 'skills')
-    try {
-      await fs.stat(additionalSkillsPath)
-      paths.push(additionalSkillsPath)
-    } catch {
-      // Path doesn't exist, skip it
+    const additionalSkillPaths = [
+      projectConfigPath(dir, 'skills'),
+      legacyProjectConfigPath(dir, 'skills'),
+    ]
+    for (const additionalSkillsPath of additionalSkillPaths) {
+      try {
+        await fs.stat(additionalSkillsPath)
+        paths.push(additionalSkillsPath)
+      } catch {
+        // Path doesn't exist, skip it
+      }
     }
   }
 

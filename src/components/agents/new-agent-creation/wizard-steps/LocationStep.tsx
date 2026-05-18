@@ -12,11 +12,11 @@ export function LocationStep(): ReactNode {
 
   const locationOptions = [
     {
-      label: 'Project (.claude/agents/)',
+      label: 'Project (.deep/agents/)',
       value: 'projectSettings' as SettingSource,
     },
     {
-      label: 'Personal (~/.claude/agents/)',
+      label: 'Personal (~/.deep/agents/)',
       value: 'userSettings' as SettingSource,
     },
   ];
